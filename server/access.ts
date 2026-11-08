@@ -25,6 +25,7 @@ export function childData(data: LearningData): LearningData {
 export function mergeChildData(
   current: LearningData,
   incoming: LearningData,
+  profileId?: string,
 ): LearningData {
   const view = childData(current);
   for (const key of ["courses", "series", "english"] as const)
@@ -47,6 +48,10 @@ export function mergeChildData(
   const attempts: Attempt[] = [...current.attempts];
   for (const supplied of incoming.attempts) {
     const existing = current.attempts.find((a) => a.id === supplied.id);
+    const context = supplied as Attempt & { planId?: string; stepId?: string };
+    const oldContext = existing as (Attempt & { planId?: string; stepId?: string }) | undefined;
+    if (profileId && supplied.profileId && supplied.profileId !== profileId)
+      throw new HttpError(403, "Cette tentative n’appartient pas à ce profil.");
     const series = current.series.find(
       (s) => s.id === supplied.seriesId && s.status === "published",
     );
@@ -57,12 +62,18 @@ export function mergeChildData(
       !same(supplied.questions, questions) ||
       supplied.subjectId !== (existing?.subjectId ?? series!.subjectId) ||
       supplied.seriesTitle !== (existing?.seriesTitle ?? series!.title) ||
-      (existing && supplied.startedAt !== existing.startedAt)
+      (existing && (supplied.startedAt !== existing.startedAt || supplied.seriesId !== existing.seriesId || supplied.mode !== existing.mode || supplied.deadlineAt !== existing.deadlineAt || supplied.profileId !== existing.profileId || context.planId !== oldContext?.planId || context.stepId !== oldContext?.stepId))
     )
       throw new HttpError(
         403,
         "Une tentative conserve les questions réellement présentées.",
       );
+    if (!existing && (context.planId || context.stepId)) {
+      const plan = view.plans?.find((plan) => plan.id === context.planId);
+      const step = plan?.steps.find((step) => step.id === context.stepId);
+      if (!plan || !step || !["practice", "mistakes", "mock"].includes(step.kind) || (step.seriesId && step.seriesId !== supplied.seriesId) || !series!.courseIds.every((id) => step.courseIds.includes(id)) || (step.kind === "mock" && supplied.mode !== "exam"))
+        throw new HttpError(403, "Cette tentative ne correspond pas à une étape publiée du plan.");
+    }
     if (existing?.completedAt) {
       if (!same(supplied, existing))
         throw new HttpError(

@@ -5,7 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import staticPlugin from "@fastify/static";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import type {
   ChildProfile,
@@ -297,13 +297,11 @@ export async function createApp(options: ServerOptions = {}) {
     },
   );
   app.get("/api/profiles", async () => ({
-    profiles: database
-      .profiles()
-      .map((profile) => ({
-        id: profile.id,
-        name: profile.name,
-        grade: profile.grade,
-      })),
+    profiles: database.profiles().map((profile) => ({
+      id: profile.id,
+      name: profile.name,
+      grade: profile.grade,
+    })),
   }));
   app.post(
     "/api/child-login",
@@ -432,7 +430,7 @@ export async function createApp(options: ServerOptions = {}) {
           data: user.role === "child" ? childData(current.data) : current.data,
         },
       );
-    if (user.role === "child") data = mergeChildData(current.data, data);
+    if (user.role === "child") data = mergeChildData(current.data, data, profile.id);
     else
       for (const course of data.courses)
         for (const source of course.sources) {
@@ -634,6 +632,23 @@ export async function createApp(options: ServerOptions = {}) {
       }
       if (kind === "exercises") {
         if (
+          Array.isArray(body.courseIds) &&
+          (new Set(body.courseIds).size !== body.courseIds.length ||
+            body.courseIds.length > Number(body.count))
+        )
+          throw new HttpError(
+            400,
+            "Prévoyez au moins une question par cours sélectionné, sans doublon.",
+          );
+        if (
+          body.level !== undefined &&
+          !["discovery", "practice", "challenge"].includes(String(body.level))
+        )
+          throw new HttpError(
+            400,
+            "Choisissez un niveau de difficulté valide.",
+          );
+        if (
           !Array.isArray(body.courseIds) ||
           !body.courseIds.length ||
           body.courseIds.length > 12 ||
@@ -778,6 +793,7 @@ export async function createApp(options: ServerOptions = {}) {
     const uploads = database.uploads(user.familyId);
     database.deleteFamily(user.familyId);
     for (const upload of uploads) await removeUploadFiles(upload);
+    await rm(join(database.dataDir, "backups"), { recursive: true, force: true });
     return { ok: true };
   });
   const staticDir = resolve(options.staticDir ?? "dist");

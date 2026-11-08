@@ -147,7 +147,7 @@ export class JobQueue {
         throw new Error("Un document source est introuvable pour ce profil.");
       this.database.updateJob(job.id, {
         stage: "lecture",
-        message: `Lecture de ${upload.name} (${sources.length + 1}/${ids.length}).`,
+        message: `Lecture de ${upload.name} (${ids.indexOf(id) + 1}/${ids.length}).`,
       });
       const extracted = await extractUpload(
         upload,
@@ -157,18 +157,17 @@ export class JobQueue {
         signal,
       );
       pages.push(...extracted);
-      sources.push({
-        id: upload.id,
+      sources.push(...extracted.map((page) => ({
+        id: page.page === 1 ? upload.id : `${upload.id}-page-${page.page}`,
         storageId: upload.id,
         name: upload.name,
         uri: `/api/uploads/${upload.id}`,
         mimeType: upload.mimeType,
         rotation: upload.rotation,
-        extractedText: extracted
-          .map((p) => `Page ${p.page}\n${p.text}`)
-          .join("\n\n"),
-        uncertain: extracted.some((p) => p.uncertain),
-      });
+        page: page.page,
+        extractedText: page.text,
+        uncertain: page.uncertain,
+      })));
     }
     const data = this.database.data(job.profileId).data;
     let result: AiJob["result"];
@@ -253,20 +252,47 @@ export class JobQueue {
       const english = payload.english
         ? (payload.english as unknown as EnglishSettings)
         : undefined;
-      result = {
-        questions: await generateExercises(
-          this.client,
-          settings,
-          {
-            courses,
-            types: payload.types as QuestionType[],
-            level: String(payload.level ?? "practice"),
-            count: Number(payload.count ?? 5),
-            english,
-          },
-          signal,
-        ),
-      };
+      const count = Number(payload.count ?? 5);
+      if (courses.length > count)
+        throw new Error(
+          "Augmentez le nombre de questions pour couvrir chaque cours sélectionné.",
+        );
+      const requested = payload.types as QuestionType[];
+      const questions = [];
+      let cursor = 0;
+      for (let index = 0; index < courses.length; index++) {
+        const size =
+          Math.floor(count / courses.length) +
+          (index < count % courses.length ? 1 : 0);
+        const types = [
+          ...new Set(
+            Array.from(
+              { length: size },
+              (_, offset) => requested[(cursor + offset) % requested.length],
+            ),
+          ),
+        ];
+        this.database.updateJob(job.id, {
+          stage: "exercices",
+          message: `Questions sur « ${courses[index].title} » (${index + 1}/${courses.length}).`,
+        });
+        questions.push(
+          ...(await generateExercises(
+            this.client,
+            settings,
+            {
+              courses: [courses[index]],
+              types,
+              level: String(payload.level ?? "practice"),
+              count: size,
+              english,
+            },
+            signal,
+          )),
+        );
+        cursor += size;
+      }
+      result = { questions };
     } else {
       this.database.updateJob(job.id, {
         stage: "anglais",
@@ -288,8 +314,19 @@ export class JobQueue {
   }
 }
 export function publicJob(job: StoredJob): AiJob {
+  const input: Record<string, unknown> = {};
+  for (const key of ["title", "subjectId", "existingCourseId", "level"])
+    if (typeof job.payload[key] === "string") input[key] = job.payload[key];
+  for (const key of ["courseIds", "types"])
+    if (Array.isArray(job.payload[key]))
+      input[key] = (job.payload[key] as unknown[]).filter(
+        (value) => typeof value === "string",
+      );
+  if (typeof job.payload.count === "number") input.count = job.payload.count;
   return {
     id: job.id,
+    profileId: job.profileId,
+    input,
     kind: job.kind,
     status: job.status,
     stage: job.stage,
@@ -297,5 +334,5 @@ export function publicJob(job: StoredJob): AiJob {
     createdAt: job.createdAt,
     result: job.result,
     error: job.error,
-  };
+  } as AiJob;
 }
