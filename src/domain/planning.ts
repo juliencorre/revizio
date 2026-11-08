@@ -255,14 +255,51 @@ export function reschedulePlan(
     throw new Error(
       "La nouvelle date doit être dans les douze prochains mois.",
     );
+  const completedMinutes = new Map<string, number>();
+  for (const step of plan.steps.filter((candidate) => candidate.completedAt)) {
+    if (step.date > newExamDate)
+      throw new Error(
+        "Choisissez une date au moins aussi tardive que les séances déjà effectuées.",
+      );
+    completedMinutes.set(
+      step.date,
+      (completedMinutes.get(step.date) ?? 0) + step.minutes,
+    );
+  }
+  if (
+    [...completedMinutes.values()].some(
+      (minutes) => minutes > plan.dailyMinutes,
+    )
+  )
+    throw new Error(
+      "Le temps déjà effectué dépasse le budget d’une journée. Augmentez le temps quotidien avant de reporter.",
+    );
   const pending = plan.steps.filter((step) => !step.completedAt);
-  const dates = pending.map((_, index) =>
-    dayString(
-      dayNumber(today) +
-        (pending.length <= 1
-          ? span
-          : Math.round((index * span) / (pending.length - 1))),
+  // Minute slots distribute pending sessions while reserving every completed minute.
+  const slots = Array.from({ length: span + 1 }, (_, index) =>
+    dayString(dayNumber(today) + index),
+  ).flatMap((date) =>
+    Array.from(
+      {
+        length: Math.max(
+          0,
+          plan.dailyMinutes - (completedMinutes.get(date) ?? 0),
+        ),
+      },
+      () => date,
     ),
+  );
+  if (slots.length < pending.length)
+    throw new Error(
+      "Il ne reste pas assez de temps pour toutes les séances. Reportez le contrôle plus loin ou augmentez le temps quotidien.",
+    );
+  const dates = pending.map(
+    (_, index) =>
+      slots[
+        pending.length <= 1
+          ? slots.length - 1
+          : Math.round((index * (slots.length - 1)) / (pending.length - 1))
+      ],
   );
   const perDate = dates.reduce<Record<string, number>>(
     (map, day) => ({ ...map, [day]: (map[day] ?? 0) + 1 }),
@@ -281,7 +318,13 @@ export function reschedulePlan(
         date,
         minutes: Math.min(
           step.minutes,
-          Math.max(1, Math.floor(plan.dailyMinutes / perDate[date])),
+          Math.max(
+            1,
+            Math.floor(
+              (plan.dailyMinutes - (completedMinutes.get(date) ?? 0)) /
+                perDate[date],
+            ),
+          ),
         ),
       };
     }),

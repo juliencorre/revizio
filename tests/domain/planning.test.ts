@@ -130,6 +130,46 @@ describe("édition et report", () => {
     ).toBeLessThanOrEqual(20);
     expect(planValidation(value, initialData.courses)).toBeNull();
   });
+  it("réserve le budget des séances terminées aujourd’hui et à une date future", () => {
+    const value = plan();
+    value.status = "published";
+    value.steps[0].completedAt = "2026-11-08T18:00:00Z";
+    value.steps[3].completedAt = "2026-11-08T18:30:00Z";
+    const updated = reschedulePlan(value, "2026-11-16", input.today);
+    expect(updated.steps[0]).toEqual(value.steps[0]);
+    expect(updated.steps[3]).toEqual(value.steps[3]);
+    expect(
+      updated.steps
+        .filter((step) => !step.completedAt)
+        .every(
+          (step) =>
+            step.date !== value.steps[0].date &&
+            step.date !== value.steps[3].date,
+        ),
+    ).toBe(true);
+    expect(planValidation(updated, initialData.courses)).toBeNull();
+    expect(updated.status).toBe("draft");
+  });
+  it("partage seulement les minutes qui restent et refuse une période déjà pleine", () => {
+    const value = plan();
+    value.examDate = input.today;
+    value.steps = value.steps
+      .slice(0, 3)
+      .map((step) => ({ ...step, date: input.today }));
+    value.steps[0] = {
+      ...value.steps[0],
+      minutes: 17,
+      completedAt: "2026-11-08T18:00:00Z",
+    };
+    const updated = reschedulePlan(value, input.today, input.today);
+    expect(updated.steps[0]).toEqual(value.steps[0]);
+    expect(updated.steps.slice(1).map((step) => step.minutes)).toEqual([1, 1]);
+    expect(planValidation(updated, initialData.courses)).toBeNull();
+    value.steps[0].minutes = 20;
+    expect(() => reschedulePlan(value, input.today, input.today)).toThrow(
+      "pas assez de temps",
+    );
+  });
   it("signale les séances manquées et les durées incompatibles", () => {
     const value = plan();
     expect(stepIsLate(value.steps[0], "2026-11-09")).toBe(true);
