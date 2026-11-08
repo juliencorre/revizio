@@ -48,6 +48,11 @@ export function StudentHomeScreen() {
       );
     })
     .find((s) => !latestAttempt(data.attempts, s.id)?.completedAt);
+  const dueReviews = (data.spacedReviews ?? []).filter(
+    (review) =>
+      review.dueDate <= new Date().toLocaleDateString("en-CA") &&
+      data.publishedCourses.some((c) => c.id === review.courseId),
+  );
   const nextAttempt = nextSeries
     ? latestAttempt(data.attempts, nextSeries.id)
     : undefined;
@@ -63,6 +68,32 @@ export function StudentHomeScreen() {
           <Loading />
         ) : (
           <>
+            {dueReviews.length > 0 && (
+              <Card style={{ gap: 14 }}>
+                <AppText variant="heading">
+                  Un rappel pour mieux retenir
+                </AppText>
+                <AppText color={colors.muted}>
+                  Quelques minutes pour retrouver ce que tu as appris.
+                </AppText>
+                {dueReviews.slice(0, 3).map((review) => (
+                  <Button
+                    key={review.courseId}
+                    variant="secondary"
+                    icon="refresh"
+                    onPress={() =>
+                      router.push(`/student/course/${review.courseId}`)
+                    }
+                  >
+                    {
+                      data.publishedCourses.find(
+                        (c) => c.id === review.courseId,
+                      )?.title
+                    }
+                  </Button>
+                ))}
+              </Card>
+            )}
             {nextSeries ? (
               <Card
                 style={{

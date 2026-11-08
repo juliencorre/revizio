@@ -65,6 +65,7 @@ export function StudentExerciseScreen() {
   const [hintVisible, setHintVisible] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
   const [reviewingErrors, setReviewingErrors] = useState(false);
+  const [reviewingAll, setReviewingAll] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [startError, setStartError] = useState(false);
   const [clock, setClock] = useState(Date.now());
@@ -93,6 +94,7 @@ export function StudentExerciseScreen() {
     setHintVisible(false);
     setHintUsed(false);
     setReviewingErrors(errors === "1");
+    setReviewingAll(false);
     setShowSummary(false);
     const existing = [...data.attempts]
       .filter(
@@ -190,7 +192,7 @@ export function StudentExerciseScreen() {
   const question =
     questionIndex === null ? undefined : displayed[questionIndex];
   const answer = attempt?.answers.find((a) => a.questionId === question?.id);
-  const reveal = !isExam || !!attempt?.completedAt || reviewingErrors;
+  const reveal = !isExam || reviewingErrors || reviewingAll;
   const written =
     !!question?.type &&
     !["single-choice", "true-false"].includes(question.type);
@@ -210,6 +212,7 @@ export function StudentExerciseScreen() {
       data.completeAttempt(attempt.id);
       setShowSummary(true);
       setReviewingErrors(false);
+      setReviewingAll(false);
     } else setQuestionIndex(questionIndex + 1);
   }
   function reviewErrors() {
@@ -245,6 +248,13 @@ export function StudentExerciseScreen() {
           canRestart={!!publishedSeries}
           onRestart={restart}
           onReviewErrors={reviewErrors}
+          onReviewAll={() => {
+            setReviewingAll(true);
+            setReviewingErrors(false);
+            setShowSummary(false);
+            setQuestionIndex(0);
+            resetQuestion();
+          }}
           onExit={() =>
             router.push(
               subject
@@ -640,12 +650,14 @@ function ExerciseSummary({
   canRestart,
   onRestart,
   onReviewErrors,
+  onReviewAll,
   onExit,
 }: {
   attempt: Attempt;
   canRestart: boolean;
   onRestart: () => void;
   onReviewErrors: () => void;
+  onReviewAll: () => void;
   onExit: () => void;
 }) {
   const correct = attempt.answers.filter((a) => a.isCorrect).length;
@@ -717,6 +729,9 @@ function ExerciseSummary({
         </Card>
       )}
       <View style={styles.wrap}>
+        <Button variant="secondary" icon="book" onPress={onReviewAll}>
+          Revoir toutes les corrections
+        </Button>
         {mistakes.length > 0 && (
           <Button icon="book" onPress={onReviewErrors}>
             Revoir mes erreurs ({mistakes.length})
