@@ -47,6 +47,7 @@ export async function configureApiBase(url: string) {
     throw new Error(
       "L’adresse du serveur doit commencer par http:// ou https://.",
     );
+  if (normalized !== configuredBase) await rememberToken();
   configuredBase = normalized
     ? normalized.endsWith("/api")
       ? normalized
@@ -116,8 +117,12 @@ export async function apiFetch<T>(
     clearTimeout(timer);
   }
 }
+export function apiAuthHeaders(): Record<string, string> {
+  return accessToken ? { Authorization: "Bearer " + accessToken } : {};
+}
 export async function uploadCourseSource(
   source: CourseSource,
+  profileId?: string,
 ): Promise<CourseSource> {
   if (source.storageId) return source;
   if (!source.uri)
@@ -125,18 +130,27 @@ export async function uploadCourseSource(
       "Le fichier original doit être sélectionné avant son import.",
     );
   const form = new FormData();
+  const { resolveSourceUri, cacheSource } = await import("./source-cache");
   if (Platform.OS === "web") {
-    const response = await fetch(source.uri);
+    const response = await fetch(await resolveSourceUri(source));
     if (!response.ok)
       throw new Error("Le fichier sélectionné n’est plus disponible.");
     form.append("file", await response.blob(), source.name);
   } else
     form.append("file", {
-      uri: source.uri,
+      uri: await resolveSourceUri(source),
       name: source.name,
       type: source.mimeType || "application/octet-stream",
     } as unknown as Blob);
-  return apiFetch<CourseSource>("/uploads", { method: "POST", body: form });
+  const uploaded = await apiFetch<CourseSource>(
+    "/uploads" +
+      (profileId ? "?profileId=" + encodeURIComponent(profileId) : ""),
+    { method: "POST", body: form },
+  );
+  await cacheSource({ ...uploaded, uri: await resolveSourceUri(source) }).catch(
+    () => undefined,
+  );
+  return uploaded;
 }
 export async function waitForJob(
   jobId: string,

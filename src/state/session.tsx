@@ -165,7 +165,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           if (
             cached?.user &&
             Array.isArray(cached.profiles) &&
-            Date.now() - cached.savedAt < 7 * 86400000
+            Date.now() - cached.savedAt <
+              (cached.user.role === "child" ? 1 : 7) * 86400000
           ) {
             setMode("family");
             setUser(cached.user);

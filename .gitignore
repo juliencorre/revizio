@@ -55,3 +55,6 @@ artifacts/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+/.revizio/
+/ocr-cache/

@@ -28,15 +28,13 @@ export function restoreLearningData(
 export function createLearningPersistence(
   storage: StorageAdapter,
   fallback: LearningData = initialData,
+  key: string = STORAGE_KEY,
 ) {
   let queue: Promise<unknown> = Promise.resolve();
   return {
     async load(): Promise<HydrationResult> {
       try {
-        return restoreLearningData(
-          await storage.getItem(STORAGE_KEY),
-          fallback,
-        );
+        return restoreLearningData(await storage.getItem(key), fallback);
       } catch {
         return {
           data: clone(fallback),
@@ -49,7 +47,7 @@ export function createLearningPersistence(
       const snapshot = JSON.stringify(data);
       const write = queue
         .catch(() => undefined)
-        .then(() => storage.setItem(STORAGE_KEY, snapshot));
+        .then(() => storage.setItem(key, snapshot));
       queue = write;
       return write;
     },

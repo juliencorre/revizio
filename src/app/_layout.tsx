@@ -3,11 +3,13 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { LearningProvider, useLearning } from "@/state/learning-store";
-import { AppText, Brand } from "@/components/ui";
+import { AppText, Brand, Button } from "@/components/ui";
+import { SessionProvider } from "@/state/session";
 import { colors } from "@/theme";
 export { ErrorBoundary } from "expo-router";
 function AppNavigator() {
-  const { isReady, storageError } = useLearning();
+  const { isReady, storageError, syncStatus, syncNow, resolveSyncConflict } =
+    useLearning();
   if (!isReady)
     return (
       <View
@@ -33,6 +35,27 @@ function AppNavigator() {
           <AppText variant="small" color={colors.orange}>
             {storageError}
           </AppText>
+          {syncStatus === "conflict" ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+              <Button
+                variant="secondary"
+                onPress={() => void resolveSyncConflict("server")}
+              >
+                Charger la version du serveur
+              </Button>
+              <Button onPress={() => void resolveSyncConflict("local")}>
+                Conserver mes modifications
+              </Button>
+            </View>
+          ) : syncStatus === "offline" ? (
+            <Button
+              variant="ghost"
+              icon="refresh"
+              onPress={() => void syncNow()}
+            >
+              Réessayer la synchronisation
+            </Button>
+          ) : null}
         </View>
       )}
       <Stack
@@ -48,10 +71,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <LearningProvider>
-          <StatusBar style="dark" />
-          <AppNavigator />
-        </LearningProvider>
+        <SessionProvider>
+          <LearningProvider>
+            <StatusBar style="dark" />
+            <AppNavigator />
+          </LearningProvider>
+        </SessionProvider>
       </SafeAreaView>
     </SafeAreaProvider>
   );

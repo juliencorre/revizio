@@ -224,6 +224,7 @@ export interface ChildProfile {
   id: string;
   name: string;
   grade: string;
+  needsPin?: boolean;
 }
 export interface SessionUser {
   id: string;
