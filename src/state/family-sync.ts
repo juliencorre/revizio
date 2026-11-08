@@ -13,6 +13,7 @@ interface SyncOptions {
   storage: {
     getItem(key: string): Promise<string | null>;
     setItem(key: string, value: string): Promise<unknown>;
+    removeItem?(key: string): Promise<unknown>;
   };
   getData(): LearningData;
   apply(data: LearningData): void;
@@ -43,6 +44,22 @@ export class FamilySync {
   async load(fallback: LearningData): Promise<LearningData> {
     const { key, storage } = this.options;
     try {
+      const state = await storage.getItem(key + ".state");
+      if (state) {
+        const saved = JSON.parse(state);
+        if (
+          saved.version !== 1 ||
+          typeof saved.pending !== "boolean" ||
+          !Number.isInteger(saved.revision) ||
+          saved.revision < 0
+        )
+          throw new Error("invalid snapshot");
+        const data = parseLearningData(JSON.stringify(saved.data));
+        this.base = parseLearningData(JSON.stringify(saved.base));
+        this.revision = saved.revision;
+        this.dirty = saved.pending;
+        return data;
+      }
       const [raw, base, revision, pending] = await Promise.all([
         storage.getItem(key),
         storage.getItem(key + ".base"),
@@ -75,16 +92,25 @@ export class FamilySync {
   }
   private persist(data: LearningData, dirty: boolean) {
     const { key, storage } = this.options;
-    const raw = JSON.stringify(data),
-      base = JSON.stringify(this.base),
-      revision = String(this.revision);
+    const state = JSON.stringify({
+      version: 1,
+      data,
+      base: this.base,
+      revision: this.revision,
+      pending: dirty,
+    });
     this.writes = this.writes
       .catch(() => undefined)
       .then(async () => {
-        await storage.setItem(key, raw);
-        await storage.setItem(key + ".base", base);
-        await storage.setItem(key + ".revision", revision);
-        await storage.setItem(key + ".pending", dirty ? "1" : "0");
+        // A single storage write is the recovery source. Four legacy keys are
+        // read for migration, then removed only after this write has succeeded.
+        await storage.setItem(key + ".state", state);
+        if (storage.removeItem)
+          await Promise.all(
+            [key, key + ".base", key + ".revision", key + ".pending"].map(
+              (old) => storage.removeItem!(old).catch(() => undefined),
+            ),
+          );
       });
     return this.writes;
   }
@@ -118,7 +144,7 @@ export class FamilySync {
           this.options.status("synced");
           return;
         }
-        const local = this.options.getData();
+        const local = clone(this.options.getData());
         const merged = mergeLearningData(this.base, local, remote.data);
         if (merged.conflicts.length) {
           this.conflict = remote;
@@ -154,6 +180,14 @@ export class FamilySync {
             this.options.status("synced");
             return;
           }
+          const rebased = mergeLearningData(
+            local,
+            this.options.getData(),
+            saved.data,
+            "local",
+          ).data;
+          this.options.apply(rebased);
+          await this.persist(rebased, true);
         } catch (error) {
           if ((error as { status?: number }).status === 409) continue;
           throw error;
