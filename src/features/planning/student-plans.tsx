@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -34,6 +34,9 @@ export function StudentPlansScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const [selectedId, setSelectedId] = useState(params.id ?? "");
+  useEffect(() => {
+    if (params.id) setSelectedId(params.id);
+  }, [params.id]);
   const plans = (data.plans ?? [])
     .filter((plan) => plan.status === "published")
     .sort((a, b) => a.examDate.localeCompare(b.examDate));

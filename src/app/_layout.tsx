@@ -6,13 +6,15 @@ import { LearningProvider, useLearning } from "@/state/learning-store";
 import { AppText, Brand, Button } from "@/components/ui";
 import { SessionProvider } from "@/state/session";
 import { colors } from "@/theme";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { registerOfflineShell } from "@/services/offline-shell";
 export { ErrorBoundary } from "expo-router";
 function AppNavigator() {
   const { isReady, storageError, syncStatus, syncNow, resolveSyncConflict } =
     useLearning();
-  if (!isReady)
+  const navigationStarted = useRef(false);
+  if (isReady) navigationStarted.current = true;
+  if (!isReady && !navigationStarted.current)
     return (
       <View
         style={{
@@ -29,43 +31,69 @@ function AppNavigator() {
     );
   return (
     <View style={{ flex: 1 }}>
-      {storageError && (
-        <View
-          accessibilityRole="alert"
-          style={{ backgroundColor: colors.orangeLight, padding: 12 }}
-        >
-          <AppText variant="small" color={colors.orange}>
-            {storageError}
-          </AppText>
-          {syncStatus === "conflict" ? (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+      <View
+        style={{ flex: 1, opacity: isReady ? 1 : 0 }}
+        pointerEvents={isReady ? "auto" : "none"}
+        accessibilityElementsHidden={!isReady}
+      >
+        {storageError && (
+          <View
+            accessibilityRole="alert"
+            style={{ backgroundColor: colors.orangeLight, padding: 12 }}
+          >
+            <AppText variant="small" color={colors.orange}>
+              {storageError}
+            </AppText>
+            {syncStatus === "conflict" ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+                <Button
+                  variant="secondary"
+                  onPress={() => void resolveSyncConflict("server")}
+                >
+                  Charger la version du serveur
+                </Button>
+                <Button onPress={() => void resolveSyncConflict("local")}>
+                  Conserver mes modifications
+                </Button>
+              </View>
+            ) : syncStatus === "offline" ? (
               <Button
-                variant="secondary"
-                onPress={() => void resolveSyncConflict("server")}
+                variant="ghost"
+                icon="refresh"
+                onPress={() => void syncNow()}
               >
-                Charger la version du serveur
+                Réessayer la synchronisation
               </Button>
-              <Button onPress={() => void resolveSyncConflict("local")}>
-                Conserver mes modifications
-              </Button>
-            </View>
-          ) : syncStatus === "offline" ? (
-            <Button
-              variant="ghost"
-              icon="refresh"
-              onPress={() => void syncNow()}
-            >
-              Réessayer la synchronisation
-            </Button>
-          ) : null}
+            ) : null}
+          </View>
+        )}
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
+      </View>
+      {!isReady && (
+        <View
+          testID="app-loading"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 20,
+            backgroundColor: colors.background,
+          }}
+        >
+          <Brand />
+          <ActivityIndicator color={colors.primary} />
+          <AppText>On prépare ton espace…</AppText>
         </View>
       )}
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      />
     </View>
   );
 }

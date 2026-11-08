@@ -1,6 +1,6 @@
 {
   "name": "revizio",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -17,7 +17,8 @@
     "serve": "node dist-server/index.mjs",
     "build:server": "esbuild server/index.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=dist-server/index.mjs",
     "build": "npm run export:web && npm run build:server",
-    "test:server": "vitest run tests/server"
+    "test:server": "vitest run tests/server",
+    "release:package": "node scripts/package-release.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

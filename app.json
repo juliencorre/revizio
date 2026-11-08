@@ -2,7 +2,7 @@
   "expo": {
     "name": "Révizo",
     "slug": "revizio",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "default",
     "scheme": "revizio",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
       "favicon": "./assets/brand/favicon.png",
       "lang": "fr",
       "themeColor": "#514CCF",
-      "backgroundColor": "#F3F4FA"
+      "backgroundColor": "#E4E9F2"
     },
     "plugins": [
       "expo-router",

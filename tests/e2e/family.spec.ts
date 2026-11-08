@@ -296,6 +296,9 @@ test("créer la famille, gérer les profils et protéger l’espace parent derri
     "Le profil de Milo test est enregistré",
   );
   await page.getByTestId(`settings-active-profile-${added.id}`).click();
+  await expect(page.getByTestId("app-loading")).toHaveCount(0);
+  await expect(page.getByTestId("settings-screen")).toBeVisible();
+  await expect(page).toHaveURL(/\/parent\/settings$/);
   await capture(page, info, "family-profile-settings");
 
   const context = await freshContext(browser, page, baseURL);

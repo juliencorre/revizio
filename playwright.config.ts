@@ -6,7 +6,7 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: "list",
+  reporter: [["list"], ["json", { outputFile: "artifacts/playwright-report.json" }]],
   timeout: 30000,
   use: {
     baseURL: "http://127.0.0.1:4183",
