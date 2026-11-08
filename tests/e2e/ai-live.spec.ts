@@ -12,6 +12,7 @@ import type {
   Attempt,
   Course,
   ExerciseSeries,
+  EnglishSettings,
   LearningData,
   SessionUser,
 } from "../../src/domain/model";
@@ -63,7 +64,11 @@ async function capture(page: Page, info: TestInfo, name: string) {
   await page.screenshot({ path, fullPage: true });
   await info.attach(name, { path, contentType: "image/png" });
 }
-async function createdJob(page: Page, kind: "course" | "exercises") {
+async function createdJob(
+  page: Page,
+  kind: AiJob["kind"],
+  activate?: () => Promise<unknown>,
+) {
   const [response] = await Promise.all([
     page.waitForResponse(
       (result) =>
@@ -71,11 +76,13 @@ async function createdJob(page: Page, kind: "course" | "exercises") {
         new URL(result.url()).pathname === "/api/ai/" + kind,
       { timeout: 60_000 },
     ),
-    page
-      .getByTestId(
-        kind === "course" ? "ai-generate-course" : "ai-generate-exercises",
-      )
-      .click(),
+    activate
+      ? activate()
+      : page
+          .getByTestId(
+            kind === "course" ? "ai-generate-course" : "ai-generate-exercises",
+          )
+          .click(),
   ]);
   const { job } = await json<{ job: AiJob }>(
     response,
@@ -428,6 +435,338 @@ test("Ollama réel : photo, fiche relue, cinq formats et séance enfant", async 
     expect(completed.answers.every((answer) => answer.isCorrect)).toBe(true);
     await attachJson(info, "tentative-enfant-corrigee-serveur", completed);
     await capture(page, info, "ia-reelle-bilan-enfant");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+});
+
+async function printedEnglishVocabulary() {
+  return sharp(
+    Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="800"><rect width="1500" height="800" fill="white"/><g fill="black" font-family="DejaVu Sans"><text x="70" y="90" font-size="42">MON RÉPERTOIRE D’ANGLAIS</text><text x="70" y="170" font-size="34">MOTS : ANGLAIS — FRANÇAIS</text><text x="90" y="250" font-size="44">castle = château</text><text x="90" y="330" font-size="44">river = rivière</text><text x="70" y="440" font-size="34">VERBE IRRÉGULIER</text><g font-size="30"><text x="90" y="520">Base verbale</text><text x="440" y="520">Prétérit</text><text x="760" y="520">Participe passé</text><text x="1180" y="520">Sens</text></g><g font-size="44"><text x="90" y="610">swim</text><text x="440" y="610">swam</text><text x="760" y="610">swum</text><text x="1180" y="610">nager</text></g></g></svg>',
+    ),
+  )
+    .png()
+    .toBuffer();
+}
+const vocabularyOnPhoto = [
+  { en: "castle", fr: "château" },
+  { en: "river", fr: "rivière" },
+];
+const verbOnPhoto = {
+  base: "swim",
+  past: "swam",
+  participle: "swum",
+  meaning: "nager",
+};
+const normalizedText = (value: string) =>
+  value.normalize("NFC").trim().toLocaleLowerCase("fr");
+
+test("Ollama réel : photo de vocabulaire anglais, relecture, cartes et quiz enfant", async ({
+  page,
+}, info) => {
+  test.skip(
+    process.env.REVIZIO_LIVE_AI !== "1",
+    "Campagne IA réelle sur demande : REVIZIO_LIVE_AI=1.",
+  );
+  test.skip(
+    info.project.name !== "tablet-landscape",
+    "La campagne Ollama réelle s’exécute uniquement sur tablet-landscape.",
+  );
+  test.setTimeout(600_000);
+  const aiDeadline = Date.now() + 540_000;
+  expect(
+    (await page.request.post("/__test/reset")).ok(),
+    "Réinitialisation du backend jetable",
+  ).toBe(true);
+  const health = await json<{
+    ai: { available: boolean; model: string };
+    needsSetup: boolean;
+  }>(
+    await page.request.get("/api/health"),
+    "Disponibilité d’Ollama réel pour l’anglais",
+  );
+  expect(
+    health.ai.available,
+    "Le modèle Ollama réel doit être disponible ; aucune extraction simulée n’est utilisée.",
+  ).toBe(true);
+  expect(health.needsSetup).toBe(true);
+  info.annotations.push({
+    type: "modèle Ollama réel",
+    description: health.ai.model,
+  });
+  const setup = await json<{ user: SessionUser; profiles: { id: string }[] }>(
+    await page.request.post("/api/setup", {
+      data: {
+        parentName: "Parent anglais IA",
+        email: "english-live@example.test",
+        password: "English-validation-42!",
+        childName: "Camille",
+        grade: "5e",
+        pin: "2468",
+      },
+    }),
+    "Création de la famille pour le vocabulaire anglais",
+  );
+  expect(setup.user.role).toBe("parent");
+  const profileId = setup.profiles[0].id;
+  let extracted!: EnglishSettings;
+
+  await test.step("Lire uniquement les pixels du document anglais et garder le résultat en brouillon", async () => {
+    await page.goto("/parent/english");
+    await expect(page.getByTestId("parent-english")).toBeVisible();
+    await expect(page.getByTestId("english-word-en")).toHaveValue("");
+    await expect(page.getByTestId("english-word-fr")).toHaveValue("");
+    const created = await createdJob(page, "english", async () => {
+      const chooser = page.waitForEvent("filechooser");
+      await page
+        .getByRole("button", { name: "Fichiers / PDF", exact: true })
+        .click();
+      await (
+        await chooser
+      ).setFiles({
+        name: "vocabulaire-castle-river-swim.png",
+        mimeType: "image/png",
+        buffer: await printedEnglishVocabulary(),
+      });
+    });
+    const done = await finishedJob(page, info, created, aiDeadline);
+    expect(done.result?.words).toHaveLength(2);
+    expect(done.result?.verbs).toHaveLength(1);
+    extracted = {
+      words: done.result!.words!,
+      verbs: done.result!.verbs!,
+      tenses: done.result?.tenses ?? [],
+      toolWords: done.result?.toolWords ?? [],
+    };
+    expect(
+      extracted.words
+        .map((word) => ({
+          en: normalizedText(word.en),
+          fr: normalizedText(word.fr),
+        }))
+        .sort((a, b) => a.en.localeCompare(b.en)),
+    ).toEqual(vocabularyOnPhoto);
+    expect(
+      Object.fromEntries(
+        Object.entries(verbOnPhoto).map(([key]) => [
+          key,
+          normalizedText(extracted.verbs[0][key as keyof typeof verbOnPhoto]),
+        ]),
+      ),
+    ).toEqual(verbOnPhoto);
+    // Nothing is typed into vocabulary fields to repair or enrich the generated result.
+    for (const [index, word] of extracted.words.entries()) {
+      await expect(
+        page.getByRole("textbox", {
+          name: "Mot anglais " + (index + 1),
+          exact: true,
+        }),
+      ).toHaveValue(word.en, { timeout: 20_000 });
+      await expect(
+        page.getByRole("textbox", {
+          name: "Traduction du mot " + (index + 1),
+          exact: true,
+        }),
+      ).toHaveValue(word.fr);
+    }
+    for (const [column, key] of [
+      ["Base verbale", "base"],
+      ["Prétérit", "past"],
+      ["Participe passé", "participle"],
+      ["Sens", "meaning"],
+    ] as const)
+      await expect(
+        page.getByRole("textbox", {
+          name: column + " du verbe 1",
+          exact: true,
+        }),
+      ).toHaveValue(extracted.verbs[0][key]);
+    const beforePublication = (await snapshot(page.request, profileId)).data;
+    expect(beforePublication.english?.words).toEqual([]);
+    expect(beforePublication.english?.verbs).toEqual([]);
+    expect(
+      beforePublication.courses.some(
+        (course) => course.id === "english-repertoire-course",
+      ),
+    ).toBe(false);
+    expect(
+      beforePublication.series.some(
+        (series) => series.id === "english-repertoire-practice",
+      ),
+    ).toBe(false);
+    await attachJson(info, "anglais-ia-resultat-a-relire", extracted);
+    await page
+      .getByRole("heading", { name: "Les mots à connaître", exact: true })
+      .scrollIntoViewIfNeeded();
+    await capture(page, info, "anglais-ia-brouillon-lu-sur-photo");
+  });
+
+  let quiz!: ExerciseSeries;
+  await test.step("Prévisualiser et publier uniquement les éléments relus par le parent", async () => {
+    await page.getByTestId("preview-english").click();
+    await expect(
+      page.getByRole("heading", {
+        name: "Quelques questions qui seront proposées",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(page.getByTestId("publish-english")).toBeDisabled();
+    await capture(page, info, "anglais-ia-apercu-avant-publication");
+    await page
+      .getByRole("button", {
+        name: "Confirmer la relecture du répertoire anglais",
+        exact: true,
+      })
+      .click();
+    await page.getByTestId("publish-english").click();
+    await expect
+      .poll(
+        async () =>
+          (await snapshot(page.request, profileId)).data.series.find(
+            (series) => series.id === "english-repertoire-practice",
+          )?.status,
+        { timeout: 20_000 },
+      )
+      .toBe("published");
+    const published = (await snapshot(page.request, profileId)).data;
+    expect(published.english?.words).toEqual(extracted.words);
+    expect(published.english?.verbs).toEqual(extracted.verbs);
+    expect(
+      published.courses.find(
+        (course) => course.id === "english-repertoire-course",
+      )?.status,
+    ).toBe("published");
+    quiz = published.series.find(
+      (series) => series.id === "english-repertoire-practice",
+    )!;
+    expect(quiz.questions.length).toBeGreaterThanOrEqual(5);
+    const sourceAnswers = new Set([
+      ...vocabularyOnPhoto.flatMap((word) => [word.en, word.fr]),
+      ...Object.values(verbOnPhoto),
+    ]);
+    for (const question of quiz.questions) {
+      expect(questionError(question)).toBeNull();
+      const answer =
+        question.choices.find(
+          (choice) => choice.id === question.correctChoiceId,
+        )?.label ?? question.expectedAnswers?.[0];
+      expect(
+        answer,
+        "Le quiz doit avoir une réponse présente dans le répertoire publié",
+      ).toBeTruthy();
+      expect(
+        sourceAnswers.has(normalizedText(answer!)),
+        "La bonne réponse doit venir de la photo importée",
+      ).toBe(true);
+      for (const choice of question.choices)
+        expect(
+          sourceAnswers.has(normalizedText(choice.label)),
+          "Les propositions restent dans les mots et formes de la photo",
+        ).toBe(true);
+    }
+    await attachJson(info, "anglais-ia-repertoire-et-quiz-publies", {
+      english: published.english,
+      quiz,
+    });
+  });
+
+  await test.step("L’enfant apprend les traductions avec les cartes puis termine le quiz", async () => {
+    await page.goto(
+      "/auth?target=child&profileId=" + encodeURIComponent(profileId),
+    );
+    await page.getByTestId("auth-pin").fill("2468");
+    await page.getByTestId("auth-submit").click();
+    await expect(page).toHaveURL(/\/student(?:\?|$)/);
+    expect(
+      (
+        await json<{ user: SessionUser }>(
+          await page.request.get("/api/session"),
+          "Session enfant anglais",
+        )
+      ).user.role,
+    ).toBe("child");
+    await page.goto("/student/english");
+    await expect(page.getByTestId("student-english")).toBeVisible();
+    await page.getByRole("button", { name: "Mes mots", exact: true }).click();
+    const card = page.getByTestId("english-flashcard");
+    for (const word of vocabularyOnPhoto) {
+      const displayedWord = extracted.words.find(
+        (item) => normalizedText(item.en) === word.en,
+      )!;
+      for (
+        let index = 0;
+        index < extracted.words.length &&
+        !normalizedText((await card.textContent()) ?? "").includes(word.en);
+        index++
+      )
+        await page
+          .getByRole("button", { name: "Suivante", exact: true })
+          .click();
+      await expect(card).toContainText(displayedWord.en);
+      await card.click();
+      await expect(card).toContainText(displayedWord.fr);
+      await capture(page, info, "anglais-ia-carte-" + word.en);
+      await page.getByRole("button", { name: "Suivante", exact: true }).click();
+    }
+    await page.getByRole("button", { name: "Mes verbes", exact: true }).click();
+    await expect(card).toContainText(extracted.verbs[0].base);
+    await card.click();
+    await expect(card).toContainText(extracted.verbs[0].meaning);
+    await capture(page, info, "anglais-ia-carte-verbe-swim");
+    await page.getByTestId("start-english-quiz").click();
+    await expect(page.getByTestId("verify-answer")).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          (await snapshot(page.request, profileId)).data.attempts.find(
+            (attempt) => attempt.seriesId === quiz.id,
+          )?.questions.length,
+        { timeout: 20_000 },
+      )
+      .toBe(quiz.questions.length);
+    const presented = (
+      await snapshot(page.request, profileId)
+    ).data.attempts.find((attempt) => attempt.seriesId === quiz.id)!;
+    expect(presented.questions).toEqual(quiz.questions);
+    for (const question of presented.questions) {
+      await expect(
+        page.getByText(question.prompt, { exact: true }),
+      ).toBeVisible();
+      if (question.choices.length)
+        await page.getByTestId("choice-" + question.correctChoiceId).click();
+      else
+        await page
+          .getByTestId("written-answer")
+          .fill(question.expectedAnswers![0]);
+      await page.getByTestId("verify-answer").click();
+      await expect(
+        page.getByText(question.explanation, { exact: true }),
+      ).toBeVisible();
+      await page.getByTestId("next-question").click();
+    }
+    await expect(page.getByTestId("exercise-score")).toHaveText(
+      `${presented.questions.length} / ${presented.questions.length}`,
+    );
+    await expect
+      .poll(
+        async () =>
+          !!(await snapshot(page.request, profileId)).data.attempts.find(
+            (attempt) => attempt.id === presented.id,
+          )?.completedAt,
+        { timeout: 20_000 },
+      )
+      .toBe(true);
+    const completed = (
+      await snapshot(page.request, profileId)
+    ).data.attempts.find((attempt) => attempt.id === presented.id)!;
+    expect(completed.questions).toEqual(presented.questions);
+    expect(completed.answers.every((answer) => answer.isCorrect)).toBe(true);
+    await attachJson(info, "anglais-ia-tentative-enfant", completed);
+    await capture(page, info, "anglais-ia-bilan-quiz-enfant");
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
