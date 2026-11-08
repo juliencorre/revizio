@@ -5,7 +5,7 @@
 | Contrôle                                                        | Résultat                                                                        |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `npm run typecheck`                                             | Client et serveur sans erreur TypeScript.                                       |
-| `npm test`                                                      | 113 tests réussis ; le test Ollama opt-in est exclu de cette commande.          |
+| `npm test`                                                      | 114 tests réussis ; le test Ollama opt-in est exclu de cette commande.          |
 | `npm run build`                                                 | Export web/PWA et serveur Node compilés.                                        |
 | `REVIZIO_LIVE_AI=1 npm run test:e2e`                            | 74 parcours réussis, aucun échec et aucune relance, en 6 min 17 s.              |
 | `REVIZIO_LIVE_AI=1 npx vitest run tests/server/live-ai.test.ts` | 1 essai réel photo/PDF/multi-cours réussi en 26 s.                              |
@@ -38,7 +38,7 @@ Les contrôles refusent les citations inventées, les formats invalides, les ré
 
 ## Corrections issues de la recette
 
-Publication bloquée par des sections facultatives vides, perte de saisie sur rechargement immédiat, stockage Blob incompatible avec WebKit, état de connexion après déconnexion, navigation réinitialisée au changement de profil, report surchargeant une journée déjà travaillée et conservation du texte OCR lors d’une régénération ont été corrigés. Les régressions correspondantes sont testées. Une dernière inspection visuelle a corrigé la hauteur des cartes de contrôle en portrait ; 32 parcours complémentaires sur les quatre configurations ont ensuite réussi, avec vérification que les champs restent à l’intérieur de leur carte.
+Publication bloquée par des sections facultatives vides, perte de saisie sur rechargement immédiat, stockage Blob incompatible avec WebKit, état de connexion après déconnexion, navigation réinitialisée au changement de profil, report surchargeant une journée déjà travaillée et conservation du texte OCR lors d’une régénération ont été corrigés. La régénération réutilise aussi les textes OCR corrigés par le parent, lit les nouveaux fichiers sans répéter le texte et garde le numéro du brouillon ; les régressions correspondantes sont testées. Une dernière inspection visuelle a corrigé la hauteur des cartes de contrôle en portrait ; 32 parcours complémentaires sur les quatre configurations ont ensuite réussi, avec vérification que les champs restent à l’intérieur de leur carte.
 
 ## Limites pratiques
 
