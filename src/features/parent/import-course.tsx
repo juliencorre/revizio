@@ -235,9 +235,12 @@ export function ImportCourseScreen() {
           description="Rassemblez les documents, puis relisez la fiche avant de la partager."
         />
         {data.isDemo && (
-          <Notice>
-            Vous utilisez la démonstration. La rédaction manuelle fonctionne ici
-            ; connectez votre espace familial pour préparer une fiche avec l’IA.
+          <View style={{ gap: 14 }}>
+            <Notice>
+              Vous utilisez la démonstration. La rédaction manuelle fonctionne
+              ici ; connectez votre espace familial pour préparer une fiche avec
+              l’IA.
+            </Notice>
             <Button
               variant="ghost"
               icon="lock"
@@ -245,7 +248,7 @@ export function ImportCourseScreen() {
             >
               Connexion familiale
             </Button>
-          </Notice>
+          </View>
         )}
         {local.error && <Notice error>{local.error}</Notice>}
         {error && (
@@ -460,32 +463,33 @@ export function ImportCourseScreen() {
                         >
                           Descendre
                         </Button>
-                        {source.mimeType !== "application/pdf" && (
-                          <Button
-                            variant="ghost"
-                            disabled={!!busy}
-                            icon="rotate"
-                            accessibilityLabel={
-                              "Tourner le document " + (index + 1)
-                            }
-                            onPress={() =>
-                              change({
-                                sources: draft.sources.map((item) =>
-                                  item.id === source.id
-                                    ? {
-                                        ...item,
-                                        rotation:
-                                          ((item.rotation ?? 0) + 90) % 360,
-                                      }
-                                    : item,
-                                ),
-                              })
-                            }
-                            testID={"ai-source-rotate-" + index}
-                          >
-                            Tourner · {source.rotation ?? 0}°
-                          </Button>
-                        )}
+                        {source.mimeType !== "application/pdf" &&
+                          !source.storageId && (
+                            <Button
+                              variant="ghost"
+                              disabled={!!busy}
+                              icon="rotate"
+                              accessibilityLabel={
+                                "Tourner le document " + (index + 1)
+                              }
+                              onPress={() =>
+                                change({
+                                  sources: draft.sources.map((item) =>
+                                    item.id === source.id
+                                      ? {
+                                          ...item,
+                                          rotation:
+                                            ((item.rotation ?? 0) + 90) % 360,
+                                        }
+                                      : item,
+                                  ),
+                                })
+                              }
+                              testID={"ai-source-rotate-" + index}
+                            >
+                              Tourner · {source.rotation ?? 0}°
+                            </Button>
+                          )}
                         <Button
                           variant="danger"
                           disabled={!!busy}

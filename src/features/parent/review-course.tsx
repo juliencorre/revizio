@@ -139,6 +139,17 @@ export function ReviewCourseScreen() {
       setError("Confirmez la relecture avant de publier la fiche.");
       return;
     }
+    data.updateCourse(id, {
+      title: course!.title.trim(),
+      description: course!.description.trim(),
+      sections: sections
+        .filter((section) => section.content.trim())
+        .map((section) => ({
+          ...section,
+          content: section.content.trim(),
+          example: section.example?.trim(),
+        })),
+    });
     const result = data.publishCourse(id);
     if (!result.ok)
       setError(result.error ?? "La fiche ne peut pas encore être publiée.");
