@@ -122,6 +122,7 @@ export function formatDate(date: string) {
 export function latestAttempt(attempts: Attempt[], seriesId: string) {
   return attempts
     .filter((a) => a.seriesId === seriesId)
+    .reverse()
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
 }
 export function levelLabel(level: ExerciseSeries["level"]) {

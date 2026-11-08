@@ -1,5 +1,7 @@
 # Révizo
 
+[Dépôt GitHub public](https://github.com/juliencorre/revizio)
+
 Application de révision scolaire familiale, conçue pour l’iPad, développée avec Expo, React Native et TypeScript. Une version web partage le même socle.
 
 ## Démarrer
@@ -33,6 +35,8 @@ npm test
 npm run export:web
 npm run test:e2e
 ```
+
+Les [résultats de validation](docs/validation.md) documentent les contrôles du premier lot.
 
 Les tests de parcours web nécessitent Chromium installé pour Playwright (`npx playwright install chromium`). Les tests iPad physiques restent une étape distincte du contrôle web.
 

@@ -49,6 +49,7 @@ export function StudentExerciseScreen() {
     setShowSummary(false);
     const existing = [...data.attempts]
       .filter((a) => a.seriesId === id)
+      .reverse()
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
     const existingAttempt = existing.find((a) => !a.completedAt) ?? existing[0];
     const next = existingAttempt?.id ?? data.startAttempt(id);

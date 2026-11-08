@@ -383,7 +383,13 @@ export function AppShell({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ maxHeight: 66, backgroundColor: colors.surface }}
+            style={{
+              height: 72,
+              maxHeight: 72,
+              flexGrow: 0,
+              flexShrink: 0,
+              backgroundColor: colors.surface,
+            }}
             contentContainerStyle={{
               paddingHorizontal: 16,
               gap: 8,

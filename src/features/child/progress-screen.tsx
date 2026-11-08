@@ -214,7 +214,7 @@ export function StudentProgressScreen() {
                               router.push(`/student/exercise/${item.seriesId}`)
                             }
                           >
-                            Retrouver le bilan
+                            Retrouver la série
                           </Button>
                         )}
                       </View>

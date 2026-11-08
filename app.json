@@ -15,7 +15,10 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/brand/favicon.png"
+      "favicon": "./assets/brand/favicon.png",
+      "lang": "fr",
+      "themeColor": "#514CCF",
+      "backgroundColor": "#F3F4FA"
     },
     "plugins": [
       "expo-router",
@@ -32,6 +35,7 @@
     "experiments": {
       "typedRoutes": true
     },
-    "icon": "./assets/brand/icon.png"
+    "icon": "./assets/brand/icon.png",
+    "description": "Apprendre, réviser et progresser en famille."
   }
 }

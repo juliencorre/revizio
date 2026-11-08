@@ -217,7 +217,7 @@ export function localId(prefix: string) {
 }
 export const parentStyles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 20 },
-  column: { flexGrow: 1, flexBasis: "auto", minWidth: 280, gap: 20 },
+  column: { flex: 1, minWidth: 280, gap: 20 },
   row: {
     flexDirection: "row",
     alignItems: "center",
