@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "export:web": "expo export --platform web",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "preview:web": "node scripts/serve-web.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

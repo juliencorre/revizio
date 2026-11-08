@@ -14,13 +14,24 @@
       "package": "fr.revizio.app"
     },
     "web": {
-      "output": "static"
+      "output": "single",
+      "favicon": "./assets/brand/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Révizo accède aux photos que vous choisissez pour importer un cours.",
+          "cameraPermission": "Révizo utilise l’appareil photo pour photographier les pages d’un cours.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-document-picker"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "icon": "./assets/brand/icon.png"
   }
 }
