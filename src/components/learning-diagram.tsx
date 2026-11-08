@@ -19,7 +19,7 @@ export function LearningDiagram({ diagram }: { diagram: Diagram }) {
       return null;
     return (
       <View
-        accessibilityLabel={`${n} parts coloriées sur ${d}`}
+        accessibilityLabel={`${n} part${n === 1 ? " coloriée" : "s coloriées"} sur ${d}`}
         style={{ gap: 12 }}
       >
         <View
@@ -44,7 +44,7 @@ export function LearningDiagram({ diagram }: { diagram: Diagram }) {
           ))}
         </View>
         <AppText variant="small">
-          {n} / {d} · {n} parts sur {d}
+          {n} / {d} · {n} part{n === 1 ? "" : "s"} sur {d}
         </AppText>
       </View>
     );

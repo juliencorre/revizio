@@ -56,6 +56,15 @@ test("préparer un contrôle, publier son plan et terminer lecture et contrôle 
   const title = "Mon contrôle de nombres relatifs";
   await page.goto("/parent/controls");
   await page.getByTestId("control-title").fill(title);
+  const card = await page.getByTestId("control-settings-card").boundingBox();
+  const duration = await page
+    .getByRole("textbox", { name: "Autre durée en minutes", exact: true })
+    .boundingBox();
+  expect(
+    card &&
+      duration &&
+      duration.y + duration.height <= card.y + card.height + 1,
+  ).toBeTruthy();
   await page.getByTestId("control-date").fill(futureDate(4));
   await page.getByTestId("control-course-maths-relative-numbers").click();
   await page.getByTestId("propose-plan").click();

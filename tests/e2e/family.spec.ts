@@ -376,6 +376,9 @@ test("conserver une image et un PDF après rechargement puis publier seulement l
     page.getByText("cours-image.png", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("cours-pdf.pdf", { exact: true })).toBeVisible();
+  await page
+    .getByText("cours-pdf.pdf", { exact: true })
+    .scrollIntoViewIfNeeded();
   await capture(page, info, "parent-durable-documents");
   const childContext = await freshContext(browser, page, baseURL);
   try {

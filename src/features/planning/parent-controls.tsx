@@ -536,7 +536,14 @@ export function ParentControlsScreen() {
                 alignItems: "stretch",
               }}
             >
-              <Card style={{ flex: 1, minWidth: 280, gap: 18 }}>
+              <Card
+                testID="control-settings-card"
+                style={{
+                  flex: width >= 1150 ? 1 : undefined,
+                  minWidth: 280,
+                  gap: 18,
+                }}
+              >
                 <AppText variant="heading">Le contrôle</AppText>
                 <Field
                   label="Titre du contrôle"
@@ -610,7 +617,13 @@ export function ParentControlsScreen() {
                   maxLength={3}
                 />
               </Card>
-              <Card style={{ flex: 1, minWidth: 280, gap: 18 }}>
+              <Card
+                style={{
+                  flex: width >= 1150 ? 1 : undefined,
+                  minWidth: 280,
+                  gap: 18,
+                }}
+              >
                 <AppText variant="heading">Chapitres au programme</AppText>
                 {available.map((course) => (
                   <Pressable

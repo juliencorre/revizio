@@ -145,7 +145,7 @@ test("créer des schémas validés, publier puis les revoir en mode mémoire", a
   await page.getByTestId("auth-submit").click();
   await expect(page).toHaveURL(/\/student(?:\?|$)/);
   await page.goto("/student/course/" + courseId);
-  const fractionCaption = page.getByText("1 / 4 · 1 parts sur 4", {
+  const fractionCaption = page.getByText("1 / 4 · 1 part sur 4", {
     exact: true,
   });
   const pointLabels = page.getByLabel("Origine : 0, Point A : 3", {

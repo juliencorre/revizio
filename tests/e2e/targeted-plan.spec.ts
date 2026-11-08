@@ -87,6 +87,7 @@ test("relire les erreurs réellement commises puis partager une séance ciblée 
       )!.label,
   );
   await expect(preview).not.toContainText(series.questions[1].prompt);
+  await preview.scrollIntoViewIfNeeded();
   await capture(page, info, "parent-targeted-errors-preview");
   const plan = await publishPlan(page, title);
   const mistakeStep = plan.steps.find((step) => step.kind === "mistakes")!;
@@ -134,6 +135,7 @@ test("annoncer une consolidation approuvée quand aucune erreur n’est connue",
   await expect(preview).toContainText(`${series.questions.length} questions`);
   for (const question of series.questions)
     await expect(preview).toContainText(question.explanation);
+  await preview.scrollIntoViewIfNeeded();
   await capture(page, info, "parent-approved-consolidation-preview");
   const plan = await publishPlan(page, title);
   const mistakeStep = plan.steps.find((step) => step.kind === "mistakes")!;
