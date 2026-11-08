@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import { colors, fontFamily, neumorphic } from "@/theme";
 import type { CourseSource } from "@/domain/model";
+import { SourceThumbnail, SourceViewer } from "@/components/source-viewer";
 export function ParentLayout({
   active,
   children,
@@ -195,22 +196,12 @@ export function SourcePreview({
             ? (expanded ? "Réduire" : "Agrandir") + " la page " + (index + 1)
             : "Document " + source.name
         }
-        onPress={() => image && setExpanded(!expanded)}
-        disabled={!image}
+        onPress={() => setExpanded(true)}
+        disabled={!source.uri && !source.cachedUri}
         style={{ gap: 10 }}
       >
         {image && !failed ? (
-          <Image
-            source={{ uri: source.uri }}
-            resizeMode="contain"
-            style={{
-              width: "100%",
-              height: expanded ? 360 : 126,
-              backgroundColor: colors.surfaceInset,
-              borderRadius: 12,
-            }}
-            onError={() => setFailed(true)}
-          />
+          <SourceThumbnail source={source} />
         ) : (
           <View
             style={{
@@ -235,6 +226,10 @@ export function SourcePreview({
         </AppText>
       </Pressable>
       {controls}
+      <SourceViewer
+        source={expanded ? source : null}
+        onClose={() => setExpanded(false)}
+      />
     </View>
   );
 }

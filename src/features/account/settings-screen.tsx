@@ -277,6 +277,7 @@ export function ParentSettingsScreen() {
   async function restoreBackup() {
     if (!restore || restoreConfirm !== "RESTAURER")
       throw new Error("Confirmez la restauration avant de continuer.");
+    await learning.syncNow();
     await apiFetch("/backup/restore", {
       method: "POST",
       body: JSON.stringify({ backup: restore.value }),

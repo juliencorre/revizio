@@ -61,6 +61,7 @@ import {
 import { useRouter, type Href } from "expo-router";
 import { colors, radius, fontFamily, neumorphic } from "@/theme";
 import type { IconName } from "@/domain/model";
+import { useSession } from "@/state/session";
 const icons: Record<string, typeof Sparkles> = {
   sparkles: Sparkles,
   book: BookOpen,
@@ -389,6 +390,7 @@ export function AppShell({
   subject?: { title: string; color: string; icon: IconName };
 }) {
   const { width } = useWindowDimensions();
+  const session = useSession();
   const wide = width >= 1000;
   const router = useRouter();
   return (
@@ -409,7 +411,7 @@ export function AppShell({
                 {subject.title}
               </AppText>
               <AppText variant="small" color="#FFFFFF">
-                5e · À ton rythme
+                {session.childGrade} · À ton rythme
               </AppText>
             </View>
           )}
@@ -497,7 +499,11 @@ export function AppShell({
                 }}
               />
               <AppText variant="small" color={colors.muted}>
-                Démonstration locale · Données enregistrées sur cet appareil
+                {session.mode === "demo"
+                  ? "Démonstration locale · Données enregistrées sur cet appareil"
+                  : session.offline
+                    ? "Hors connexion · Modifications conservées sur cet appareil"
+                    : `Espace familial · ${session.childName}`}
               </AppText>
             </View>
           </View>

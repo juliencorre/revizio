@@ -177,6 +177,7 @@ export class FamilySync {
     }
   }
   async reload() {
+    if (this.running) await this.running;
     const remote = await this.options.request<RemoteData>(
       "/data?profileId=" + encodeURIComponent(this.options.profileId),
     );

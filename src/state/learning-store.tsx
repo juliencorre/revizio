@@ -51,6 +51,8 @@ export interface AttemptOptions {
   restart?: boolean;
   mode?: "practice" | "exam";
   timeLimitSeconds?: number;
+  planId?: string;
+  stepId?: string;
 }
 export interface GenerateSeriesInput {
   title: string;
@@ -775,7 +777,9 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           title: course.title,
           existingCourseId: id,
           sourceText: course.sourceText,
-          sourceIds: sources.map((source) => source.storageId || source.id),
+          sourceIds: [
+            ...new Set(sources.map((source) => source.storageId || source.id)),
+          ],
         }),
       });
       updateCourse(id, { generationJobId: job.id });
@@ -818,6 +822,44 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     (job: AiJob): string | null => {
       assertParent();
       if (job.status !== "succeeded") return null;
+      if (job.profileId && job.profileId !== sessionRef.current.activeProfileId)
+        throw new Error(
+          "Sélectionnez le profil concerné avant de récupérer cette préparation.",
+        );
+      if (job.kind === "exercises" && job.result?.questions?.length) {
+        const previous = dataRef.current.series.find(
+          (s) => s.generationJobId === job.id,
+        );
+        if (previous) return previous.id;
+        const input = job.input ?? {};
+        const courseIds = Array.isArray(input.courseIds)
+          ? input.courseIds.filter((id): id is string => typeof id === "string")
+          : [];
+        const courses = dataRef.current.courses.filter((c) =>
+          courseIds.includes(c.id),
+        );
+        if (!courses.length)
+          throw new Error(
+            "Les cours de cette préparation ne sont plus disponibles.",
+          );
+        return addSeries({
+          title:
+            typeof input.title === "string"
+              ? input.title
+              : `Révision · ${courses.map((c) => c.title).join(", ")}`,
+          courseIds,
+          subjectId: courses[0].subjectId,
+          level:
+            input.level === "discovery" || input.level === "challenge"
+              ? input.level
+              : "practice",
+          questions: job.result.questions,
+          generationJobId: job.id,
+          ...(typeof input.dueDate === "string"
+            ? { dueDate: input.dueDate }
+            : {}),
+        });
+      }
       const existing = dataRef.current.courses.find(
         (c) => c.generationJobId === job.id,
       );
@@ -840,7 +882,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       }
       return null;
     },
-    [assertParent, addCourse, updateCourse],
+    [assertParent, addCourse, updateCourse, addSeries],
   );
   const value = useMemo<LearningContextValue>(
     () => ({

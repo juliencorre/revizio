@@ -50,6 +50,7 @@ interface SessionContextValue {
 const SessionContext = createContext<SessionContextValue | null>(null);
 const CACHE_KEY = "revizo.family-session";
 const MODE_KEY = "revizo.mode";
+const LOCK_KEY = "revizo.session-locked";
 const DEMO_PROFILE = { id: "alex", name: "Alex", grade: "5e" };
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -61,6 +62,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [serverAvailable, setServerAvailable] = useState(false);
   const [offline, setOffline] = useState(false);
   const accept = useCallback(async (response: SessionResponse) => {
+    await AsyncStorage.removeItem(LOCK_KEY);
     await rememberToken(response.token);
     setUser(response.user);
     setProfiles(response.profiles);
@@ -102,6 +104,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setServerAvailable(true);
       setOffline(false);
       const savedMode = await AsyncStorage.getItem(MODE_KEY);
+      const locked = await AsyncStorage.getItem(LOCK_KEY);
+      if (locked) {
+        await apiFetch("/logout", { method: "POST" });
+        await rememberToken();
+        if (savedMode !== "demo") {
+          setUser(null);
+          setMode("choose");
+          const available = await apiFetch<{ profiles: ChildProfile[] }>(
+            "/profiles",
+          );
+          setProfiles(available.profiles);
+          return;
+        }
+      }
       if (savedMode === "demo") {
         setMode("demo");
         setUser(null);
@@ -157,6 +173,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setProfiles([DEMO_PROFILE]);
         setActiveProfileId("alex");
+      } else if (await AsyncStorage.getItem(LOCK_KEY)) {
+        setMode("choose");
+        setUser(null);
       } else {
         try {
           const cached = JSON.parse(
@@ -209,6 +228,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
   const enterDemo = useCallback(async () => {
+    await AsyncStorage.setItem(LOCK_KEY, "1");
+    await apiFetch("/logout", { method: "POST" }).catch(() => undefined);
+    await rememberToken();
+    await AsyncStorage.removeItem(CACHE_KEY);
     await AsyncStorage.setItem(MODE_KEY, "demo");
     setMode("demo");
     setUser(null);
@@ -249,19 +272,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [accept],
   );
   const logout = useCallback(async () => {
+    await AsyncStorage.setItem(LOCK_KEY, "1");
     try {
-      if (mode === "family") await apiFetch("/logout", { method: "POST" });
+      await apiFetch("/logout", { method: "POST" });
     } catch {}
     await rememberToken();
     await AsyncStorage.multiRemove([MODE_KEY, CACHE_KEY]);
-    if (user) {
-      const keys = await AsyncStorage.getAllKeys();
-      await AsyncStorage.multiRemove(
-        keys.filter((key) =>
-          key.startsWith("revizo.family." + user.familyId + "."),
-        ),
-      );
-    }
     setUser(null);
     setMode("choose");
     setActiveProfileId("");

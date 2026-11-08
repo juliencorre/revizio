@@ -72,6 +72,8 @@ export function ChildShell({
       icon: "chart",
       active: active === "progress",
     },
+    { label: "Mes contrôles", href: "/student/plans", icon: "calendar" },
+    { label: "Mon anglais", href: "/student/english", icon: "languages" },
   ];
   return (
     <AppShell role="child" navigation={navigation} subject={subject}>

@@ -142,15 +142,25 @@ export async function uploadCourseSource(
       name: source.name,
       type: source.mimeType || "application/octet-stream",
     } as unknown as Blob);
-  const uploaded = await apiFetch<CourseSource>(
+  let uploaded = await apiFetch<CourseSource>(
     "/uploads" +
       (profileId ? "?profileId=" + encodeURIComponent(profileId) : ""),
     { method: "POST", body: form },
   );
-  await cacheSource({ ...uploaded, uri: await resolveSourceUri(source) }).catch(
-    () => undefined,
-  );
-  return uploaded;
+  if (source.rotation && [90, 180, 270].includes(source.rotation)) {
+    uploaded = await apiFetch<CourseSource>("/uploads/" + uploaded.id, {
+      method: "PATCH",
+      body: JSON.stringify({ rotation: source.rotation }),
+    });
+  }
+  const normalized: CourseSource = {
+    ...uploaded,
+    ...(source.page ? { page: source.page } : {}),
+    ...(source.extractedText ? { extractedText: source.extractedText } : {}),
+    ...(source.uncertain !== undefined ? { uncertain: source.uncertain } : {}),
+  };
+  const cached = await cacheSource(normalized).catch(() => normalized);
+  return cached;
 }
 export async function waitForJob(
   jobId: string,

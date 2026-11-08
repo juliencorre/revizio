@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Image, Modal, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AppIcon,
@@ -11,6 +11,9 @@ import {
   PageHeading,
 } from "@/components/ui";
 import { colors } from "@/theme";
+import { SourceViewer } from "@/components/source-viewer";
+import { ReadAloud } from "@/components/read-aloud";
+import { LearningDiagram } from "@/components/learning-diagram";
 import type { CourseSource, RevisionSection } from "@/domain/model";
 import {
   ChildShell,
@@ -52,9 +55,9 @@ export function StudentHomeScreen() {
     <ChildShell>
       <View testID="student-home" style={{ gap: 26 }}>
         <PageHeading
-          title="Salut Alex !"
+          title={`Salut ${data.childName} !`}
           description="Un cours à relire, une question à essayer. Avance à ton rythme."
-          action={<Badge>Élève de 5e</Badge>}
+          action={<Badge>Élève de {data.childGrade}</Badge>}
         />
         {!data.isReady ? (
           <Loading />
@@ -121,7 +124,9 @@ export function StudentHomeScreen() {
               </Card>
             )}
             <View style={styles.sectionHeading}>
-              <AppText variant="heading">Mes matières de 5e</AppText>
+              <AppText variant="heading">
+                Mes matières de {data.childGrade}
+              </AppText>
               <AppText variant="small" color={colors.muted}>
                 {plural(
                   data.publishedCourses.length,
@@ -291,6 +296,8 @@ export function StudentCourseScreen() {
   const reviewed = data.reviewedCourseIds.includes(id);
   const [source, setSource] = useState<CourseSource | null>(null);
   const split = width >= 880;
+  const [recall, setRecall] = useState(false);
+  const [revealed, setRevealed] = useState<string[]>([]);
   return (
     <ChildShell active="courses" subject={subject}>
       {!data.isReady ? (
@@ -313,6 +320,34 @@ export function StudentCourseScreen() {
             <Badge tone="green">Vérifiée par un parent</Badge>
           </View>
           <PageHeading title={course.title} description={course.description} />
+          <View style={styles.wrap}>
+            <ReadAloud
+              text={[
+                course.title,
+                ...course.sections.flatMap((s) => [
+                  s.title,
+                  s.content,
+                  s.example || "",
+                ]),
+              ].join(". ")}
+            />
+            <Button
+              variant="secondary"
+              icon="lightbulb"
+              onPress={() => {
+                setRecall(!recall);
+                setRevealed([]);
+              }}
+            >
+              {recall ? "Lire toute la fiche" : "Me tester de mémoire"}
+            </Button>
+          </View>
+          {recall && (
+            <AppText color={colors.muted}>
+              Essaie d’expliquer chaque notion avec tes mots, puis affiche
+              l’explication pour comparer.
+            </AppText>
+          )}
           <View
             style={{
               flexDirection: split ? "row" : "column",
@@ -361,35 +396,62 @@ export function StudentCourseScreen() {
                           {section.title}
                         </AppText>
                       </View>
-                      <AppText style={{ fontSize: 18, lineHeight: 30 }}>
-                        {section.content}
-                      </AppText>
-                      {section.example && (
-                        <View
-                          style={{
-                            borderRadius: 16,
-                            backgroundColor: config.background,
-                            padding: 18,
-                            gap: 6,
-                          }}
+                      {recall && !revealed.includes(section.id) ? (
+                        <Button
+                          variant="secondary"
+                          onPress={() => setRevealed([...revealed, section.id])}
                         >
-                          <AppText
-                            variant="small"
-                            color={config.color}
-                            style={{ fontWeight: "700" }}
-                          >
-                            UN EXEMPLE
+                          Afficher l’explication
+                        </Button>
+                      ) : (
+                        <>
+                          <AppText style={{ fontSize: 18, lineHeight: 30 }}>
+                            {section.content}
                           </AppText>
-                          <AppText
-                            style={{
-                              fontSize: 18,
-                              lineHeight: 29,
-                              fontWeight: "600",
-                            }}
-                          >
-                            {section.example}
-                          </AppText>
-                        </View>
+                          {section.diagram && (
+                            <LearningDiagram diagram={section.diagram} />
+                          )}
+                          {!!section.sourceRefs?.length && (
+                            <AppText variant="small" color={colors.muted}>
+                              Sources :{" "}
+                              {section.sourceRefs
+                                .map(
+                                  (ref) =>
+                                    course.sources.find(
+                                      (s) => s.id === ref.sourceId,
+                                    )?.name || "Texte du cours",
+                                )
+                                .join(", ")}
+                            </AppText>
+                          )}
+                          {section.example && (
+                            <View
+                              style={{
+                                borderRadius: 16,
+                                backgroundColor: config.background,
+                                padding: 18,
+                                gap: 6,
+                              }}
+                            >
+                              <AppText
+                                variant="small"
+                                color={config.color}
+                                style={{ fontWeight: "700" }}
+                              >
+                                UN EXEMPLE
+                              </AppText>
+                              <AppText
+                                style={{
+                                  fontSize: 18,
+                                  lineHeight: 29,
+                                  fontWeight: "600",
+                                }}
+                              >
+                                {section.example}
+                              </AppText>
+                            </View>
+                          )}
+                        </>
                       )}
                     </Card>
                   );
@@ -416,11 +478,10 @@ export function StudentCourseScreen() {
                 <Button
                   icon="check"
                   variant={reviewed ? "secondary" : "primary"}
-                  disabled={reviewed}
                   onPress={() => data.markReviewed(course.id)}
                 >
                   {reviewed
-                    ? "Déjà marquée relue"
+                    ? "Je viens de la relire"
                     : "Marquer cette fiche comme relue"}
                 </Button>
               </Card>
@@ -463,7 +524,7 @@ export function StudentCourseScreen() {
                       <AppIcon name="file" size={19} />
                       <View style={{ flex: 1, gap: 6 }}>
                         <AppText variant="small">{item.name}</AppText>
-                        {item.uri && item.mimeType?.startsWith("image/") ? (
+                        {item.uri || item.cachedUri ? (
                           <Button
                             variant="secondary"
                             icon="book"
@@ -485,58 +546,7 @@ export function StudentCourseScreen() {
               )}
             </View>
           </View>
-          <Modal
-            visible={!!source}
-            animationType="fade"
-            transparent
-            onRequestClose={() => setSource(null)}
-          >
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: "#252B3BCC",
-                padding: 24,
-                justifyContent: "center",
-              }}
-            >
-              <Card
-                style={{
-                  flex: 1,
-                  maxHeight: 900,
-                  width: "100%",
-                  maxWidth: 1100,
-                  alignSelf: "center",
-                  gap: 16,
-                }}
-              >
-                <View style={styles.sectionHeading}>
-                  <AppText variant="heading" style={{ flex: 1 }}>
-                    {source?.name}
-                  </AppText>
-                  <Button
-                    variant="secondary"
-                    icon="close"
-                    onPress={() => setSource(null)}
-                  >
-                    Fermer
-                  </Button>
-                </View>
-                <ScrollView
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{ flexGrow: 1 }}
-                >
-                  {source?.uri && (
-                    <Image
-                      accessibilityLabel={source.name}
-                      source={{ uri: source.uri }}
-                      resizeMode="contain"
-                      style={{ width: "100%", minHeight: 500, flex: 1 }}
-                    />
-                  )}
-                </ScrollView>
-              </Card>
-            </View>
-          </Modal>
+          <SourceViewer source={source} onClose={() => setSource(null)} />
         </>
       )}
     </ChildShell>

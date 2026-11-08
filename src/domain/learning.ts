@@ -168,6 +168,8 @@ export function startAttemptInData(
     mode?: "practice" | "exam";
     timeLimitSeconds?: number;
     profileId?: string;
+    planId?: string;
+    stepId?: string;
   },
 ): { data: LearningData; attemptId: string | null } {
   const series = data.series.find(
@@ -177,7 +179,15 @@ export function startAttemptInData(
     return { data, attemptId: null };
   const unfinished = [...data.attempts]
     .reverse()
-    .find((attempt) => attempt.seriesId === seriesId && !attempt.completedAt);
+    .find(
+      (attempt) =>
+        attempt.seriesId === seriesId &&
+        !attempt.completedAt &&
+        (attempt.mode ?? "practice") ===
+          (options?.mode ?? series.mode ?? "practice") &&
+        attempt.planId === options?.planId &&
+        attempt.stepId === options?.stepId,
+    );
   if (unfinished && !restart) return { data, attemptId: unfinished.id };
   if (data.attempts.some((attempt) => attempt.id === id))
     return { data, attemptId: null };
@@ -190,6 +200,9 @@ export function startAttemptInData(
     seriesTitle: series.title,
     subjectId: series.subjectId,
     mode: options?.mode ?? series.mode ?? "practice",
+    ...(options?.planId
+      ? { planId: options.planId, stepId: options.stepId }
+      : {}),
     ...(options?.profileId ? { profileId: options.profileId } : {}),
     ...((options?.timeLimitSeconds ?? series.timeLimitSeconds)
       ? {

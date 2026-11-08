@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AppIcon,
@@ -11,7 +11,8 @@ import {
   PageHeading,
   ProgressBar,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { colors, fontFamily, neumorphic } from "@/theme";
+import { expectedAnswerLabel } from "@/domain/answers";
 import type { Answer, Attempt, Question } from "@/domain/model";
 import {
   ChildShell,
@@ -23,11 +24,40 @@ import {
   useContentWidth,
 } from "./shared";
 export function StudentExerciseScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const {
+    id,
+    mode,
+    minutes,
+    planId,
+    stepId,
+    errors,
+    attemptId: requestedAttemptId,
+  } = useLocalSearchParams<{
+    id: string;
+    mode?: string;
+    minutes?: string;
+    planId?: string;
+    stepId?: string;
+    attemptId?: string;
+    errors?: string;
+  }>();
   const data = useChildData();
   const router = useRouter();
   const width = useContentWidth();
-  const series = data.publishedSeries.find((s) => s.id === id);
+  const archived = data.attempts.find(
+    (a) => a.id === requestedAttemptId && a.seriesId === id,
+  );
+  const publishedSeries = data.publishedSeries.find((s) => s.id === id);
+  const series =
+    publishedSeries ??
+    (archived
+      ? {
+          id,
+          subjectId: archived.subjectId,
+          title: archived.seriesTitle,
+          mode: archived.mode,
+        }
+      : undefined);
   const subject = subjectFor(data.subjects, series?.subjectId ?? "");
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questionIndex, setQuestionIndex] = useState<number | null>(null);
@@ -37,35 +67,89 @@ export function StudentExerciseScreen() {
   const [reviewingErrors, setReviewingErrors] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [startError, setStartError] = useState(false);
+  const [clock, setClock] = useState(Date.now());
+  const exam = mode === "exam" || series?.mode === "exam";
+  const routeKey = [id, mode, planId, stepId, requestedAttemptId, errors].join(
+    "|",
+  );
+  const attemptOptions = {
+    mode: exam ? ("exam" as const) : ("practice" as const),
+    ...(exam
+      ? {
+          timeLimitSeconds:
+            Math.max(1, Math.min(120, Number(minutes) || 20)) * 60,
+        }
+      : {}),
+    planId,
+    stepId,
+  };
   const initializedRoute = useRef<string | null>(null);
   useEffect(() => {
-    if (!data.isReady || !series || initializedRoute.current === id) return;
-    initializedRoute.current = id;
+    if (!data.isReady || !series || initializedRoute.current === routeKey)
+      return;
+    initializedRoute.current = routeKey;
     setQuestionIndex(null);
     setSelectedChoice(null);
     setHintVisible(false);
     setHintUsed(false);
-    setReviewingErrors(false);
+    setReviewingErrors(errors === "1");
     setShowSummary(false);
     const existing = [...data.attempts]
-      .filter((a) => a.seriesId === id)
+      .filter(
+        (a) =>
+          a.seriesId === id &&
+          (requestedAttemptId
+            ? a.id === requestedAttemptId
+            : (a.mode ?? "practice") === attemptOptions.mode &&
+              a.planId === planId &&
+              a.stepId === stepId),
+      )
       .reverse()
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
     const existingAttempt = existing.find((a) => !a.completedAt) ?? existing[0];
-    const next = existingAttempt?.id ?? data.startAttempt(id);
+    const next =
+      existingAttempt?.id ??
+      (requestedAttemptId ? null : data.startAttempt(id, attemptOptions));
     setAttemptId(next);
     setStartError(!next);
-  }, [data.isReady, id, series, data.attempts, data.startAttempt]);
+  }, [data.isReady, routeKey, series, data.attempts, data.startAttempt]);
   const attempt = data.attempts.find(
     (a) => a.id === attemptId && a.seriesId === id,
   );
+  const isExam = attempt?.mode === "exam";
+  useEffect(() => {
+    if (!attempt?.deadlineAt || attempt.completedAt) return;
+    const tick = () => setClock(Date.now());
+    tick();
+    const timer = setInterval(tick, 500);
+    return () => clearInterval(timer);
+  }, [attempt?.id, attempt?.deadlineAt, attempt?.completedAt]);
+  useEffect(() => {
+    if (
+      attempt?.deadlineAt &&
+      !attempt.completedAt &&
+      Date.parse(attempt.deadlineAt) <= clock
+    ) {
+      data.submitAttempt(attempt.id);
+      setShowSummary(true);
+    }
+  }, [attempt, clock, data.submitAttempt]);
+  useEffect(() => {
+    if (attempt?.completedAt && attempt.planId && attempt.stepId)
+      data.completePlanStep(attempt.planId, attempt.stepId);
+  }, [
+    attempt?.completedAt,
+    attempt?.planId,
+    attempt?.stepId,
+    data.completePlanStep,
+  ]);
   useEffect(() => {
     if (!attempt || questionIndex !== null) return;
     const first = attempt.questions.findIndex(
       (q) => !attempt.answers.some((a) => a.questionId === q.id),
     );
     if (first === -1) {
-      setShowSummary(true);
+      setShowSummary(errors !== "1");
       setQuestionIndex(0);
     } else {
       setQuestionIndex(first);
@@ -87,7 +171,7 @@ export function StudentExerciseScreen() {
     setHintUsed(false);
   }
   function restart() {
-    const next = data.startAttempt(id, true);
+    const next = data.startAttempt(id, { ...attemptOptions, restart: true });
     if (!next) {
       setStartError(true);
       return;
@@ -106,9 +190,18 @@ export function StudentExerciseScreen() {
   const question =
     questionIndex === null ? undefined : displayed[questionIndex];
   const answer = attempt?.answers.find((a) => a.questionId === question?.id);
+  const reveal = !isExam || !!attempt?.completedAt || reviewingErrors;
+  const written =
+    !!question?.type &&
+    !["single-choice", "true-false"].includes(question.type);
   function verify() {
-    if (!attempt || !question || !selectedChoice || answer) return;
-    data.answerQuestion(attempt.id, question.id, selectedChoice, hintUsed);
+    if (!attempt || !question || !selectedChoice?.trim() || answer) return;
+    data.answerQuestion(
+      attempt.id,
+      question.id,
+      selectedChoice.trim(),
+      hintUsed,
+    );
   }
   function next() {
     resetQuestion();
@@ -149,6 +242,7 @@ export function StudentExerciseScreen() {
       ) : showSummary ? (
         <ExerciseSummary
           attempt={attempt}
+          canRestart={!!publishedSeries}
           onRestart={restart}
           onReviewErrors={reviewErrors}
           onExit={() =>
@@ -177,9 +271,32 @@ export function StudentExerciseScreen() {
             >
               Quitter et garder ma place
             </Button>
-            <Badge tone={reviewingErrors ? "orange" : "primary"}>
-              {reviewingErrors ? "Je revois mes erreurs" : "À mon rythme"}
-            </Badge>
+            {isExam && attempt.deadlineAt && !attempt.completedAt ? (
+              <AppText
+                testID="exam-timer"
+                variant="label"
+                color={colors.primary}
+              >
+                Temps restant :{" "}
+                {Math.floor(
+                  Math.max(0, Date.parse(attempt.deadlineAt) - clock) / 60000,
+                )}
+                :
+                {String(
+                  Math.floor(
+                    Math.max(0, Date.parse(attempt.deadlineAt) - clock) / 1000,
+                  ) % 60,
+                ).padStart(2, "0")}
+              </AppText>
+            ) : (
+              <Badge tone={reviewingErrors ? "orange" : "primary"}>
+                {reviewingErrors
+                  ? "Je revois mes erreurs"
+                  : isExam
+                    ? "Contrôle blanc"
+                    : "À mon rythme"}
+              </Badge>
+            )}
           </View>
           <View style={{ gap: 12 }}>
             <View style={styles.sectionHeading}>
@@ -204,8 +321,18 @@ export function StudentExerciseScreen() {
           </View>
           <Card style={{ gap: 26, padding: width >= 650 ? 34 : 22 }}>
             <View style={styles.sectionHeading}>
-              <Badge>QCM · Une seule réponse</Badge>
-              {!answer && question.hint && (
+              <Badge>
+                {
+                  {
+                    "single-choice": "QCM · Une seule réponse",
+                    "true-false": "Vrai ou faux",
+                    "fill-blank": "Texte à compléter",
+                    "short-answer": "Réponse courte",
+                    problem: "Problème",
+                  }[question.type ?? "single-choice"]
+                }
+              </Badge>
+              {!isExam && !answer && question.hint && (
                 <Button
                   variant="ghost"
                   icon="lightbulb"
@@ -242,97 +369,138 @@ export function StudentExerciseScreen() {
                 <AppText color={colors.orange}>{question.hint}</AppText>
               </View>
             )}
-            <View style={styles.grid}>
-              {question.choices.map((choice, index) => {
-                const selected =
-                  (answer?.choiceId ?? selectedChoice) === choice.id;
-                const correct =
-                  !!answer && choice.id === question.correctChoiceId;
-                const wrong = !!answer && selected && !answer.isCorrect;
-                const border = correct
-                  ? colors.green
-                  : wrong
-                    ? colors.danger
-                    : selected
-                      ? colors.primary
-                      : colors.border;
-                return (
-                  <Pressable
-                    key={choice.id}
-                    accessibilityRole="radio"
-                    accessibilityLabel={`${String.fromCharCode(65 + index)}. ${choice.label}`}
-                    accessibilityState={{
-                      checked: selected,
-                      disabled: !!answer,
-                    }}
-                    disabled={!!answer}
-                    testID={`choice-${choice.id}`}
-                    onPress={() => setSelectedChoice(choice.id)}
-                    style={({ pressed }) => [
-                      {
-                        width: width >= 650 ? (width - 70 - 18) / 2 : "100%",
-                        minHeight: 106,
-                        borderRadius: 20,
-                        borderWidth: 2,
-                        borderColor: border,
-                        backgroundColor: correct
-                          ? colors.greenLight
-                          : wrong
-                            ? colors.dangerLight
-                            : selected
-                              ? colors.primaryLight
-                              : "#F8F9FC",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        padding: 19,
-                        gap: 15,
-                      },
-                      pressed && { opacity: 0.8 },
-                    ]}
-                  >
-                    <View
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 19,
-                        borderWidth: 1.5,
-                        borderColor: border,
-                        backgroundColor: colors.surface,
-                        alignItems: "center",
-                        justifyContent: "center",
+            {written ? (
+              <TextInput
+                testID="written-answer"
+                accessibilityLabel="Ma réponse"
+                placeholder="Écris ta réponse ici"
+                placeholderTextColor={colors.muted}
+                value={answer?.choiceId ?? selectedChoice ?? ""}
+                onChangeText={setSelectedChoice}
+                editable={!answer}
+                multiline={question.type === "problem"}
+                maxLength={2000}
+                style={[
+                  neumorphic.inset,
+                  {
+                    minHeight: question.type === "problem" ? 130 : 60,
+                    padding: 20,
+                    borderRadius: 18,
+                    fontFamily,
+                    fontSize: 20,
+                    color: colors.ink,
+                  },
+                ]}
+              />
+            ) : (
+              <View style={styles.grid}>
+                {question.choices.map((choice, index) => {
+                  const selected =
+                    (answer?.choiceId ?? selectedChoice) === choice.id;
+                  const correct =
+                    !!answer &&
+                    reveal &&
+                    choice.id === question.correctChoiceId;
+                  const wrong =
+                    !!answer && reveal && selected && !answer.isCorrect;
+                  const border = correct
+                    ? colors.green
+                    : wrong
+                      ? colors.danger
+                      : selected
+                        ? colors.primary
+                        : colors.border;
+                  return (
+                    <Pressable
+                      key={choice.id}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`${String.fromCharCode(65 + index)}. ${choice.label}`}
+                      accessibilityState={{
+                        checked: selected,
+                        disabled: !!answer,
                       }}
+                      disabled={!!answer}
+                      testID={`choice-${choice.id}`}
+                      onPress={() => setSelectedChoice(choice.id)}
+                      style={({ pressed }) => [
+                        selected || pressed
+                          ? neumorphic.inset
+                          : neumorphic.small,
+                        {
+                          width: width >= 650 ? (width - 70 - 18) / 2 : "100%",
+                          minHeight: 106,
+                          borderRadius: 20,
+                          borderWidth: 2,
+                          borderColor: border,
+                          backgroundColor: correct
+                            ? colors.greenLight
+                            : wrong
+                              ? colors.dangerLight
+                              : selected
+                                ? colors.primaryLight
+                                : colors.surface,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          padding: 19,
+                          gap: 15,
+                        },
+                        pressed && { opacity: 0.8 },
+                      ]}
                     >
-                      {correct ? (
-                        <AppIcon name="check" color={colors.green} size={21} />
-                      ) : wrong ? (
-                        <AppIcon name="close" color={colors.danger} size={21} />
-                      ) : (
-                        <AppText
-                          variant="label"
-                          color={selected ? colors.primary : colors.muted}
-                        >
-                          {String.fromCharCode(65 + index)}
-                        </AppText>
-                      )}
-                    </View>
-                    <AppText
-                      variant="heading"
-                      style={{ flex: 1, fontSize: 21, lineHeight: 28 }}
-                      color={
-                        correct
-                          ? colors.green
-                          : wrong
-                            ? colors.danger
-                            : colors.ink
-                      }
-                    >
-                      {choice.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {answer && <AnswerFeedback question={question} answer={answer} />}
+                      <View
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 19,
+                          borderWidth: 1.5,
+                          borderColor: border,
+                          backgroundColor: colors.surface,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {correct ? (
+                          <AppIcon
+                            name="check"
+                            color={colors.green}
+                            size={21}
+                          />
+                        ) : wrong ? (
+                          <AppIcon
+                            name="close"
+                            color={colors.danger}
+                            size={21}
+                          />
+                        ) : (
+                          <AppText
+                            variant="label"
+                            color={selected ? colors.primary : colors.muted}
+                          >
+                            {String.fromCharCode(65 + index)}
+                          </AppText>
+                        )}
+                      </View>
+                      <AppText
+                        variant="heading"
+                        style={{ flex: 1, fontSize: 21, lineHeight: 28 }}
+                        color={
+                          correct
+                            ? colors.green
+                            : wrong
+                              ? colors.danger
+                              : colors.ink
+                        }
+                      >
+                        {choice.label}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+            {answer && reveal && (
+              <AnswerFeedback question={question} answer={answer} />
+            )}
             <View
               style={[
                 styles.row,
@@ -348,7 +516,9 @@ export function StudentExerciseScreen() {
                   ? "Tu retrouves ici ta réponse et son explication."
                   : answer
                     ? "Ta réponse est enregistrée."
-                    : "Choisis une réponse, puis vérifie."}
+                    : written
+                      ? "Écris ta réponse, puis valide."
+                      : "Choisis une réponse, puis valide."}
               </AppText>
               {answer ? (
                 <Button
@@ -366,10 +536,10 @@ export function StudentExerciseScreen() {
                 <Button
                   testID="verify-answer"
                   icon="check"
-                  disabled={!selectedChoice}
+                  disabled={!selectedChoice?.trim()}
                   onPress={verify}
                 >
-                  Vérifier ma réponse
+                  {isExam ? "Enregistrer ma réponse" : "Vérifier ma réponse"}
                 </Button>
               )}
             </View>
@@ -380,7 +550,7 @@ export function StudentExerciseScreen() {
               return (
                 <View
                   key={q.id}
-                  accessibilityLabel={`Question ${index + 1} : ${saved ? (saved.isCorrect ? "bonne réponse" : "à revoir") : "sans réponse"}`}
+                  accessibilityLabel={`Question ${index + 1} : ${saved ? (reveal ? (saved.isCorrect ? "bonne réponse" : "à revoir") : "enregistrée") : "sans réponse"}`}
                   style={{
                     width: 25,
                     height: 25,
@@ -388,9 +558,11 @@ export function StudentExerciseScreen() {
                     borderWidth: index === questionIndex ? 2 : 0,
                     borderColor: colors.primary,
                     backgroundColor: saved
-                      ? saved.isCorrect
-                        ? colors.greenLight
-                        : colors.orangeLight
+                      ? !reveal
+                        ? colors.primaryLight
+                        : saved.isCorrect
+                          ? colors.greenLight
+                          : colors.orangeLight
                       : colors.border,
                     alignItems: "center",
                     justifyContent: "center",
@@ -398,9 +570,15 @@ export function StudentExerciseScreen() {
                 >
                   {saved && (
                     <AppIcon
-                      name={saved.isCorrect ? "check" : "close"}
+                      name={!reveal || saved.isCorrect ? "check" : "close"}
                       size={14}
-                      color={saved.isCorrect ? colors.green : colors.orange}
+                      color={
+                        !reveal
+                          ? colors.primary
+                          : saved.isCorrect
+                            ? colors.green
+                            : colors.orange
+                      }
                     />
                   )}
                 </View>
@@ -445,11 +623,7 @@ function AnswerFeedback({
       </View>
       {!answer.isCorrect && (
         <AppText style={{ fontWeight: "700" }}>
-          La bonne réponse :{" "}
-          {
-            question.choices.find((c) => c.id === question.correctChoiceId)
-              ?.label
-          }
+          La bonne réponse : {expectedAnswerLabel(question)}
         </AppText>
       )}
       <AppText style={{ lineHeight: 27 }}>{question.explanation}</AppText>
@@ -463,11 +637,13 @@ function AnswerFeedback({
 }
 function ExerciseSummary({
   attempt,
+  canRestart,
   onRestart,
   onReviewErrors,
   onExit,
 }: {
   attempt: Attempt;
+  canRestart: boolean;
   onRestart: () => void;
   onReviewErrors: () => void;
   onExit: () => void;
@@ -546,13 +722,15 @@ function ExerciseSummary({
             Revoir mes erreurs ({mistakes.length})
           </Button>
         )}
-        <Button
-          variant={mistakes.length ? "secondary" : "primary"}
-          icon="refresh"
-          onPress={onRestart}
-        >
-          Recommencer la série
-        </Button>
+        {canRestart && (
+          <Button
+            variant={mistakes.length ? "secondary" : "primary"}
+            icon="refresh"
+            onPress={onRestart}
+          >
+            Recommencer la série
+          </Button>
+        )}
         <Button variant="ghost" icon="arrow-left" onPress={onExit}>
           Mes exercices
         </Button>

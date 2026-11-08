@@ -49,6 +49,7 @@ export function StudentProgressScreen() {
         question: q,
         seriesId: a.seriesId,
         seriesTitle: a.seriesTitle,
+        attemptId: a.id,
       })),
   );
   const concepts = errors.filter(
@@ -211,10 +212,12 @@ export function StudentProgressScreen() {
                             variant="ghost"
                             icon="arrow-right"
                             onPress={() =>
-                              router.push(`/student/exercise/${item.seriesId}`)
+                              router.push(
+                                `/student/exercise/${item.seriesId}?attemptId=${item.attemptId}&errors=1`,
+                              )
                             }
                           >
-                            Retrouver la série
+                            Revoir mes erreurs
                           </Button>
                         )}
                       </View>
@@ -277,18 +280,22 @@ export function StudentProgressScreen() {
                           ? ` · ${a.answers.filter((answer) => answer.usedHint).length} avec indice`
                           : ""}
                       </AppText>
-                      {data.publishedSeries.some((s) => s.id === a.seriesId) &&
-                        !a.completedAt && (
-                          <Button
-                            variant="secondary"
-                            icon="play"
-                            onPress={() =>
-                              router.push(`/student/exercise/${a.seriesId}`)
-                            }
-                          >
-                            Reprendre
-                          </Button>
-                        )}
+                      {(a.completedAt ||
+                        data.publishedSeries.some(
+                          (s) => s.id === a.seriesId,
+                        )) && (
+                        <Button
+                          variant="secondary"
+                          icon="play"
+                          onPress={() =>
+                            router.push(
+                              `/student/exercise/${a.seriesId}?attemptId=${a.id}`,
+                            )
+                          }
+                        >
+                          {a.completedAt ? "Revoir ce bilan" : "Reprendre"}
+                        </Button>
+                      )}
                     </View>
                   ))
                 ) : (

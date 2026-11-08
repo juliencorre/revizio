@@ -156,6 +156,8 @@ export interface Attempt {
   mode?: "practice" | "exam";
   deadlineAt?: string;
   submittedAt?: string;
+  planId?: string;
+  stepId?: string;
 }
 export interface LearningData {
   version: 1;
@@ -246,6 +248,8 @@ export interface SpacedReview {
 }
 export interface AiJob {
   id: string;
+  profileId?: string;
+  input?: Record<string, unknown>;
   kind: "course" | "exercises" | "english";
   status: "queued" | "running" | "succeeded" | "failed";
   stage?: string;
