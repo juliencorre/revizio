@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { View, useWindowDimensions } from "react-native";
 import {
@@ -10,7 +10,7 @@ import {
   PageHeading,
 } from "@/components/ui";
 import { colors } from "@/theme";
-import type { RevisionSection } from "@/domain/model";
+import type { AiJob, CourseSource, RevisionSection } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import {
   Field,
@@ -48,101 +48,107 @@ const definitions: {
     placeholder: "Les confusions fréquentes et les points d’attention.",
   },
 ];
-function editableSections(sections: RevisionSection[]) {
-  return definitions.map(
-    (definition) =>
-      sections.find((section) => section.kind === definition.kind) ?? {
+function editableSections(sections: RevisionSection[]): RevisionSection[] {
+  return [
+    ...sections,
+    ...definitions
+      .filter(
+        (definition) =>
+          !sections.some((section) => section.kind === definition.kind),
+      )
+      .map((definition) => ({
         id: localId("section"),
         kind: definition.kind,
         title: definition.title,
         content: "",
         example: "",
-      },
-  );
+      })),
+  ];
 }
 export function ReviewCourseScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { courses, subjects, updateCourse, publishCourse, addCourse, isReady } =
-    useLearning();
-  const course = courses.find((item) => item.id === id);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [sections, setSections] = useState<RevisionSection[]>([]);
+  const data = useLearning();
+  const course = data.courses.find((item) => item.id === id);
+  const sections = useMemo(
+    () => editableSections(course?.sections ?? []),
+    [course?.sections, id],
+  );
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [published, setPublished] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  useEffect(() => {
-    if (course) {
-      setTitle(course.title);
-      setDescription(course.description);
-      setSections(editableSections(course.sections));
-      setSaved(false);
-      setError("");
-      setPublished(false);
-      setConfirmed(false);
-    }
-  }, [id, isReady]);
-  if (!isReady) return <LoadingParent active="import" />;
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const [job, setJob] = useState<AiJob | null>(null);
+  const [replaceConfirmed, setReplaceConfirmed] = useState(false);
+  if (!data.isReady) return <LoadingParent active="import" />;
   if (!course) return <ParentNotFound />;
-  const subject = subjects.find((item) => item.id === course.subjectId);
+  const subject = data.subjects.find((item) => item.id === course.subjectId);
   const readOnly = course.status === "published";
+  const disabled = busy || readOnly;
+  function change(update: Parameters<typeof data.updateCourse>[1]) {
+    if (disabled) return;
+    data.updateCourse(id, update);
+    setSaved(false);
+    setConfirmed(false);
+    setError("");
+    setReplaceConfirmed(false);
+  }
   function changeSection(
     sectionId: string,
     key: "content" | "example",
     value: string,
   ) {
-    setSections((current) =>
-      current.map((section) =>
+    change({
+      sections: sections.map((section) =>
         section.id === sectionId ? { ...section, [key]: value } : section,
       ),
-    );
-    setSaved(false);
-    setConfirmed(false);
-  }
-  function save() {
-    updateCourse(id, {
-      title: title.trim(),
-      description: description.trim(),
-      sections: sections
-        .filter((section) => section.content.trim())
-        .map((section) => ({
-          ...section,
-          content: section.content.trim(),
-          example: section.example?.trim(),
-        })),
     });
-    setSaved(true);
-    setError("");
+  }
+  function correctOcr(source: CourseSource, extractedText: string) {
+    const old = source.extractedText ?? "";
+    const current = course!.sourceText ?? "";
+    change({
+      sources: course!.sources.map((item) =>
+        item.id === source.id ? { ...item, extractedText } : item,
+      ),
+      sourceText:
+        old && current.includes(old)
+          ? current.replace(old, extractedText)
+          : [current, extractedText].filter(Boolean).join("\n\n"),
+    });
+  }
+  async function save() {
+    try {
+      await data.syncNow();
+      setSaved(true);
+      setError("");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Le brouillon n’a pas pu être synchronisé. Il reste sur cet appareil.",
+      );
+    }
   }
   function publish() {
-    if (!title.trim()) {
-      setError("Ajoutez un titre au cours.");
-      return;
-    }
-    if (
-      !sections.some(
-        (section) => section.kind === "essential" && section.content.trim(),
-      )
-    ) {
-      setError("Rédigez au moins la section « L’essentiel » avant de publier.");
-      return;
-    }
     if (!confirmed) {
       setError("Confirmez la relecture avant de publier la fiche.");
       return;
     }
-    save();
-    const result = publishCourse(id);
+    const result = data.publishCourse(id);
     if (!result.ok)
       setError(result.error ?? "La fiche ne peut pas encore être publiée.");
-    else setPublished(true);
+    else {
+      setPublished(true);
+      setError("");
+    }
   }
   function duplicate() {
-    const nextId = addCourse({
+    const nextId = data.addCourse({
       subjectId: course!.subjectId,
       title: course!.title + " — nouvelle version",
       description: course!.description,
@@ -150,12 +156,55 @@ export function ReviewCourseScreen() {
         ...section,
         id: localId("section"),
       })),
-      sources: course!.sources.map((source) => ({
-        ...source,
-        id: localId("source"),
-      })),
+      sources: course!.sources,
+      sourceText: course!.sourceText,
+      originId: course!.originId || course!.id,
+      revision: (course!.revision ?? 1) + 1,
     });
+    setConfirmed(false);
+    setPublished(false);
+    setJob(null);
     router.replace({ pathname: "/parent/review/[id]", params: { id: nextId } });
+  }
+  async function generate() {
+    if (busyRef.current || readOnly) return;
+    if (!course!.title.trim()) {
+      setError("Donnez un titre à la fiche avant la génération.");
+      return;
+    }
+    if (!course!.sources.length && !course!.sourceText?.trim()) {
+      setError(
+        "Ajoutez des documents ou du texte pour préparer une fiche fidèle au cours.",
+      );
+      return;
+    }
+    if (
+      sections.some((section) => section.content.trim()) &&
+      !replaceConfirmed
+    ) {
+      setReplaceConfirmed(true);
+      return;
+    }
+    busyRef.current = true;
+    setBusy(true);
+    setError("");
+    setConfirmed(false);
+    setSaved(false);
+    setJob(null);
+    try {
+      await data.generateCourse(id, (progress) => setJob(progress));
+      setReplaceConfirmed(false);
+      setSaved(true);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "La génération a été interrompue. Votre brouillon est conservé.",
+      );
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
   }
   return (
     <ParentLayout active="import">
@@ -165,33 +214,138 @@ export function ReviewCourseScreen() {
           title={readOnly ? "La fiche publiée" : "Préparer la fiche"}
           description={
             readOnly
-              ? "Voici le contenu disponible dans l’espace d’Alex."
-              : "Relisez le cours et préparez une fiche courte, claire et fidèle aux pages."
+              ? `Voici le contenu disponible dans l’espace de ${data.childName}.`
+              : "Vérifiez les documents, puis corrigez la fiche avant de la publier."
           }
           action={
             <Badge tone={readOnly ? "green" : "orange"}>
-              {readOnly ? "Publiée pour Alex" : "Brouillon · visible par vous"}
+              {readOnly
+                ? `Publiée pour ${data.childName}`
+                : "Brouillon · visible par vous"}
             </Badge>
           }
         />
         {published && (
           <Notice success>
-            La fiche est publiée ! Alex peut maintenant la retrouver dans ses
+            La fiche est publiée ! {data.childName} peut la retrouver dans ses
             cours.
           </Notice>
         )}
-        {readOnly ? (
+        {error && (
+          <View testID="ai-course-error">
+            <Notice error>{error}</Notice>
+          </View>
+        )}
+        {!readOnly && (
+          <Card style={{ gap: 18 }} testID="ai-course-panel">
+            <View style={s.row}>
+              <AppIcon name="sparkles" />
+              <AppText variant="heading">Préparer une fiche avec l’IA</AppText>
+            </View>
+            {data.isDemo ? (
+              <>
+                <Notice>
+                  La génération IA est disponible dans votre espace familial.
+                  Vous pouvez rédiger et publier une fiche manuellement dans
+                  cette démonstration.
+                </Notice>
+                <Button
+                  variant="secondary"
+                  icon="lock"
+                  onPress={() => router.push("/auth?target=parent")}
+                >
+                  Connexion familiale
+                </Button>
+              </>
+            ) : (
+              <>
+                <AppText color={colors.muted}>
+                  L’IA extrait le texte des documents et prépare les sections.
+                  Comparez les signes, les définitions et les exemples avec les
+                  originaux. La publication reste votre choix.
+                </AppText>
+                {replaceConfirmed && (
+                  <Notice>
+                    La nouvelle génération remplacera les sections de ce
+                    brouillon. Le texte source et les documents seront
+                    conservés. Confirmez pour continuer.
+                  </Notice>
+                )}
+                <View style={s.row}>
+                  <Button
+                    icon="sparkles"
+                    onPress={() => void generate()}
+                    disabled={busy || !data.serverAvailable}
+                    testID="ai-generate-course"
+                  >
+                    {busy
+                      ? "Préparation en cours…"
+                      : replaceConfirmed
+                        ? "Confirmer et régénérer la fiche"
+                        : sections.some((section) => section.content.trim())
+                          ? "Régénérer la fiche"
+                          : "Générer la fiche"}
+                  </Button>
+                  {replaceConfirmed && (
+                    <Button
+                      variant="ghost"
+                      onPress={() => setReplaceConfirmed(false)}
+                    >
+                      Annuler
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    icon="clock"
+                    onPress={() => router.push("/parent/preparations")}
+                  >
+                    Voir les préparations
+                  </Button>
+                </View>
+                {!data.serverAvailable && (
+                  <Notice>
+                    Retrouvez la connexion au serveur pour lancer la génération.
+                    La rédaction manuelle reste disponible.
+                  </Notice>
+                )}
+              </>
+            )}
+            {job && (
+              <Card inset style={{ gap: 8 }} testID="ai-course-progress">
+                <Badge
+                  tone={
+                    job.status === "failed"
+                      ? "orange"
+                      : job.status === "succeeded"
+                        ? "green"
+                        : "primary"
+                  }
+                >
+                  {job.status === "queued"
+                    ? "En attente"
+                    : job.status === "running"
+                      ? "En cours"
+                      : job.status === "succeeded"
+                        ? "Fiche à relire"
+                        : "À relancer"}
+                </Badge>
+                <AppText variant="label">
+                  {job.message || job.stage || "Préparation sur le serveur"}
+                </AppText>
+                <AppText variant="small" color={colors.muted}>
+                  Vous pouvez quitter cet écran et retrouver cette tâche dans
+                  les préparations.
+                </AppText>
+              </Card>
+            )}
+          </Card>
+        )}
+        {readOnly && (
           <Notice>
-            Pour modifier cette fiche en conservant la version actuelle, créez
-            une copie à préparer.
-          </Notice>
-        ) : (
-          <Notice>
-            L’extraction et la génération IA ne sont pas encore disponibles.
-            Complétez la fiche à partir des documents avant de la partager.
+            Pour modifier cette fiche, créez une nouvelle version en brouillon.
+            La version publiée reste disponible pendant sa préparation.
           </Notice>
         )}
-        {error && <Notice error>{error}</Notice>}
         <View
           style={[
             s.grid,
@@ -201,47 +355,35 @@ export function ReviewCourseScreen() {
             },
           ]}
         >
-          <View style={[s.column, { flex: 1.6, alignSelf: "stretch" }]}>
+          <View style={[s.column, { flex: 1.5, alignSelf: "stretch" }]}>
             <Card style={s.section}>
               <Field
                 label="Titre de la fiche"
                 testID="course-title"
-                value={title}
-                onChangeText={(value) => {
-                  setTitle(value);
-                  setSaved(false);
-                  setConfirmed(false);
-                }}
-                editable={!readOnly}
+                value={course.title}
+                onChangeText={(title) => change({ title })}
+                editable={!disabled}
                 maxLength={120}
               />
               <Field
                 label="Présentation courte"
                 optional
-                value={description}
-                onChangeText={(value) => {
-                  setDescription(value);
-                  setSaved(false);
-                  setConfirmed(false);
-                }}
-                editable={!readOnly}
-                placeholder="Ce que cette fiche aide à comprendre."
+                value={course.description}
+                onChangeText={(description) => change({ description })}
+                editable={!disabled}
                 maxLength={300}
               />
+              <AppText variant="small" color={colors.muted}>
+                {readOnly
+                  ? "Fiche publiée"
+                  : "Vos corrections sont enregistrées dans le brouillon au fil de la saisie."}
+                {course.revision ? ` · Version ${course.revision}` : ""}
+              </AppText>
             </Card>
             {sections
               .filter((section) => !readOnly || section.content.trim())
-              .map((section, index) => (
-                <Card
-                  key={section.id}
-                  style={[
-                    s.section,
-                    section.kind === "warning" && {
-                      backgroundColor: "#FFF8F2",
-                      borderColor: "#F1DCCD",
-                    },
-                  ]}
-                >
+              .map((section) => (
+                <Card key={section.id} style={s.section}>
                   <View style={s.row}>
                     <AppIcon
                       name={
@@ -269,7 +411,7 @@ export function ReviewCourseScreen() {
                     testID={
                       section.kind === "essential"
                         ? "course-content"
-                        : undefined
+                        : "course-content-" + section.id
                     }
                     multiline
                     placeholder={
@@ -281,8 +423,8 @@ export function ReviewCourseScreen() {
                     onChangeText={(value) =>
                       changeSection(section.id, "content", value)
                     }
-                    editable={!readOnly}
-                    maxLength={6000}
+                    editable={!disabled}
+                    maxLength={12000}
                   />
                   <Field
                     label={"Exemple — " + section.title}
@@ -291,50 +433,105 @@ export function ReviewCourseScreen() {
                     onChangeText={(value) =>
                       changeSection(section.id, "example", value)
                     }
-                    editable={!readOnly}
-                    placeholder="Un exemple concret pour mieux comprendre."
+                    editable={!disabled}
                     multiline
-                    maxLength={2000}
+                    maxLength={4000}
                   />
+                  {!!section.sourceRefs?.length && (
+                    <AppText variant="small" color={colors.muted}>
+                      Sources :{" "}
+                      {section.sourceRefs
+                        .map(
+                          (ref) =>
+                            `${course.sources.findIndex((source) => source.id === ref.sourceId) + 1}${ref.page ? `, page ${ref.page}` : ""}`,
+                        )
+                        .join(" · ")}
+                    </AppText>
+                  )}
                 </Card>
               ))}
           </View>
           <Card style={[s.column, { alignSelf: "stretch" }]}>
-            <AppText variant="heading">Les documents du cours</AppText>
-            <AppText variant="small" color={colors.muted}>
-              Comparez les définitions, les signes et les exemples avec les
-              pages originales.
+            <AppText variant="heading">Le cours d’origine</AppText>
+            <AppText color={colors.muted}>
+              Relisez le texte extrait et comparez-le aux documents. Les
+              passages signalés demandent une vérification.
             </AppText>
+            <Field
+              label="Texte du cours utilisé pour la fiche"
+              optional
+              multiline
+              testID="ai-course-source-text"
+              value={course.sourceText ?? ""}
+              onChangeText={(sourceText) => change({ sourceText })}
+              editable={!disabled}
+              maxLength={150000}
+              placeholder="Collez ou corrigez ici le texte complet du cours."
+            />
             {course.sources.length ? (
-              <View style={s.grid}>
-                {course.sources.map((source, index) => (
-                  <SourcePreview
-                    key={source.id}
-                    source={source}
-                    index={index}
+              course.sources.map((source, index) => (
+                <View key={source.id} style={{ gap: 14 }}>
+                  <SourcePreview source={source} index={index} />
+                  {source.uncertain && (
+                    <Notice>
+                      Lecture incertaine : vérifiez ce document avant de
+                      publier.
+                    </Notice>
+                  )}
+                  <Field
+                    label={"Texte extrait — document " + (index + 1)}
+                    optional
+                    multiline
+                    value={source.extractedText ?? ""}
+                    onChangeText={(value) => correctOcr(source, value)}
+                    editable={!disabled}
+                    testID={"ai-ocr-text-" + index}
+                    maxLength={150000}
+                    placeholder="Le texte extrait apparaîtra après la préparation IA."
                   />
-                ))}
-              </View>
+                  {source.uncertain && !readOnly && (
+                    <Button
+                      variant="secondary"
+                      icon="check"
+                      disabled={busy}
+                      onPress={() =>
+                        change({
+                          sources: course.sources.map((item) =>
+                            item.id === source.id
+                              ? { ...item, uncertain: false }
+                              : item,
+                          ),
+                        })
+                      }
+                      testID={"ai-ocr-confirm-" + index}
+                    >
+                      J’ai vérifié ce texte
+                    </Button>
+                  )}
+                  <View style={s.divider} />
+                </View>
+              ))
             ) : (
-              <View
-                style={{
-                  padding: 20,
-                  gap: 12,
-                  backgroundColor: "#F6F7FB",
-                  borderRadius: 16,
-                }}
-              >
-                <AppIcon name="file" color={colors.muted} />
-                <AppText variant="small" color={colors.muted}>
-                  Aucun document joint à ce cours. Vous pouvez rédiger la fiche
-                  directement.
+              <Card inset>
+                <AppText color={colors.muted}>
+                  Aucun document joint. Utilisez le texte du cours ou rédigez la
+                  fiche à la main.
                 </AppText>
-              </View>
+              </Card>
             )}
-            <AppText variant="small" color={colors.muted}>
-              Les aperçus dépendent des fichiers encore disponibles sur cet
-              appareil. Gardez vos originaux.
-            </AppText>
+            <Button
+              variant="secondary"
+              icon="plus"
+              disabled={busy}
+              onPress={() =>
+                router.push({
+                  pathname: "/parent/import",
+                  params: { courseId: id },
+                })
+              }
+            >
+              Ajouter ou organiser les documents
+            </Button>
           </Card>
         </View>
         <Card style={{ gap: 18 }}>
@@ -342,12 +539,22 @@ export function ReviewCourseScreen() {
             <>
               <AppText variant="heading">Une version prête à réviser</AppText>
               <View style={s.row}>
-                <Button variant="secondary" icon="pencil" onPress={duplicate}>
+                <Button
+                  variant="secondary"
+                  icon="pencil"
+                  onPress={duplicate}
+                  testID="ai-course-new-version"
+                >
                   Créer une copie à modifier
                 </Button>
                 <Button
                   icon="plus"
-                  onPress={() => router.push("/parent/exercises")}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/parent/exercises",
+                      params: { courseId: id },
+                    })
+                  }
                 >
                   Préparer des exercices
                 </Button>
@@ -372,6 +579,8 @@ export function ReviewCourseScreen() {
                     : "Confirmer la relecture du cours"
                 }
                 onPress={() => setConfirmed(!confirmed)}
+                disabled={busy}
+                testID="ai-course-confirm-review"
                 style={{ alignSelf: "flex-start" }}
               >
                 {confirmed
@@ -386,8 +595,9 @@ export function ReviewCourseScreen() {
                 )}
                 <Button
                   variant="secondary"
-                  icon="file"
-                  onPress={save}
+                  icon="save"
+                  onPress={() => void save()}
+                  disabled={busy}
                   testID="save-course"
                 >
                   Enregistrer le brouillon
@@ -395,10 +605,10 @@ export function ReviewCourseScreen() {
                 <Button
                   icon="check"
                   onPress={publish}
-                  disabled={!confirmed || !title.trim()}
+                  disabled={busy || !confirmed || !course.title.trim()}
                   testID="publish-course"
                 >
-                  Publier pour Alex
+                  Publier pour {data.childName}
                 </Button>
               </View>
             </>
