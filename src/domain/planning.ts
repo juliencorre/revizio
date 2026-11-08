@@ -271,6 +271,7 @@ export function reschedulePlan(
   let index = 0;
   return {
     ...plan,
+    status: "draft",
     examDate: newExamDate,
     steps: plan.steps.map((step) => {
       if (step.completedAt) return { ...step };

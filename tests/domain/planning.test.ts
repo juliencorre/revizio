@@ -107,6 +107,7 @@ describe("proposition de plan", () => {
 describe("édition et report", () => {
   it("conserve le travail terminé et redistribue les séances restantes avant le nouveau contrôle", () => {
     const value = plan();
+    value.status = "published";
     value.steps[0].completedAt = "2026-11-08T18:00:00Z";
     const updated = reschedulePlan(value, "2026-11-16", "2026-11-10");
     expect(updated.steps[0]).toEqual(value.steps[0]);
@@ -118,6 +119,7 @@ describe("édition et report", () => {
         ),
     ).toBe(true);
     expect(updated.examDate).toBe("2026-11-16");
+    expect(updated.status).toBe("draft");
     expect(value.examDate).toBe("2026-11-12");
     expect(planValidation(updated, initialData.courses)).toBeNull();
   });
