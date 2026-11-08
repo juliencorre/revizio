@@ -4,6 +4,7 @@ import type {
   Course,
   ExerciseSeries,
   LearningData,
+  LearningDiagram,
   Question,
 } from "./model";
 import { subjects } from "./fixtures";
@@ -21,6 +22,86 @@ const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const date = (value: unknown): value is string =>
   text(value) && Number.isFinite(Date.parse(value));
+const optionalText = (value: unknown) => value === undefined || text(value);
+const optionalId = (value: unknown) => value === undefined || nonempty(value);
+const finiteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+const positiveInteger = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+const optionalMode = (value: unknown) =>
+  value === undefined || value === "practice" || value === "exam";
+const maxExamSeconds = 120 * 60;
+function isSourceReferences(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every(
+        (reference) =>
+          record(reference) &&
+          nonempty(reference.sourceId) &&
+          (reference.page === undefined || positiveInteger(reference.page)) &&
+          optionalText(reference.excerpt),
+      ))
+  );
+}
+function isDiagram(value: unknown): boolean {
+  if (value === undefined) return true;
+  return (
+    record(value) &&
+    ["number-line", "fraction", "timeline"].some(
+      (type) => type === value.type,
+    ) &&
+    ["min", "max", "numerator", "denominator"].every(
+      (key) => value[key] === undefined || finiteNumber(value[key]),
+    ) &&
+    (value.points === undefined ||
+      (Array.isArray(value.points) &&
+        value.points.every(
+          (point) =>
+            record(point) && finiteNumber(point.value) && text(point.label),
+        )))
+  );
+}
+function diagramPublicationError(diagram: LearningDiagram): string | null {
+  if (diagram.type === "fraction") {
+    const numerator = diagram.numerator,
+      denominator = diagram.denominator;
+    if (
+      !finiteNumber(numerator) ||
+      !finiteNumber(denominator) ||
+      !Number.isInteger(numerator) ||
+      !Number.isInteger(denominator) ||
+      numerator < 0 ||
+      denominator < 1 ||
+      denominator > 24 ||
+      numerator > denominator
+    )
+      return "Le schéma de fraction doit contenir entre 1 et 24 parts, avec un numérateur compris entre zéro et le dénominateur.";
+    return null;
+  }
+  const min = diagram.min ?? -5,
+    max = diagram.max ?? 5;
+  if (
+    !finiteNumber(min) ||
+    !finiteNumber(max) ||
+    min < -1_000_000 ||
+    max > 1_000_000 ||
+    min >= max
+  )
+    return "Les bornes du schéma doivent être croissantes et comprises entre −1 000 000 et 1 000 000.";
+  if (
+    (diagram.points ?? []).length > 12 ||
+    (diagram.points ?? []).some(
+      (point) =>
+        point.value < min ||
+        point.value > max ||
+        !nonempty(point.label) ||
+        point.label.trim().length > 40,
+    )
+  )
+    return "Prévoyez au plus 12 points dans les bornes du schéma, chacun avec un libellé de 1 à 40 caractères.";
+  return null;
+}
 export function questionError(question: Question): string | null {
   if (!nonempty(question.id) || !nonempty(question.prompt))
     return "Chaque question doit avoir un énoncé.";
@@ -87,6 +168,14 @@ export function coursePublicationError(course: Course): string | null {
     )
   )
     return "Complétez ou retirez les sections vides avant de publier.";
+  for (const section of course.sections) {
+    if (section.diagram) {
+      if (!isDiagram(section.diagram))
+        return "Le schéma du cours est invalide.";
+      const error = diagramPublicationError(section.diagram);
+      if (error) return error;
+    }
+  }
   return null;
 }
 export function seriesPublicationError(
@@ -191,6 +280,16 @@ export function startAttemptInData(
   if (unfinished && !restart) return { data, attemptId: unfinished.id };
   if (data.attempts.some((attempt) => attempt.id === id))
     return { data, attemptId: null };
+  const attemptMode = options?.mode ?? series.mode ?? "practice";
+  const timeLimitSeconds =
+    options?.timeLimitSeconds ??
+    series.timeLimitSeconds ??
+    (attemptMode === "exam" ? 1200 : undefined);
+  if (
+    timeLimitSeconds !== undefined &&
+    (!positiveInteger(timeLimitSeconds) || timeLimitSeconds > maxExamSeconds)
+  )
+    return { data, attemptId: null };
   const attempt: Attempt = {
     id,
     seriesId,
@@ -199,16 +298,15 @@ export function startAttemptInData(
     questions: clone(series.questions),
     seriesTitle: series.title,
     subjectId: series.subjectId,
-    mode: options?.mode ?? series.mode ?? "practice",
+    mode: attemptMode,
     ...(options?.planId
       ? { planId: options.planId, stepId: options.stepId }
       : {}),
     ...(options?.profileId ? { profileId: options.profileId } : {}),
-    ...((options?.timeLimitSeconds ?? series.timeLimitSeconds)
+    ...(timeLimitSeconds
       ? {
           deadlineAt: new Date(
-            Date.parse(now) +
-              (options?.timeLimitSeconds ?? series.timeLimitSeconds)! * 1000,
+            Date.parse(now) + timeLimitSeconds * 1000,
           ).toISOString(),
         }
       : {}),
@@ -325,13 +423,20 @@ function isQuestion(value: unknown): value is Question {
       "fill-blank",
       "short-answer",
       "problem",
-    ].includes(String(value.type))
+    ].some((type) => type === value.type)
   )
     return false;
   if (
     value.expectedAnswers !== undefined &&
     (!Array.isArray(value.expectedAnswers) ||
       !value.expectedAnswers.every(text))
+  )
+    return false;
+  if (
+    (value.tolerance !== undefined &&
+      (!finiteNumber(value.tolerance) || value.tolerance < 0)) ||
+    !optionalText(value.rubric) ||
+    !isSourceReferences(value.sourceRefs)
   )
     return false;
   return value.choices.every(
@@ -347,7 +452,15 @@ function isCourse(value: unknown): value is Course {
     !text(value.title) ||
     !text(value.description) ||
     !date(value.updatedAt) ||
-    !["draft", "published"].includes(String(value.status)) ||
+    !["draft", "published"].some((status) => status === value.status) ||
+    !optionalText(value.sourceText) ||
+    ![
+      value.originId,
+      value.profileId,
+      value.generationJobId,
+      value.generationAppliedJobId,
+    ].every(optionalId) ||
+    (value.revision !== undefined && !positiveInteger(value.revision)) ||
     !Array.isArray(value.sections) ||
     !Array.isArray(value.sources)
   )
@@ -359,10 +472,12 @@ function isCourse(value: unknown): value is Course {
         nonempty(section.id) &&
         text(section.title) &&
         text(section.content) &&
-        ["essential", "vocabulary", "method", "warning"].includes(
-          String(section.kind),
+        ["essential", "vocabulary", "method", "warning"].some(
+          (kind) => kind === section.kind,
         ) &&
-        (section.example === undefined || text(section.example)),
+        optionalText(section.example) &&
+        isSourceReferences(section.sourceRefs) &&
+        isDiagram(section.diagram),
     ) &&
     unique(value.sections.map((section) => (section as { id: string }).id)) &&
     value.sources.every(
@@ -370,9 +485,20 @@ function isCourse(value: unknown): value is Course {
         record(source) &&
         nonempty(source.id) &&
         text(source.name) &&
-        (source.uri === undefined || text(source.uri)) &&
-        (source.mimeType === undefined || text(source.mimeType)),
-    )
+        [
+          source.uri,
+          source.mimeType,
+          source.cachedUri,
+          source.extractedText,
+        ].every(optionalText) &&
+        optionalId(source.storageId) &&
+        (source.page === undefined || positiveInteger(source.page)) &&
+        (source.rotation === undefined ||
+          [0, 90, 180, 270].some((rotation) => rotation === source.rotation)) &&
+        (source.uncertain === undefined ||
+          typeof source.uncertain === "boolean"),
+    ) &&
+    unique(value.sources.map((source) => (source as { id: string }).id))
   );
 }
 function isSeries(value: unknown): value is ExerciseSeries {
@@ -382,8 +508,15 @@ function isSeries(value: unknown): value is ExerciseSeries {
     text(value.title) &&
     text(value.subjectId) &&
     knownSubject(value.subjectId) &&
-    ["draft", "published"].includes(String(value.status)) &&
-    ["discovery", "practice", "challenge"].includes(String(value.level)) &&
+    ["draft", "published"].some((status) => status === value.status) &&
+    ["discovery", "practice", "challenge"].some(
+      (level) => level === value.level,
+    ) &&
+    optionalMode(value.mode) &&
+    [value.profileId, value.generationJobId].every(optionalId) &&
+    (value.timeLimitSeconds === undefined ||
+      (positiveInteger(value.timeLimitSeconds) &&
+        value.timeLimitSeconds <= maxExamSeconds)) &&
     (value.dueDate === undefined || date(value.dueDate)) &&
     Array.isArray(value.courseIds) &&
     value.courseIds.every(nonempty) &&
@@ -402,6 +535,17 @@ function isAttempt(value: unknown): value is Attempt {
     !text(value.subjectId) ||
     !knownSubject(value.subjectId) ||
     !date(value.startedAt) ||
+    !optionalMode(value.mode) ||
+    ![value.profileId, value.planId, value.stepId].every(optionalId) ||
+    (value.planId === undefined) !== (value.stepId === undefined) ||
+    (value.deadlineAt !== undefined &&
+      (!date(value.deadlineAt) ||
+        Date.parse(value.deadlineAt) <= Date.parse(value.startedAt) ||
+        Date.parse(value.deadlineAt) - Date.parse(value.startedAt) >
+          maxExamSeconds * 1000)) ||
+    (value.mode === "exam" && value.deadlineAt === undefined) ||
+    (value.submittedAt !== undefined &&
+      (!date(value.submittedAt) || value.completedAt === undefined)) ||
     (value.completedAt !== undefined && !date(value.completedAt)) ||
     !Array.isArray(value.questions) ||
     !value.questions.length ||
@@ -419,6 +563,7 @@ function isAttempt(value: unknown): value is Attempt {
       !text(answer.choiceId) ||
       typeof answer.isCorrect !== "boolean" ||
       typeof answer.usedHint !== "boolean" ||
+      !optionalText(answer.response) ||
       !date(answer.answeredAt)
     )
       return false;
