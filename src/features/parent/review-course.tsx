@@ -10,8 +10,14 @@ import {
   PageHeading,
 } from "@/components/ui";
 import { colors } from "@/theme";
-import type { AiJob, CourseSource, RevisionSection } from "@/domain/model";
+import type {
+  AiJob,
+  CourseSource,
+  RevisionSection,
+  LearningDiagram as Diagram,
+} from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
+import { DiagramEditor } from "./diagram-editor";
 import {
   Field,
   LoadingParent,
@@ -84,6 +90,10 @@ export function ReviewCourseScreen() {
   const busyRef = useRef(false);
   const [job, setJob] = useState<AiJob | null>(null);
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
+  const [pendingDiagrams, setPendingDiagrams] = useState<
+    Record<string, boolean>
+  >({});
+  const hasPendingDiagrams = Object.values(pendingDiagrams).some(Boolean);
   if (!data.isReady) return <LoadingParent active="import" />;
   if (!course) return <ParentNotFound />;
   const subject = data.subjects.find((item) => item.id === course.subjectId);
@@ -107,6 +117,23 @@ export function ReviewCourseScreen() {
         section.id === sectionId ? { ...section, [key]: value } : section,
       ),
     });
+  }
+  function changeDiagram(sectionId: string, diagram: Diagram | undefined) {
+    change({
+      sections: sections.map((section) => {
+        if (section.id !== sectionId) return section;
+        const { diagram: previous, ...rest } = section;
+        return diagram ? { ...rest, diagram } : rest;
+      }),
+    });
+  }
+  function pendingDiagram(sectionId: string, pending: boolean) {
+    setPendingDiagrams((current) =>
+      current[sectionId] === pending
+        ? current
+        : { ...current, [sectionId]: pending },
+    );
+    if (pending) setConfirmed(false);
   }
   function correctOcr(source: CourseSource, extractedText: string) {
     const old = source.extractedText ?? "";
@@ -135,6 +162,20 @@ export function ReviewCourseScreen() {
     }
   }
   function publish() {
+    if (hasPendingDiagrams) {
+      setError(
+        "Appliquez ou annulez les modifications des schémas avant de publier.",
+      );
+      return;
+    }
+    if (
+      sections.some((section) => section.diagram && !section.content.trim())
+    ) {
+      setError(
+        "Ajoutez une explication dans chaque section qui contient un schéma.",
+      );
+      return;
+    }
     if (!confirmed) {
       setError("Confirmez la relecture avant de publier la fiche.");
       return;
@@ -179,6 +220,12 @@ export function ReviewCourseScreen() {
   }
   async function generate() {
     if (busyRef.current || readOnly) return;
+    if (hasPendingDiagrams) {
+      setError(
+        "Appliquez ou annulez les modifications des schémas avant de régénérer la fiche.",
+      );
+      return;
+    }
     if (!course!.title.trim()) {
       setError("Donnez un titre à la fiche avant la génération.");
       return;
@@ -448,6 +495,17 @@ export function ReviewCourseScreen() {
                     multiline
                     maxLength={4000}
                   />
+                  <DiagramEditor
+                    value={section.diagram}
+                    storageKey={`revizo.diagram-editor.${data.activeProfileId}.${id}.${section.id}`}
+                    testID={"diagram-editor-" + section.kind}
+                    disabled={busy}
+                    readOnly={readOnly}
+                    onChange={(diagram) => changeDiagram(section.id, diagram)}
+                    onPendingChange={(pending) =>
+                      pendingDiagram(section.id, pending)
+                    }
+                  />
                   {!!section.sourceRefs?.length && (
                     <AppText variant="small" color={colors.muted}>
                       Sources :{" "}
@@ -581,6 +639,12 @@ export function ReviewCourseScreen() {
           ) : (
             <>
               <AppText variant="heading">Prête à être partagée ?</AppText>
+              {hasPendingDiagrams && (
+                <Notice>
+                  Appliquez ou annulez les modifications des schémas avant de
+                  confirmer la relecture.
+                </Notice>
+              )}
               <Button
                 variant={confirmed ? "secondary" : "ghost"}
                 icon={confirmed ? "check" : "shield"}
@@ -590,7 +654,7 @@ export function ReviewCourseScreen() {
                     : "Confirmer la relecture du cours"
                 }
                 onPress={() => setConfirmed(!confirmed)}
-                disabled={busy}
+                disabled={busy || hasPendingDiagrams}
                 testID="ai-course-confirm-review"
                 style={{ alignSelf: "flex-start" }}
               >
@@ -616,7 +680,12 @@ export function ReviewCourseScreen() {
                 <Button
                   icon="check"
                   onPress={publish}
-                  disabled={busy || !confirmed || !course.title.trim()}
+                  disabled={
+                    busy ||
+                    hasPendingDiagrams ||
+                    !confirmed ||
+                    !course.title.trim()
+                  }
                   testID="publish-course"
                 >
                   Publier pour {data.childName}
