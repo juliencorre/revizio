@@ -478,7 +478,7 @@ describe("contenus publiés, réponses et concurrence", () => {
     expect(saved.statusCode, saved.body).toBe(200);
     expect(saved.json().data.attempts[0].answers[0].isCorrect).toBe(false);
     for (const patch of [
-      { mode: "exam" },
+      { mode: "exam", deadlineAt: new Date(Date.now() + 60000).toISOString() },
       { deadlineAt: new Date(Date.now() + 60000).toISOString() },
       { planId: "invented", stepId: "invented" },
     ]) {

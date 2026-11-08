@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import * as Speech from "expo-speech";
 import { AppText, Button } from "./ui";
@@ -13,34 +13,50 @@ export function ReadAloud({
 }) {
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState("");
-  useEffect(
-    () => () => {
+  const generation = useRef(0);
+  useEffect(() => {
+    setSpeaking(false);
+    return () => {
+      generation.current++;
       if (speechSupported()) void Speech.stop().catch(() => undefined);
-    },
-    [text],
-  );
+    };
+  }, [text]);
   function play() {
     if (!speechSupported()) {
       setError("La lecture audio n’est pas disponible sur cet appareil.");
       return;
     }
     if (speaking) {
-      void Speech.stop();
+      generation.current++;
+      void Speech.stop().catch(() => undefined);
       setSpeaking(false);
       return;
     }
     setError("");
     setSpeaking(true);
-    Speech.speak(text, {
-      language,
-      rate: 0.9,
-      onDone: () => setSpeaking(false),
-      onStopped: () => setSpeaking(false),
-      onError: () => {
+    const chunks = text.match(/[\s\S]{1,2000}(?:\s|$)|[\s\S]{1,2000}/g) ?? [];
+    const current = ++generation.current;
+    function read(index: number) {
+      if (current !== generation.current) return;
+      if (index >= chunks.length) {
         setSpeaking(false);
-        setError("La lecture audio n’est pas disponible sur cet appareil.");
-      },
-    });
+        return;
+      }
+      Speech.speak(chunks[index], {
+        language,
+        rate: 0.9,
+        onDone: () => read(index + 1),
+        onStopped: () => {
+          if (current === generation.current) setSpeaking(false);
+        },
+        onError: () => {
+          if (current !== generation.current) return;
+          setSpeaking(false);
+          setError("La lecture audio n’est pas disponible sur cet appareil.");
+        },
+      });
+    }
+    read(0);
   }
   return (
     <View style={{ gap: 8 }}>
