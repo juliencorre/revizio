@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { AppState, Platform } from "react-native";
 
 /** Local editor drafts are separate from the content explicitly published by a parent. */
 export function useLocalDraft<T>(
@@ -27,63 +29,118 @@ export function useLocalDraft<T>(
   const valueRef = useRef(value);
   valueRef.current = value;
   const loadedKey = useRef<string | null>(null);
+  const activeKey = useRef(key);
+  activeKey.current = key;
+  const writes = useRef<Promise<void>>(Promise.resolve());
+  const persist = useCallback((storageKey: string, next: T) => {
+    const content = JSON.stringify(next);
+    const saved = () => {
+      if (activeKey.current === storageKey) setError(null);
+    };
+    const failed = () => {
+      if (activeKey.current === storageKey)
+        setError(
+          "Le brouillon n’a pas pu être sauvegardé. Gardez cette page ouverte.",
+        );
+    };
+    // Web storage must finish before reload/pagehide can tear down this page.
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(storageKey, content);
+        saved();
+      } catch {
+        failed();
+      }
+      return;
+    }
+    // Native writes complete asynchronously. Keep their order when typing quickly.
+    writes.current = writes.current
+      .catch(() => undefined)
+      .then(() => AsyncStorage.setItem(storageKey, content))
+      .then(saved, failed);
+  }, []);
+  const changeValue = useCallback<Dispatch<SetStateAction<T>>>(
+    (update) => {
+      const next =
+        typeof update === "function"
+          ? (update as (current: T) => T)(valueRef.current)
+          : update;
+      valueRef.current = next;
+      if (loadedKey.current === key) persist(key, next);
+      setValue(() => next);
+    },
+    [key, persist],
+  );
   useEffect(() => {
     let active = true;
     setReady(false);
     loadedKey.current = null;
-    void AsyncStorage.getItem(key).then(
-      (raw) => {
-        if (!active) return;
-        if (raw) {
-          try {
-            const parsed: unknown = JSON.parse(raw);
-            if (acceptRef.current(parsed)) setValue(parsed);
-            else throw new Error();
-          } catch {
-            setValue(fallbackRef.current);
-            setError(
-              "Le brouillon local est illisible. Le dernier contenu enregistré a été chargé.",
-            );
+    void writes.current
+      .then(() => AsyncStorage.getItem(key))
+      .then(
+        (raw) => {
+          if (!active) return;
+          let loaded = fallbackRef.current;
+          if (raw) {
+            try {
+              const parsed: unknown = JSON.parse(raw);
+              if (acceptRef.current(parsed)) loaded = parsed;
+              else throw new Error();
+              setError(null);
+            } catch {
+              setError(
+                "Le brouillon local est illisible. Le dernier contenu enregistré a été chargé.",
+              );
+            }
+          } else {
+            setError(null);
           }
-        } else {
-          setValue(fallbackRef.current);
-          setError(null);
-        }
-        loadedKey.current = key;
-        setReady(true);
-      },
-      () => {
-        if (active) {
-          setValue(fallbackRef.current);
-          setError("Le brouillon ne peut pas être chargé sur cet appareil.");
+          valueRef.current = loaded;
+          setValue(() => loaded);
           loadedKey.current = key;
           setReady(true);
-        }
-      },
-    );
+        },
+        () => {
+          if (active) {
+            valueRef.current = fallbackRef.current;
+            setValue(() => fallbackRef.current);
+            setError("Le brouillon ne peut pas être chargé sur cet appareil.");
+            loadedKey.current = key;
+            setReady(true);
+          }
+        },
+      );
     return () => {
       active = false;
-      if (loadedKey.current === key)
-        void AsyncStorage.setItem(key, JSON.stringify(valueRef.current)).catch(
-          () => undefined,
-        );
+      if (loadedKey.current === key) persist(key, valueRef.current);
     };
-  }, [key]);
+  }, [key, persist]);
   useEffect(() => {
-    if (!ready || loadedKey.current !== key) return;
-    const timeout = setTimeout(() => {
-      void AsyncStorage.setItem(key, JSON.stringify(value)).then(
-        () => setError(null),
-        () =>
-          setError(
-            "Le brouillon n’a pas pu être sauvegardé. Gardez cette page ouverte.",
-          ),
-      );
-    }, 250);
-    return () => clearTimeout(timeout);
-  }, [key, ready, value]);
+    const flush = () => {
+      if (loadedKey.current) persist(loadedKey.current, valueRef.current);
+    };
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") flush();
+    });
+    const pageHidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.addEventListener("pagehide", flush);
+      document.addEventListener("visibilitychange", pageHidden);
+    }
+    return () => {
+      flush();
+      subscription.remove();
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.removeEventListener("pagehide", flush);
+        document.removeEventListener("visibilitychange", pageHidden);
+      }
+    };
+  }, [persist]);
   async function clear() {
+    await writes.current;
     await AsyncStorage.removeItem(key);
   }
-  return [value, setValue, { ready, error, clear }];
+  return [value, changeValue, { ready, error, clear }];
 }

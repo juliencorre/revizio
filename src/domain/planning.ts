@@ -216,7 +216,8 @@ export function buildRevisionSteps(input: RevisionStepInput): PlanStep[] {
       (series) =>
         series.status === "published" &&
         series.subjectId === input.subjectId &&
-        series.courseIds.some((id) => input.courseIds.includes(id)),
+        series.courseIds.length > 0 &&
+        series.courseIds.every((id) => input.courseIds.includes(id)),
     ) ?? [];
   return stages.map((stage, index) => ({
     id: `step-${today}-${stage.kind}-${index}`,

@@ -83,6 +83,26 @@ describe("proposition de plan", () => {
       }),
     ).toThrow();
   });
+  it("exclut une série qui contient un chapitre extérieur au contrôle", () => {
+    const series = initialData.series[0];
+    const result = buildRevisionSteps({
+      ...input,
+      series: [
+        {
+          ...series,
+          id: "outside",
+          courseIds: [input.courseIds[0], "hors-controle"],
+        },
+        { ...series, id: "empty", courseIds: [] },
+        { ...series, id: "included", courseIds: [...input.courseIds] },
+      ],
+    });
+    const exercises = result.filter((step) =>
+      ["practice", "mistakes", "mock"].includes(step.kind),
+    );
+    expect(exercises).toHaveLength(3);
+    expect(exercises.every((step) => step.seriesId === "included")).toBe(true);
+  });
 });
 describe("édition et report", () => {
   it("conserve le travail terminé et redistribue les séances restantes avant le nouveau contrôle", () => {
