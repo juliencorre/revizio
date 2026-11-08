@@ -157,17 +157,19 @@ export class JobQueue {
         signal,
       );
       pages.push(...extracted);
-      sources.push(...extracted.map((page) => ({
-        id: page.page === 1 ? upload.id : `${upload.id}-page-${page.page}`,
-        storageId: upload.id,
-        name: upload.name,
-        uri: `/api/uploads/${upload.id}`,
-        mimeType: upload.mimeType,
-        rotation: upload.rotation,
-        page: page.page,
-        extractedText: page.text,
-        uncertain: page.uncertain,
-      })));
+      sources.push(
+        ...extracted.map((page) => ({
+          id: page.page === 1 ? upload.id : `${upload.id}-page-${page.page}`,
+          storageId: upload.id,
+          name: upload.name,
+          uri: `/api/uploads/${upload.id}`,
+          mimeType: upload.mimeType,
+          rotation: upload.rotation,
+          page: page.page,
+          extractedText: page.text,
+          uncertain: page.uncertain,
+        })),
+      );
     }
     const data = this.database.data(job.profileId).data;
     let result: AiJob["result"];
@@ -198,10 +200,24 @@ export class JobQueue {
         stage: "fiche",
         message: "L’IA prépare les notions, méthodes et exemples à relire.",
       });
-      const allSources = [...(old?.sources ?? []), ...sources].filter(
-        (source, index, array) =>
-          array.findIndex((other) => other.id === source.id) === index,
-      );
+      // Fresh OCR metadata replaces the upload placeholder already in the draft.
+      const order = [
+        ...new Set(
+          [...(old?.sources ?? []), ...sources].map(
+            (source) => source.storageId ?? source.id,
+          ),
+        ),
+      ];
+      const allSources = order.flatMap((id) => {
+        const extracted = sources.filter(
+          (source) => (source.storageId ?? source.id) === id,
+        );
+        return extracted.length
+          ? extracted
+          : (old?.sources ?? []).filter(
+              (source) => (source.storageId ?? source.id) === id,
+            );
+      });
       const course = await generateCourse(
         this.client,
         settings,

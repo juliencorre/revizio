@@ -107,7 +107,8 @@ export function ParentControlsScreen() {
     (series) =>
       series.status === "published" &&
       series.subjectId === editor.subjectId &&
-      series.courseIds.some((id) => editor.courseIds.includes(id)),
+      series.courseIds.length > 0 &&
+      series.courseIds.every((id) => editor.courseIds.includes(id)),
   );
   const questions = [
     ...new Map(
@@ -275,10 +276,14 @@ export function ParentControlsScreen() {
     }
     const steps = editor.steps.map((step) => ({
       ...step,
-      ...(["practice", "mistakes"].includes(step.kind) && trainingId
+      ...(!step.completedAt &&
+      ["practice", "mistakes"].includes(step.kind) &&
+      trainingId
         ? { seriesId: trainingId }
         : {}),
-      ...(step.kind === "mock" && mockId ? { seriesId: mockId } : {}),
+      ...(!step.completedAt && step.kind === "mock" && mockId
+        ? { seriesId: mockId }
+        : {}),
     }));
     const id =
       editor.id ??

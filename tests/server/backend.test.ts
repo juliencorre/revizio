@@ -477,10 +477,16 @@ describe("contenus publiés, réponses et concurrence", () => {
     const saved = await save(token, outcome.data, current.revision);
     expect(saved.statusCode, saved.body).toBe(200);
     expect(saved.json().data.attempts[0].answers[0].isCorrect).toBe(false);
-    for (const patch of [{ mode: "exam" }, { deadlineAt: new Date(Date.now() + 60000).toISOString() }, { planId: "invented", stepId: "invented" }]) {
+    for (const patch of [
+      { mode: "exam" },
+      { deadlineAt: new Date(Date.now() + 60000).toISOString() },
+      { planId: "invented", stepId: "invented" },
+    ]) {
       const immutable = await envelope(token);
       Object.assign(immutable.data.attempts[0], patch);
-      expect((await save(token, immutable.data, immutable.revision)).statusCode).toBe(403);
+      expect(
+        (await save(token, immutable.data, immutable.revision)).statusCode,
+      ).toBe(403);
     }
     current = await envelope(token);
     current.data.attempts[0].questions[0].correctChoiceId = "0";
@@ -488,9 +494,20 @@ describe("contenus publiés, réponses et concurrence", () => {
       403,
     );
     const wrongPlan = await envelope(token);
-    const second = startAttemptInData(wrongPlan.data, "maths-relative-practice", "invalid-plan-attempt", new Date().toISOString(), true);
-    Object.assign(second.data.attempts.at(-1)!, { planId: "invented", stepId: "invented" });
-    expect((await save(token, second.data, wrongPlan.revision)).statusCode).toBe(403);
+    const second = startAttemptInData(
+      wrongPlan.data,
+      "maths-relative-practice",
+      "invalid-plan-attempt",
+      new Date().toISOString(),
+      true,
+    );
+    Object.assign(second.data.attempts.at(-1)!, {
+      planId: "invented",
+      stepId: "invented",
+    });
+    expect(
+      (await save(token, second.data, wrongPlan.revision)).statusCode,
+    ).toBe(403);
   });
   it("répond 409 avec les données accessibles au profil lors d’un conflit", async () => {
     const session = await setup();
@@ -513,16 +530,54 @@ describe("contenus publiés, réponses et concurrence", () => {
   });
   it("accepte une séance d’une étape publiée et refuse ensuite de changer son contexte", async () => {
     const session = await setup();
-    const data = clone(initialData), series = data.series.find((item) => item.id === "maths-relative-practice")!;
-    data.plans = [{ id: "plan-test", title: "Mon contrôle", subjectId: series.subjectId, examDate: "2026-12-02", courseIds: series.courseIds, dailyMinutes: 20, status: "published", steps: [{ id: "step-test", date: "2026-12-01", title: "S’entraîner", kind: "practice", minutes: 20, courseIds: series.courseIds, seriesId: series.id }] }];
+    const data = clone(initialData),
+      series = data.series.find(
+        (item) => item.id === "maths-relative-practice",
+      )!;
+    data.plans = [
+      {
+        id: "plan-test",
+        title: "Mon contrôle",
+        subjectId: series.subjectId,
+        examDate: "2026-12-02",
+        courseIds: series.courseIds,
+        dailyMinutes: 20,
+        status: "published",
+        steps: [
+          {
+            id: "step-test",
+            date: "2026-12-01",
+            title: "S’entraîner",
+            kind: "practice",
+            minutes: 20,
+            courseIds: series.courseIds,
+            seriesId: series.id,
+          },
+        ],
+      },
+    ];
     expect((await save(session.token, data, 0)).statusCode).toBe(200);
-    const token = await child(session.profiles[0].id), current = await envelope(token);
-    const next = startAttemptInData(current.data, series.id, "plan-attempt", new Date().toISOString(), true);
-    Object.assign(next.data.attempts.at(-1)!, { planId: "plan-test", stepId: "step-test" });
-    expect((await save(token, next.data, current.revision)).statusCode).toBe(200);
+    const token = await child(session.profiles[0].id),
+      current = await envelope(token);
+    const next = startAttemptInData(
+      current.data,
+      series.id,
+      "plan-attempt",
+      new Date().toISOString(),
+      true,
+    );
+    Object.assign(next.data.attempts.at(-1)!, {
+      planId: "plan-test",
+      stepId: "step-test",
+    });
+    expect((await save(token, next.data, current.revision)).statusCode).toBe(
+      200,
+    );
     const saved = await envelope(token);
     Object.assign(saved.data.attempts.at(-1)!, { stepId: "another-step" });
-    expect((await save(token, saved.data, saved.revision)).statusCode).toBe(403);
+    expect((await save(token, saved.data, saved.revision)).statusCode).toBe(
+      403,
+    );
   });
 });
 
@@ -633,16 +688,49 @@ describe("fichiers privés et sauvegarde", () => {
     );
   });
   it("supprime l’espace et ses archives privées uniquement après vérification du mot de passe", async () => {
-    const session = await setup(), headers = bearer(session.token);
+    const session = await setup(),
+      headers = bearer(session.token);
     const source = (await upload(session.token, session.profiles[0].id)).json();
     const backup = (await app.inject({ url: "/api/backup", headers })).json();
-    expect((await app.inject({ method: "POST", url: "/api/backup/restore", headers, payload: { backup } })).statusCode).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/backup/restore",
+          headers,
+          payload: { backup },
+        })
+      ).statusCode,
+    ).toBe(200);
     expect((await readdir(join(dir, "backups"))).length).toBe(1);
-    expect((await app.inject({ method: "DELETE", url: "/api/family", headers, payload: { password: "wrong-password" } })).statusCode).toBe(401);
-    expect((await app.inject({ method: "DELETE", url: "/api/family", headers, payload: { password } })).statusCode).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/api/family",
+          headers,
+          payload: { password: "wrong-password" },
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/api/family",
+          headers,
+          payload: { password },
+        })
+      ).statusCode,
+    ).toBe(200);
     expect((await app.inject("/api/health")).json().needsSetup).toBe(true);
-    expect((await app.inject({ url: source.uri, headers })).statusCode).toBe(401);
-    await expect(readdir(join(dir, "backups"))).rejects.toHaveProperty("code", "ENOENT");
+    expect((await app.inject({ url: source.uri, headers })).statusCode).toBe(
+      401,
+    );
+    await expect(readdir(join(dir, "backups"))).rejects.toHaveProperty(
+      "code",
+      "ENOENT",
+    );
   });
 });
 
@@ -658,7 +746,8 @@ describe("jobs IA asynchrones — moteur de test explicite", () => {
         subjectId: "maths",
         title: "Les nombres relatifs",
         sourceIds: [],
-        sourceText: "Un nombre relatif est positif, négatif ou nul. Pour additionner deux nombres de même signe, on additionne les distances à zéro et on garde le signe.",
+        sourceText:
+          "Un nombre relatif est positif, négatif ou nul. Pour additionner deux nombres de même signe, on additionne les distances à zéro et on garde le signe.",
       },
     });
     expect(r.statusCode, r.body).toBe(200);
@@ -676,6 +765,20 @@ describe("jobs IA asynchrones — moteur de test explicite", () => {
   it("signale un échec puis relance le même job sans perdre les sources", async () => {
     const session = await setup();
     const source = (await upload(session.token, session.profiles[0].id)).json();
+    const state = await envelope(session.token);
+    state.data.courses.push({
+      id: "draft-with-source",
+      subjectId: "maths",
+      title: "Les nombres relatifs",
+      description: "",
+      status: "draft",
+      updatedAt: new Date().toISOString(),
+      sections: [],
+      sources: [source],
+    });
+    expect(
+      (await save(session.token, state.data, state.revision)).statusCode,
+    ).toBe(200);
     ai.failNext = true;
     const r = await app.inject({
       method: "POST",
@@ -686,6 +789,7 @@ describe("jobs IA asynchrones — moteur de test explicite", () => {
         subjectId: "maths",
         title: "Les nombres relatifs",
         sourceIds: [source.id],
+        existingCourseId: "draft-with-source",
       },
     });
     const id = r.json().job.id;
@@ -703,7 +807,16 @@ describe("jobs IA asynchrones — moteur de test explicite", () => {
         })
       ).statusCode,
     ).toBe(200);
-    expect((await job(session.token, id)).status).toBe("succeeded");
+    const recovered = await job(session.token, id);
+    expect(recovered.status).toBe("succeeded");
+    const result = recovered.result as {
+      course: {
+        sources: { id: string; extractedText?: string; page?: number }[];
+      };
+    };
+    expect(result.course.sources).toHaveLength(1);
+    expect(result.course.sources[0].extractedText).toContain("nombre relatif");
+    expect(result.course.sources[0].page).toBe(1);
   });
   it("génère les cinq formats demandés avec leurs corrections", async () => {
     const session = await setup();

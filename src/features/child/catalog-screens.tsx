@@ -15,6 +15,7 @@ import { SourceViewer } from "@/components/source-viewer";
 import { ReadAloud } from "@/components/read-aloud";
 import { LearningDiagram } from "@/components/learning-diagram";
 import { cacheSource } from "@/services/source-cache";
+import { NextControl } from "./next-control";
 import type { CourseSource, RevisionSection } from "@/domain/model";
 import {
   ChildShell,
@@ -69,6 +70,7 @@ export function StudentHomeScreen() {
           <Loading />
         ) : (
           <>
+            <NextControl />
             {dueReviews.length > 0 && (
               <Card style={{ gap: 14 }}>
                 <AppText variant="heading">
@@ -269,6 +271,7 @@ export function StudentSubjectScreen() {
               </Button>
             }
           />
+          <NextControl subjectId={subject.id} />
           {courses.length === 0 ? (
             <EmptyState
               title="Tes cours arriveront ici"
@@ -578,9 +581,7 @@ export function StudentCourseScreen() {
                       : "Garder les documents hors connexion"}
                   </Button>
                   {!!downloadState && (
-                    <AppText variant="small" accessibilityLiveRegion="polite">
-                      {downloadState}
-                    </AppText>
+                    <AppText variant="small">{downloadState}</AppText>
                   )}
                   {course.sources.map((item, index) => (
                     <View
