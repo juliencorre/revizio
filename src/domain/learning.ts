@@ -7,6 +7,8 @@ import type {
   Question,
 } from "./model";
 import { subjects } from "./fixtures";
+import { evaluateAnswer } from "./answers";
+import { extendedDataFields, validateExtendedData } from "./extended-data";
 export type PublicationResult = { ok: boolean; error?: string };
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const knownSubject = (id: string) =>
@@ -22,7 +24,21 @@ const date = (value: unknown): value is string =>
 export function questionError(question: Question): string | null {
   if (!nonempty(question.id) || !nonempty(question.prompt))
     return "Chaque question doit avoir un énoncé.";
-  if (question.choices.length < 2)
+  const textual =
+    question.type && !["single-choice", "true-false"].includes(question.type);
+  if (textual) {
+    if (
+      !question.expectedAnswers?.length ||
+      !question.expectedAnswers.every(nonempty)
+    )
+      return "Prévoyez au moins une réponse attendue pour chaque question écrite.";
+    if (
+      question.tolerance !== undefined &&
+      (!Number.isFinite(question.tolerance) || question.tolerance < 0)
+    )
+      return "La tolérance numérique doit être positive.";
+  }
+  if (!textual && question.choices.length < 2)
     return "Chaque question doit proposer au moins deux réponses.";
   if (
     !question.choices.every(
@@ -41,6 +57,7 @@ export function questionError(question: Question): string | null {
   )
     return "Les réponses proposées doivent être différentes.";
   if (
+    !textual &&
     !question.choices.some((choice) => choice.id === question.correctChoiceId)
   )
     return "Sélectionnez une bonne réponse valide pour chaque question.";
@@ -147,6 +164,11 @@ export function startAttemptInData(
   id: string,
   now: string,
   restart = false,
+  options?: {
+    mode?: "practice" | "exam";
+    timeLimitSeconds?: number;
+    profileId?: string;
+  },
 ): { data: LearningData; attemptId: string | null } {
   const series = data.series.find(
     (item) => item.id === seriesId && item.status === "published",
@@ -167,6 +189,16 @@ export function startAttemptInData(
     questions: clone(series.questions),
     seriesTitle: series.title,
     subjectId: series.subjectId,
+    mode: options?.mode ?? series.mode ?? "practice",
+    ...(options?.profileId ? { profileId: options.profileId } : {}),
+    ...((options?.timeLimitSeconds ?? series.timeLimitSeconds)
+      ? {
+          deadlineAt: new Date(
+            Date.parse(now) +
+              (options?.timeLimitSeconds ?? series.timeLimitSeconds)! * 1000,
+          ).toISOString(),
+        }
+      : {}),
   };
   return {
     data: { ...data, attempts: [...data.attempts, attempt] },
@@ -189,14 +221,22 @@ export function answerQuestionInData(
   )
     return data;
   const question = attempt.questions.find((item) => item.id === questionId);
-  if (!question || !question.choices.some((choice) => choice.id === choiceId))
+  if (
+    !question ||
+    (!(
+      question.type && !["single-choice", "true-false"].includes(question.type)
+    ) &&
+      !question.choices.some((choice) => choice.id === choiceId)) ||
+    !choiceId.trim()
+  )
     return data;
   const answer: Answer = {
     questionId,
     choiceId,
-    isCorrect: question.correctChoiceId === choiceId,
+    isCorrect: evaluateAnswer(question, choiceId),
     usedHint,
     answeredAt: now,
+    response: choiceId,
   };
   return {
     ...data,
@@ -262,6 +302,23 @@ function isQuestion(value: unknown): value is Question {
     !text(value.hint) ||
     !text(value.concept) ||
     !Array.isArray(value.choices)
+  )
+    return false;
+  if (
+    value.type !== undefined &&
+    ![
+      "single-choice",
+      "true-false",
+      "fill-blank",
+      "short-answer",
+      "problem",
+    ].includes(String(value.type))
+  )
+    return false;
+  if (
+    value.expectedAnswers !== undefined &&
+    (!Array.isArray(value.expectedAnswers) ||
+      !value.expectedAnswers.every(text))
   )
     return false;
   return value.choices.every(
@@ -355,7 +412,10 @@ function isAttempt(value: unknown): value is Attempt {
     return questions.some(
       (question) =>
         question.id === answer.questionId &&
-        question.choices.some((choice) => choice.id === answer.choiceId),
+        ((question.type &&
+          !["single-choice", "true-false"].includes(question.type)) ||
+          question.choices.some((choice) => choice.id === answer.choiceId) ||
+          answer.choiceId === ""),
     );
   });
   return (
@@ -384,6 +444,7 @@ export function parseLearningData(raw: string): LearningData {
   )
     throw new Error("Sauvegarde locale incomplète ou invalide.");
   const data = value as unknown as LearningData;
+  validateExtendedData(value, data.courses, data.series);
   if (
     data.courses.some(
       (course) =>
@@ -400,6 +461,7 @@ export function parseLearningData(raw: string): LearningData {
   )
     throw new Error("Les contenus de la sauvegarde sont incohérents.");
   return {
+    ...clone(extendedDataFields(data)),
     version: 1,
     courses: clone(data.courses),
     series: clone(data.series),
@@ -407,10 +469,12 @@ export function parseLearningData(raw: string): LearningData {
       ...clone(attempt),
       answers: attempt.answers.map((answer) => ({
         ...answer,
-        isCorrect:
+        isCorrect: evaluateAnswer(
           attempt.questions.find(
             (question) => question.id === answer.questionId,
-          )!.correctChoiceId === answer.choiceId,
+          )!,
+          answer.choiceId,
+        ),
       })),
     })),
     reviewedCourseIds: [

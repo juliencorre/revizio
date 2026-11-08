@@ -48,3 +48,10 @@ example
 playwright-report/
 test-results/
 artifacts/
+
+/data/
+/dist-server/
+/releases/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
