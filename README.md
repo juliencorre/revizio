@@ -1,56 +1,52 @@
-# Welcome to your Expo app 👋
+# Révizo
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application de révision scolaire familiale, conçue pour l’iPad, développée avec Expo, React Native et TypeScript. Une version web partage le même socle.
 
-## Get started
+## Démarrer
 
-1. Install dependencies
+Prérequis : Node.js 24 et npm.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm ci
+npm run web
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Pour un appareil iOS ou Android : `npm start`, puis utiliser un client Expo compatible avec le SDK 58 ou un development build. Le simulateur iOS nécessite macOS et Xcode. Les permissions photo et documents sont configurées dans l’application.
 
-### Other setup steps
+## Premier lot
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- Choix d’un profil de démonstration parent ou enfant.
+- Matières et cours, fiches de révision structurées.
+- Séries QCM, indices, correction expliquée, sauvegarde et reprise.
+- Suivi factuel des résultats et erreurs.
+- Import parent de photos/documents, édition et publication explicite.
+- Création manuelle de séries d’exercices.
+- Persistance locale sur l’appareil.
 
-## Learn more
+Il s’agit d’une première version locale : aucun service IA ou backend familial n’est connecté, et le sélecteur de profil n’est pas une authentification. Les sources importées ne sont pas encore synchronisées entre appareils. Ne pas utiliser de données sensibles dans cette démonstration. Les prochaines étapes sont détaillées dans [le plan de développement](docs/development-plan.md).
 
-To learn more about developing your project with Expo, look at the following resources:
+## Vérifier
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```sh
+npm run typecheck
+npm test
+npm run export:web
+npm run test:e2e
+```
 
-## Join the community
+Les tests de parcours web nécessitent Chromium installé pour Playwright (`npx playwright install chromium`). Les tests iPad physiques restent une étape distincte du contrôle web.
 
-Join our community of developers creating universal apps.
+## Organisation
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `src/app` : routes Expo Router.
+- `src/features` : écrans enfant et parent.
+- `src/components` : composants partagés.
+- `src/domain` : modèles, règles et données de démonstration.
+- `src/state` : état de l’application et persistance.
+- `tests` : règles métier et parcours.
+
+## Collaboration
+
+Développement par agents dans des branches et worktrees indépendants. L’intégration est faite séquentiellement sur `main`. Voir [AGENTS.md](AGENTS.md) et [les contrats partagés](docs/contracts.md).
+
+Le fichier LICENSE conserve la licence du modèle Expo utilisé pour initialiser le projet.
