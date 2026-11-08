@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -511,6 +511,19 @@ describe("contenus publiés, réponses et concurrence", () => {
         ),
     ).toBe(true);
   });
+  it("accepte une séance d’une étape publiée et refuse ensuite de changer son contexte", async () => {
+    const session = await setup();
+    const data = clone(initialData), series = data.series.find((item) => item.id === "maths-relative-practice")!;
+    data.plans = [{ id: "plan-test", title: "Mon contrôle", subjectId: series.subjectId, examDate: "2026-12-02", courseIds: series.courseIds, dailyMinutes: 20, status: "published", steps: [{ id: "step-test", date: "2026-12-01", title: "S’entraîner", kind: "practice", minutes: 20, courseIds: series.courseIds, seriesId: series.id }] }];
+    expect((await save(session.token, data, 0)).statusCode).toBe(200);
+    const token = await child(session.profiles[0].id), current = await envelope(token);
+    const next = startAttemptInData(current.data, series.id, "plan-attempt", new Date().toISOString(), true);
+    Object.assign(next.data.attempts.at(-1)!, { planId: "plan-test", stepId: "step-test" });
+    expect((await save(token, next.data, current.revision)).statusCode).toBe(200);
+    const saved = await envelope(token);
+    Object.assign(saved.data.attempts.at(-1)!, { stepId: "another-step" });
+    expect((await save(token, saved.data, saved.revision)).statusCode).toBe(403);
+  });
 });
 
 describe("fichiers privés et sauvegarde", () => {
@@ -618,6 +631,18 @@ describe("fichiers privés et sauvegarde", () => {
     expect((await envelope(session.token)).data.courses[0].title).toBe(
       data.courses[0].title,
     );
+  });
+  it("supprime l’espace et ses archives privées uniquement après vérification du mot de passe", async () => {
+    const session = await setup(), headers = bearer(session.token);
+    const source = (await upload(session.token, session.profiles[0].id)).json();
+    const backup = (await app.inject({ url: "/api/backup", headers })).json();
+    expect((await app.inject({ method: "POST", url: "/api/backup/restore", headers, payload: { backup } })).statusCode).toBe(200);
+    expect((await readdir(join(dir, "backups"))).length).toBe(1);
+    expect((await app.inject({ method: "DELETE", url: "/api/family", headers, payload: { password: "wrong-password" } })).statusCode).toBe(401);
+    expect((await app.inject({ method: "DELETE", url: "/api/family", headers, payload: { password } })).statusCode).toBe(200);
+    expect((await app.inject("/api/health")).json().needsSetup).toBe(true);
+    expect((await app.inject({ url: source.uri, headers })).statusCode).toBe(401);
+    await expect(readdir(join(dir, "backups"))).rejects.toHaveProperty("code", "ENOENT");
   });
 });
 

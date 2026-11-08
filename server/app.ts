@@ -770,7 +770,7 @@ export async function createApp(options: ServerOptions = {}) {
   });
   app.post(
     "/api/backup/restore",
-    { bodyLimit: 128 * 1024 * 1024 },
+    { bodyLimit: 144 * 1024 * 1024 },
     async (request) => {
       const { user } = auth(request, true);
       const body = objectBody(request.body);
