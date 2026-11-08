@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AppIcon,
   AppText,
@@ -80,6 +80,9 @@ const dateLabel = (date: string) =>
 export function ParentControlsScreen() {
   const data = useLearning();
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const requestedId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const loadedPlan = useRef<string | null>(null);
   const { width } = useWindowDimensions();
   const [editor, setEditor, draft] = useLocalDraft<Editor>(
     "revizo.plan-editor." + (data.activeProfileId ?? "demo"),
@@ -119,24 +122,41 @@ export function ParentControlsScreen() {
     setError("");
     setMessage("");
   }
-  function edit(plan: RevisionPlan) {
-    setEditor({
-      id: plan.id,
-      title: plan.title,
-      subjectId: plan.subjectId,
-      examDate: plan.examDate,
-      courseIds: [...plan.courseIds],
-      dailyMinutes: plan.dailyMinutes,
-      steps: plan.steps.map((step) => ({
-        ...step,
-        courseIds: [...step.courseIds],
-      })),
-    });
-    setReportDate(plan.examDate);
-    setConfirmed(false);
-    setError("");
-    setMessage("Le plan est prêt à être ajusté ci-dessous.");
-  }
+  const edit = useCallback(
+    (plan: RevisionPlan) => {
+      setEditor({
+        id: plan.id,
+        title: plan.title,
+        subjectId: plan.subjectId,
+        examDate: plan.examDate,
+        courseIds: [...plan.courseIds],
+        dailyMinutes: plan.dailyMinutes,
+        steps: plan.steps.map((step) => ({
+          ...step,
+          courseIds: [...step.courseIds],
+        })),
+      });
+      setReportDate(plan.examDate);
+      setConfirmed(false);
+      setError("");
+      setMessage("Le plan est prêt à être ajusté ci-dessous.");
+    },
+    [setEditor],
+  );
+  useEffect(() => {
+    if (!requestedId) {
+      loadedPlan.current = null;
+      return;
+    }
+    if (!draft.ready) return;
+    const key = data.activeProfileId + ":" + requestedId;
+    if (loadedPlan.current === key) return;
+    const plan = data.plans.find((candidate) => candidate.id === requestedId);
+    if (plan) {
+      loadedPlan.current = key;
+      edit(plan);
+    }
+  }, [requestedId, draft.ready, data.activeProfileId, data.plans, edit]);
   function propose() {
     try {
       const steps = buildRevisionSteps({
