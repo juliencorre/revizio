@@ -6,6 +6,8 @@ Application familiale de révision, conçue pour l’iPad : les parents importen
 
 ## Ouvrir l’espace familial
 
+Vous avez téléchargé le paquet serveur compilé d’une release ? Suivre [son guide d’installation](docs/installation-release.md). Les commandes ci-dessous partent du dépôt source.
+
 Installer Node.js 24, npm, Ollama et Poppler (`pdftotext`, `pdfinfo`, `pdftoppm` disponibles dans le PATH). Ollama doit fonctionner sur la machine qui exécute le serveur Révizo.
 
 ```sh

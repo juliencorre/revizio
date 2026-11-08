@@ -19,6 +19,7 @@ execFileSync("tar", [
   "docs/backend.md",
   "docs/ipad-offline.md",
   "docs/validation.md",
+  "docs/installation-release.md",
 ]);
 const bytes = await readFile(join(output, name));
 await writeFile(
