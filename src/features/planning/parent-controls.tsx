@@ -14,6 +14,8 @@ import {
 import { colors } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import type { ExerciseSeries, PlanStep, RevisionPlan } from "@/domain/model";
+import { expectedAnswerLabel } from "@/domain/answers";
+import { buildTargetedRevision } from "@/domain/targeted-revision";
 import {
   buildRevisionSteps,
   dateOnly,
@@ -91,7 +93,7 @@ export function ParentControlsScreen() {
   );
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmedKey, setConfirmedKey] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [reportDate, setReportDate] = useState("");
@@ -117,9 +119,25 @@ export function ParentControlsScreen() {
         .map((question) => [question.id, question]),
     ).values(),
   ].slice(0, 20);
+  const targeted = buildTargetedRevision(approvedSeries, data.attempts);
+  const hasPendingMistakes = editor.steps.some(
+    (step) => step.kind === "mistakes" && !step.completedAt,
+  );
+  const revisionQuestions = targeted.questions.length
+    ? targeted.questions
+    : questions;
+  const revisionTitle = targeted.questions.length
+    ? "Notions à reprendre"
+    : "Consolider les notions";
+  const reviewKey = JSON.stringify([
+    editor,
+    hasPendingMistakes ? revisionQuestions : [],
+    hasPendingMistakes ? targeted.latestAttemptIds : [],
+  ]);
+  const confirmed = confirmedKey === reviewKey;
   function change(update: Partial<Editor>) {
     setEditor((current) => ({ ...current, ...update }));
-    setConfirmed(false);
+    setConfirmedKey(null);
     setError("");
     setMessage("");
   }
@@ -138,7 +156,7 @@ export function ParentControlsScreen() {
         })),
       });
       setReportDate(plan.examDate);
-      setConfirmed(false);
+      setConfirmedKey(null);
       setError("");
       setMessage("Le plan est prêt à être ajusté ci-dessous.");
     },
@@ -274,12 +292,34 @@ export function ParentControlsScreen() {
         return;
       }
     }
+    let mistakesId: string | undefined;
+    if (hasPendingMistakes) {
+      mistakesId = data.addSeries({
+        title: revisionTitle + " — " + editor.title,
+        subjectId: editor.subjectId,
+        courseIds: editor.courseIds,
+        level: "practice",
+        mode: "practice",
+        questions: revisionQuestions,
+      });
+      const result = data.publishSeries(mistakesId);
+      if (!result.ok) {
+        setError(
+          result.error ?? "La séance de révision ne peut pas être partagée.",
+        );
+        return;
+      }
+    }
     const steps = editor.steps.map((step) => ({
       ...step,
-      ...(!step.completedAt &&
-      ["practice", "mistakes"].includes(step.kind) &&
-      trainingId
+      ...(!step.completedAt && step.kind === "practice" && trainingId
         ? { seriesId: trainingId }
+        : {}),
+      ...(!step.completedAt && step.kind === "mistakes" && mistakesId
+        ? {
+            seriesId: mistakesId,
+            ...(!targeted.questions.length ? { title: revisionTitle } : {}),
+          }
         : {}),
       ...(!step.completedAt && step.kind === "mock" && mockId
         ? { seriesId: mockId }
@@ -305,7 +345,7 @@ export function ParentControlsScreen() {
       "Le plan est publié. Votre enfant le retrouve dans « Mes plans ».",
     );
     setError("");
-    setConfirmed(false);
+    setConfirmedKey(null);
   }
   function updateStep(id: string, update: Partial<PlanStep>) {
     change({
@@ -364,7 +404,7 @@ export function ParentControlsScreen() {
               icon="plus"
               onPress={() => {
                 setEditor(newEditor());
-                setConfirmed(false);
+                setConfirmedKey(null);
                 setError("");
                 setMessage("Nouveau contrôle.");
               }}
@@ -784,6 +824,78 @@ export function ParentControlsScreen() {
                     pour composer l’entraînement et le contrôle blanc.
                   </Notice>
                 )}
+                {hasPendingMistakes && (
+                  <Card
+                    inset
+                    style={{ gap: 18 }}
+                    testID="targeted-plan-preview"
+                  >
+                    <View style={common.row}>
+                      <AppText
+                        variant="heading"
+                        style={{ flex: 1, minWidth: 180 }}
+                      >
+                        {revisionTitle}
+                      </AppText>
+                      <Badge>
+                        {revisionQuestions.length} question
+                        {revisionQuestions.length > 1 ? "s" : ""}
+                      </Badge>
+                    </View>
+                    <AppText color={colors.muted}>
+                      {targeted.questions.length
+                        ? `Les questions ci-dessous ont été ratées ou laissées sans réponse dans le dernier essai terminé de chaque série concernée (${targeted.latestAttemptIds.length} essai${targeted.latestAttemptIds.length > 1 ? "s" : ""} consulté${targeted.latestAttemptIds.length > 1 ? "s" : ""}). Les énoncés et corrections sont ceux réellement présentés.`
+                        : "Aucune erreur connue dans les derniers essais terminés. La séance sera intitulée « Consolider les notions » et reprendra les questions déjà approuvées ci-dessous."}
+                    </AppText>
+                    <AppText variant="small" color={colors.muted}>
+                      Cette sélection ne génère aucun nouveau contenu avec l’IA.
+                      Vérifiez les questions, les réponses et les corrections
+                      avant de confirmer le plan.
+                    </AppText>
+                    {revisionQuestions.length ? (
+                      revisionQuestions.map((question, index) => (
+                        <View
+                          key={question.id}
+                          style={{
+                            gap: 9,
+                            paddingTop: 16,
+                            borderTopWidth: 1,
+                            borderColor: colors.border,
+                          }}
+                          testID={"targeted-plan-question-" + index}
+                        >
+                          <AppText variant="label">
+                            {index + 1}. {question.prompt}
+                          </AppText>
+                          {!!question.choices.length && (
+                            <AppText variant="small" color={colors.muted}>
+                              Choix :{" "}
+                              {question.choices
+                                .map((choice) => choice.label)
+                                .join(" · ")}
+                            </AppText>
+                          )}
+                          <AppText color={colors.primary}>
+                            Réponse attendue : {expectedAnswerLabel(question)}
+                          </AppText>
+                          <AppText variant="small">
+                            {question.explanation}
+                          </AppText>
+                          {!!question.rubric && (
+                            <AppText variant="small" color={colors.muted}>
+                              Critère : {question.rubric}
+                            </AppText>
+                          )}
+                        </View>
+                      ))
+                    ) : (
+                      <Notice>
+                        Publiez d’abord des exercices pour les chapitres
+                        choisis.
+                      </Notice>
+                    )}
+                  </Card>
+                )}
                 <Button
                   variant={confirmed ? "secondary" : "ghost"}
                   icon={confirmed ? "check" : "shield"}
@@ -792,11 +904,13 @@ export function ParentControlsScreen() {
                       ? "Relecture du plan confirmée"
                       : "Confirmer la relecture du plan"
                   }
-                  onPress={() => setConfirmed(!confirmed)}
+                  onPress={() => setConfirmedKey(confirmed ? null : reviewKey)}
                 >
                   {confirmed
-                    ? "J’ai vérifié les séances et les chapitres"
-                    : "Je confirme avoir vérifié les séances et les chapitres"}
+                    ? "J’ai vérifié les séances, les chapitres" +
+                      (hasPendingMistakes ? " et les questions ci-dessus" : "")
+                    : "Je confirme avoir vérifié les séances, les chapitres" +
+                      (hasPendingMistakes ? " et les questions ci-dessus" : "")}
                 </Button>
                 <View style={[common.row, { justifyContent: "flex-end" }]}>
                   <Button
