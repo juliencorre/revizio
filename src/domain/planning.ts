@@ -117,6 +117,12 @@ export function buildRevisionSteps(input: RevisionStepInput): PlanStep[] {
     throw new Error("Préparez les contrôles des douze prochains mois.");
   if (!input.courseIds.length)
     throw new Error("Choisissez les chapitres à réviser.");
+  if (
+    !Number.isInteger(input.dailyMinutes) ||
+    input.dailyMinutes < 5 ||
+    input.dailyMinutes > 120
+  )
+    throw new Error("Prévoyez entre 5 et 120 minutes de révision par jour.");
   const courses = input.courses.filter((course) =>
     input.courseIds.includes(course.id),
   );
