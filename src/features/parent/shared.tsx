@@ -17,13 +17,14 @@ import {
   Card,
   type NavigationItem,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { colors, fontFamily, neumorphic } from "@/theme";
 import type { CourseSource } from "@/domain/model";
 export function ParentLayout({
   active,
   children,
 }: {
-  active: "dashboard" | "import" | "exercises";
+  active:
+    "dashboard" | "import" | "exercises" | "controls" | "english" | "settings";
   children: ReactNode;
 }) {
   const navigation: NavigationItem[] = [
@@ -45,6 +46,24 @@ export function ParentLayout({
       icon: "pencil",
       active: active === "exercises",
     },
+    {
+      label: "Contrôles et plans",
+      href: "/parent/controls",
+      icon: "calendar",
+      active: active === "controls",
+    },
+    {
+      label: "Anglais",
+      href: "/parent/english",
+      icon: "languages",
+      active: active === "english",
+    },
+    {
+      label: "Réglages",
+      href: "/parent/settings",
+      icon: "users",
+      active: active === "settings",
+    },
   ];
   return (
     <AppShell role="parent" navigation={navigation}>
@@ -57,8 +76,11 @@ export function Field({
   optional,
   multiline,
   style,
+  onFocus,
+  onBlur,
   ...props
 }: TextInputProps & { label: string; optional?: boolean }) {
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ gap: 8 }}>
       <AppText variant="label">
@@ -67,10 +89,19 @@ export function Field({
       </AppText>
       <TextInput
         accessibilityLabel={label}
-        placeholderTextColor="#8B91A3"
+        placeholderTextColor="#718099"
+        onFocus={(event) => {
+          setFocused(true);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          onBlur?.(event);
+        }}
         multiline={multiline}
         style={[
           styles.input,
+          focused && neumorphic.focus,
           multiline && { minHeight: 112, textAlignVertical: "top" },
           style,
         ]}
@@ -113,7 +144,8 @@ export function Notice({
 export function LoadingParent({
   active = "dashboard",
 }: {
-  active?: "dashboard" | "import" | "exercises";
+  active?:
+    "dashboard" | "import" | "exercises" | "controls" | "english" | "settings";
 }) {
   return (
     <ParentLayout active={active}>
@@ -174,7 +206,7 @@ export function SourcePreview({
             style={{
               width: "100%",
               height: expanded ? 360 : 126,
-              backgroundColor: "#F5F6FA",
+              backgroundColor: colors.surfaceInset,
               borderRadius: 12,
             }}
             onError={() => setFailed(true)}
@@ -185,7 +217,7 @@ export function SourcePreview({
               height: 100,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: "#F5F6FA",
+              backgroundColor: colors.surfaceInset,
               borderRadius: 12,
             }}
           >
@@ -217,7 +249,7 @@ export function localId(prefix: string) {
 }
 export const parentStyles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 20 },
-  column: { flex: 1, minWidth: 280, gap: 20 },
+  column: { flex: 1, minWidth: 280, minHeight: "auto", gap: 20 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -227,9 +259,8 @@ export const parentStyles = StyleSheet.create({
   section: { gap: 18 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 3 },
   choice: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...neumorphic.small,
+    minHeight: 52,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -238,12 +269,14 @@ export const parentStyles = StyleSheet.create({
     gap: 10,
   },
   selected: {
+    ...neumorphic.inset,
     borderColor: colors.primary,
     backgroundColor: colors.primaryLight,
   },
   bubble: {
-    width: 40,
-    height: 40,
+    ...neumorphic.small,
+    width: 44,
+    height: 44,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -252,28 +285,27 @@ export const parentStyles = StyleSheet.create({
 });
 const styles = StyleSheet.create({
   input: {
-    borderWidth: 1,
-    borderColor: "#DDE0EC",
-    backgroundColor: "#FAFAFD",
-    minHeight: 50,
-    borderRadius: 14,
+    ...neumorphic.inset,
+    minHeight: 54,
+    fontFamily,
+    borderRadius: 18,
     color: colors.ink,
-    fontSize: 16,
+    fontSize: 17,
     lineHeight: 24,
     paddingHorizontal: 15,
     paddingVertical: 12,
   },
   notice: {
-    borderRadius: 16,
+    ...neumorphic.small,
+    borderRadius: 20,
     padding: 16,
     gap: 12,
     flexDirection: "row",
     alignItems: "flex-start",
   },
   source: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
+    ...neumorphic.small,
+    borderRadius: 20,
     padding: 12,
     width: 190,
     flexGrow: 1,

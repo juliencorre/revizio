@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import React, { useState, type ReactNode } from "react";
 import {
   Pressable,
   ScrollView,
@@ -45,11 +45,23 @@ import {
   Volume2,
   X,
   Calculator,
+  Settings,
+  Download,
+  Lock,
+  LogOut,
+  Cloud,
+  Search,
+  Save,
+  Eye,
+  RotateCw,
+  EyeOff,
+  Wifi,
+  Headphones,
 } from "lucide-react-native";
 import { useRouter, type Href } from "expo-router";
-import { colors, radius } from "@/theme";
+import { colors, radius, fontFamily, neumorphic } from "@/theme";
 import type { IconName } from "@/domain/model";
-const icons = {
+const icons: Record<string, typeof Sparkles> = {
   sparkles: Sparkles,
   book: BookOpen,
   calculator: Calculator,
@@ -83,6 +95,18 @@ const icons = {
   refresh: RefreshCw,
   menu: Menu,
   trash: Trash2,
+  settings: Settings,
+  download: Download,
+  lock: Lock,
+  logout: LogOut,
+  cloud: Cloud,
+  search: Search,
+  save: Save,
+  eye: Eye,
+  rotate: RotateCw,
+  "eye-off": EyeOff,
+  wifi: Wifi,
+  headphones: Headphones,
 };
 export function AppIcon({
   name,
@@ -146,12 +170,13 @@ export function Button({
   testID?: string;
   accessibilityLabel?: string;
 }) {
-  const foreground =
-    variant === "primary" || variant === "orange"
-      ? "#FFFFFF"
-      : variant === "danger"
-        ? colors.danger
-        : colors.primary;
+  const [focused, setFocused] = useState(false);
+  const filled = variant === "primary" || variant === "orange";
+  const foreground = filled
+    ? "#FFFFFF"
+    : variant === "danger"
+      ? colors.danger
+      : colors.primary;
   return (
     <Pressable
       accessibilityRole="button"
@@ -160,16 +185,26 @@ export function Button({
       disabled={disabled}
       testID={testID}
       onPress={onPress}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       style={({ pressed }) => [
         styles.button,
         buttonStyles[variant],
-        disabled && { opacity: 0.42 },
-        pressed && !disabled && { opacity: 0.8, transform: [{ scale: 0.99 }] },
+        focused && !disabled && neumorphic.focus,
+        pressed &&
+          !disabled &&
+          (filled ? neumorphic.coloredPressed : neumorphic.inset),
+        pressed && !disabled && { transform: [{ scale: 0.985 }] },
+        disabled && { opacity: 0.48, boxShadow: neumorphic.inset.boxShadow },
         style,
       ]}
     >
-      {icon && <AppIcon name={icon} color={foreground} size={20} />}
-      <AppText variant="label" color={foreground}>
+      {icon && <AppIcon name={icon} color={foreground} size={21} />}
+      <AppText
+        variant="label"
+        color={foreground}
+        style={{ flexShrink: 1, textAlign: "center" }}
+      >
         {children}
       </AppText>
     </Pressable>
@@ -178,11 +213,22 @@ export function Button({
 export function Card({
   children,
   style,
+  testID,
+  inset = false,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  testID?: string;
+  inset?: boolean;
 }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <View
+      testID={testID}
+      style={[styles.card, inset && neumorphic.inset, style]}
+    >
+      {children}
+    </View>
+  );
 }
 export function Badge({
   children,
@@ -273,7 +319,7 @@ export function PageHeading({
 }) {
   return (
     <View style={styles.heading}>
-      <View style={{ flex: 1, gap: 8 }}>
+      <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 260, gap: 8 }}>
         {eyebrow && (
           <AppText
             variant="small"
@@ -295,6 +341,41 @@ export interface NavigationItem {
   href: Href;
   icon: IconName;
   active?: boolean;
+}
+function NavigationButton({
+  item,
+  onPress,
+}: {
+  item: NavigationItem;
+  onPress: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!item.active }}
+      onPress={onPress}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={({ pressed }) => [
+        styles.navItem,
+        item.active && styles.navSelected,
+        (pressed || item.active) && neumorphic.inset,
+        focused && neumorphic.focus,
+      ]}
+    >
+      <AppIcon
+        name={item.icon}
+        color={item.active ? colors.primary : colors.muted}
+      />
+      <AppText
+        color={item.active ? colors.primary : colors.muted}
+        style={{ fontWeight: item.active ? "700" : "600", flex: 1 }}
+      >
+        {item.label}
+      </AppText>
+    </Pressable>
+  );
 }
 export function AppShell({
   children,
@@ -334,26 +415,11 @@ export function AppShell({
           )}
           <View style={{ gap: 8, marginTop: 20 }}>
             {navigation.map((item) => (
-              <Pressable
+              <NavigationButton
                 key={item.label}
-                accessibilityRole="button"
+                item={item}
                 onPress={() => router.push(item.href)}
-                style={[
-                  styles.navItem,
-                  item.active && { backgroundColor: colors.primaryLight },
-                ]}
-              >
-                <AppIcon
-                  name={item.icon}
-                  color={item.active ? colors.primary : colors.muted}
-                />
-                <AppText
-                  color={item.active ? colors.primary : colors.muted}
-                  style={{ fontWeight: item.active ? "700" : "500", flex: 1 }}
-                >
-                  {item.label}
-                </AppText>
-              </Pressable>
+              />
             ))}
           </View>
           <View style={{ flex: 1 }} />
@@ -384,16 +450,16 @@ export function AppShell({
             horizontal
             showsHorizontalScrollIndicator={false}
             style={{
-              height: 72,
-              maxHeight: 72,
+              height: 84,
+              maxHeight: 84,
               flexGrow: 0,
               flexShrink: 0,
               backgroundColor: colors.surface,
             }}
             contentContainerStyle={{
-              paddingHorizontal: 16,
-              gap: 8,
-              paddingVertical: 8,
+              paddingHorizontal: 20,
+              gap: 14,
+              paddingVertical: 12,
             }}
           >
             {navigation.map((item) => (
@@ -448,7 +514,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
           width: compact ? 34 : 42,
           height: compact ? 34 : 42,
           borderRadius: 14,
-          backgroundColor: colors.primaryLight,
+          ...neumorphic.small,
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -462,100 +528,123 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 const textStyles = StyleSheet.create({
   hero: {
     fontSize: 48,
-    lineHeight: 57,
+    lineHeight: 59,
     fontWeight: "800",
-    letterSpacing: -1.7,
+    letterSpacing: -1.5,
   },
-  title: { fontSize: 34, lineHeight: 42, fontWeight: "800", letterSpacing: -1 },
+  title: {
+    fontSize: 35,
+    lineHeight: 44,
+    fontWeight: "800",
+    letterSpacing: -0.8,
+  },
   heading: {
-    fontSize: 22,
-    lineHeight: 29,
+    fontSize: 23,
+    lineHeight: 31,
     fontWeight: "700",
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
-  body: { fontSize: 16, lineHeight: 25 },
-  small: { fontSize: 13, lineHeight: 20 },
-  label: { fontSize: 15, lineHeight: 21, fontWeight: "700" },
+  body: { fontSize: 17, lineHeight: 27 },
+  small: { fontSize: 14, lineHeight: 21 },
+  label: { fontSize: 16, lineHeight: 23, fontWeight: "700" },
 });
 const buttonStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.primaryLight },
-  ghost: { backgroundColor: "transparent" },
-  orange: { backgroundColor: colors.orange },
-  danger: { backgroundColor: colors.dangerLight },
+  primary: {
+    ...neumorphic.colored,
+    backgroundColor: colors.primary,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  secondary: { ...neumorphic.small, backgroundColor: colors.surface },
+  ghost: { ...neumorphic.small, backgroundColor: colors.surface },
+  orange: {
+    ...neumorphic.colored,
+    backgroundColor: colors.orange,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  danger: { ...neumorphic.small, backgroundColor: colors.dangerLight },
 });
 const styles = StyleSheet.create({
-  text: { color: colors.ink },
+  text: { color: colors.ink, fontFamily, flexShrink: 1 },
   button: {
-    minHeight: 48,
-    borderRadius: 14,
+    minHeight: 52,
+    maxWidth: "100%",
+    borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: "transparent",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
+    gap: 10,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: 26,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  card: { ...neumorphic.raised, borderRadius: radius.lg, padding: 26 },
   badge: {
+    ...neumorphic.inset,
     alignSelf: "flex-start",
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   track: {
-    height: 9,
-    backgroundColor: "#E9EAF3",
-    borderRadius: 8,
+    ...neumorphic.inset,
+    height: 11,
+    borderRadius: 9,
     overflow: "hidden",
+    borderWidth: 0,
   },
   heading: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 20,
+    gap: 22,
     flexWrap: "wrap",
   },
   shell: { flex: 1, flexDirection: "row", backgroundColor: colors.background },
   sidebar: {
     width: 264,
     backgroundColor: colors.surface,
-    borderRightWidth: 1,
-    borderColor: colors.border,
     padding: 24,
-    gap: 14,
+    gap: 16,
+    boxShadow: "6px 0px 14px rgba(174,186,205,0.34)",
+    zIndex: 1,
   },
-  subject: { borderRadius: 22, padding: 22, gap: 12, marginTop: 14 },
+  subject: {
+    ...neumorphic.colored,
+    borderRadius: 26,
+    padding: 22,
+    gap: 12,
+    marginTop: 14,
+  },
   navItem: {
-    minHeight: 52,
-    borderRadius: 14,
+    ...neumorphic.small,
+    minHeight: 56,
+    borderRadius: 17,
     padding: 13,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    marginBottom: 4,
   },
-  page: { flexGrow: 1 },
+  navSelected: {
+    backgroundColor: colors.primaryLight,
+    borderColor: "rgba(81,76,207,0.18)",
+  },
+  page: { flexGrow: 1, paddingBottom: 36 },
   mobileHeader: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
+    zIndex: 1,
   },
   demo: {
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
+    paddingVertical: 20,
   },
 });
