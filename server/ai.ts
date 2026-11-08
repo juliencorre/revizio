@@ -31,11 +31,18 @@ const object = (v: unknown): Record<string, unknown> =>
     : {};
 const strings = (v: unknown) =>
   Array.isArray(v) ? v.filter(nonempty).map((v) => v.trim()) : [];
-const compact = (value: string) => value.normalize("NFC").replace(/\s+/g, " ").trim();
-const citationKey = (value: string) => compact(value).normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("fr").replace(/[’]/g, "'");
+const compact = (value: string) =>
+  value.normalize("NFC").replace(/\s+/g, " ").trim();
+const citationKey = (value: string) =>
+  compact(value)
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("fr")
+    .replace(/[’]/g, "'");
 /** Accent repair is allowed for matching; the returned text always comes from the source. */
 function sourceExcerpt(source: string, proposed: string): string | null {
-  const original = compact(source), quote = compact(proposed);
+  const original = compact(source),
+    quote = compact(proposed);
   if (!quote) return null;
   const index = citationKey(original).indexOf(citationKey(quote));
   return index < 0 ? null : original.slice(index, index + quote.length);
@@ -154,22 +161,41 @@ export async function extractUpload(
       let worker: Awaited<ReturnType<typeof createWorker>> | undefined;
       try {
         worker = await createWorker("fra", 1, { cachePath });
-        const abort = () => { void worker?.terminate(); };
+        const abort = () => {
+          void worker?.terminate();
+        };
         signal?.addEventListener("abort", abort, { once: true });
         try {
           const result = (await worker.recognize(bytes)).data;
           const content = result.text.trim();
           if (content.length >= 80 && result.confidence >= 65)
-            return { sourceId: upload.id, name: upload.name, page, text: content, uncertain: result.confidence < 90 || /\uFFFD|\[illisible\]/i.test(content) };
+            return {
+              sourceId: upload.id,
+              name: upload.name,
+              page,
+              text: content,
+              uncertain:
+                result.confidence < 90 || /\uFFFD|\[illisible\]/i.test(content),
+            };
           const fallback = await vision(bytes, page);
           if (content.length > fallback.text.length && content.length >= 80)
-            return { sourceId: upload.id, name: upload.name, page, text: content, uncertain: true };
+            return {
+              sourceId: upload.id,
+              name: upload.name,
+              page,
+              text: content,
+              uncertain: true,
+            };
           return { ...fallback, uncertain: true };
-        } finally { signal?.removeEventListener("abort", abort); }
+        } finally {
+          signal?.removeEventListener("abort", abort);
+        }
       } catch (error) {
         if (signal?.aborted) throw new Error("Génération interrompue.");
-        return { ...await vision(bytes, page), uncertain: true };
-      } finally { await worker?.terminate().catch(() => {}); }
+        return { ...(await vision(bytes, page)), uncertain: true };
+      } finally {
+        await worker?.terminate().catch(() => {});
+      }
     }
     return vision(bytes, page);
   }
@@ -341,10 +367,25 @@ export async function generateCourse(
   },
   signal?: AbortSignal,
 ): Promise<Partial<Course>> {
-  const pages = input.pages.length ? input.pages : [{ sourceId: "texte-saisi", name: "Texte du cours", page: 1, text: input.sourceText, uncertain: false }];
+  const pages = input.pages.length
+    ? input.pages
+    : [
+        {
+          sourceId: "texte-saisi",
+          name: "Texte du cours",
+          page: 1,
+          text: input.sourceText,
+          uncertain: false,
+        },
+      ];
   const usefulText = pages.map((page) => page.text).join("\n");
-  if (usefulText.trim().length < 80 || (usefulText.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) < 14)
-    throw new Error("La lecture du document est trop courte pour préparer une fiche fiable. Reprenez une photo nette de la page entière ou ajoutez le texte du cours.");
+  if (
+    usefulText.trim().length < 80 ||
+    (usefulText.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) < 14
+  )
+    throw new Error(
+      "La lecture du document est trop courte pour préparer une fiche fiable. Reprenez une photo nette de la page entière ou ajoutez le texte du cours.",
+    );
   const value = object(
     await client.json(
       settings,
@@ -367,21 +408,49 @@ export async function generateCourse(
   );
   if (!Array.isArray(value.sections))
     throw new Error("La fiche proposée est invalide. Réessayez.");
-  const headings = { essential: "L’essentiel", vocabulary: "Vocabulaire", method: "Méthode", warning: "Point d’attention" };
+  const headings = {
+    essential: "L’essentiel",
+    vocabulary: "Vocabulaire",
+    method: "Méthode",
+    warning: "Point d’attention",
+  };
   const sections: RevisionSection[] = value.sections
     .map((raw) => {
       const section = object(raw);
-      const candidates = Array.isArray(section.sourceRefs) ? section.sourceRefs : [];
+      const candidates = Array.isArray(section.sourceRefs)
+        ? section.sourceRefs
+        : [];
       const verified = candidates.flatMap((rawReference) => {
-        const reference = object(rawReference), excerpt = compact(text(reference.excerpt));
-        const page = pages.find((page) => page.sourceId === reference.sourceId && page.page === reference.page && sourceExcerpt(page.text, excerpt));
-        return page && excerpt.length >= 24 ? [{ sourceId: page.sourceId, page: page.page, excerpt: sourceExcerpt(page.text, excerpt)! }] : [];
+        const reference = object(rawReference),
+          excerpt = compact(text(reference.excerpt));
+        const page = pages.find(
+          (page) =>
+            page.sourceId === reference.sourceId &&
+            page.page === reference.page &&
+            sourceExcerpt(page.text, excerpt),
+        );
+        return page && excerpt.length >= 24
+          ? [
+              {
+                sourceId: page.sourceId,
+                page: page.page,
+                excerpt: sourceExcerpt(page.text, excerpt)!,
+              },
+            ]
+          : [];
       });
       // A copied passage without a reference can be located deterministically.
       if (!verified.length) {
         const content = compact(text(section.content));
-        const page = pages.find((page) => content.length >= 24 && sourceExcerpt(page.text, content));
-        if (page) verified.push({ sourceId: page.sourceId, page: page.page, excerpt: sourceExcerpt(page.text, content)! });
+        const page = pages.find(
+          (page) => content.length >= 24 && sourceExcerpt(page.text, content),
+        );
+        if (page)
+          verified.push({
+            sourceId: page.sourceId,
+            page: page.page,
+            excerpt: sourceExcerpt(page.text, content)!,
+          });
       }
       const kind = section.kind as RevisionSection["kind"];
       const example = compact(text(section.example));
@@ -390,7 +459,10 @@ export async function generateCourse(
         kind,
         title: headings[kind] ?? "",
         content: [...new Set(verified.map((ref) => ref.excerpt))].join("\n\n"),
-        example: pages.map((page) => sourceExcerpt(page.text, example)).find(Boolean) ?? "",
+        example:
+          pages
+            .map((page) => sourceExcerpt(page.text, example))
+            .find(Boolean) ?? "",
         sourceRefs: verified,
       };
     })
@@ -406,7 +478,8 @@ export async function generateCourse(
     );
   return {
     title: input.title,
-    description: "Passages du cours organisés avec leurs sources. À relire avant publication.",
+    description:
+      "Passages du cours organisés avec leurs sources. À relire avant publication.",
     sections,
     sources: input.sources,
     sourceText: input.sourceText,
@@ -546,6 +619,8 @@ export async function generateExercises(
               types,
               count: input.count,
               level: input.level,
+              presentation:
+                "Texte simple sans balises Markdown. concept est le nom lisible de la notion travaillée, jamais un identifiant technique de cours ou de section.",
               courses: input.courses.map((c) => ({
                 id: c.id,
                 title: c.title,
@@ -575,6 +650,17 @@ export async function generateExercises(
       )
         throw new Error("Le nombre de questions n’est pas respecté.");
       const rows = value.questions;
+      const readable = (value: unknown) => {
+        let result = text(value)
+          .replace(/(\*\*|__)(.*?)\1/g, "$2")
+          .replace(/`([^`]+)`/g, "$1");
+        for (const course of input.courses) {
+          result = result.replaceAll(course.id, course.title);
+          for (const section of course.sections)
+            result = result.replaceAll(section.id, section.title);
+        }
+        return result;
+      };
       const questions: Question[] = rows.map((raw) => {
         const q = object(raw);
         const labels = strings(q.choices);
@@ -614,29 +700,56 @@ export async function generateExercises(
           );
         if (!choiceType && !expectedAnswers.length)
           throw new Error("Une réponse attendue est manquante.");
-        if (!choiceType && expectedAnswers.some((answer) => answer.length > 80 || answer.split(/\s+/).length > 8))
-          throw new Error("Les réponses attendues doivent être courtes (une valeur ou quelques mots), jamais une phrase explicative complète.");
+        if (
+          !choiceType &&
+          expectedAnswers.some(
+            (answer) => answer.length > 80 || answer.split(/\s+/).length > 8,
+          )
+        )
+          throw new Error(
+            "Les réponses attendues doivent être courtes (une valeur ou quelques mots), jamais une phrase explicative complète.",
+          );
         const calculation = requestedCalculation(text(q.prompt));
-        let explanation = text(q.explanation);
+        let explanation = readable(q.explanation);
         if (calculation && type !== "true-false") {
-          const matches = (answer: string) => { const value = calculate(answer); return value !== null && Math.abs(value - calculation.value) <= Math.max(1, Math.abs(calculation.value)) * 1e-10; };
+          const matches = (answer: string) => {
+            const value = calculate(answer);
+            return (
+              value !== null &&
+              Math.abs(value - calculation.value) <=
+                Math.max(1, Math.abs(calculation.value)) * 1e-10
+            );
+          };
           if (choiceType) {
             index = choices.findIndex((choice) => matches(choice.label));
-            if (index < 0) throw new Error(`Le calcul ${calculation.expression} vaut ${calculation.value} : ajoute cette valeur parmi les choix proposés.`);
-          } else expectedAnswers.splice(0, expectedAnswers.length, String(Number(calculation.value.toPrecision(12))).replace(".", ","));
+            if (index < 0)
+              throw new Error(
+                `Le calcul ${calculation.expression} vaut ${calculation.value} : ajoute cette valeur parmi les choix proposés.`,
+              );
+          } else
+            expectedAnswers.splice(
+              0,
+              expectedAnswers.length,
+              String(Number(calculation.value.toPrecision(12))).replace(
+                ".",
+                ",",
+              ),
+            );
           explanation = `${calculation.expression} = ${String(Number(calculation.value.toPrecision(12))).replace(".", ",")}. On calcule d’abord les parenthèses, puis les multiplications et divisions, puis les additions et soustractions. Résultat vérifié par le calculateur de Révizo.`;
         }
         return {
           id: randomUUID(),
           type,
-          prompt: text(q.prompt),
+          prompt: readable(q.prompt),
           choices,
           correctChoiceId: choiceType ? choices[index].id : "",
           expectedAnswers: choiceType ? undefined : expectedAnswers,
           explanation,
-          hint: text(q.hint),
-          concept: text(q.concept),
-          rubric: text(q.rubric),
+          hint: readable(q.hint),
+          concept: /^[\da-f]{8}-[\da-f-]{27}$/i.test(readable(q.concept))
+            ? input.courses.map((c) => c.title).join(" · ")
+            : readable(q.concept),
+          rubric: readable(q.rubric),
           sourceRefs: references(q.sourceRefs, pages),
         };
       });
