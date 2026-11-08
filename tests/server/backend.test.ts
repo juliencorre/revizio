@@ -8,7 +8,7 @@ import type { AiClient, AiMessage, AiSettings } from "../../server/types";
 import { createApp } from "../../server/app";
 import { initialData } from "../../src/domain/fixtures";
 import { clone, startAttemptInData } from "../../src/domain/learning";
-import type { LearningData } from "../../src/domain/model";
+import type { Course, LearningData } from "../../src/domain/model";
 
 class FixtureAi implements AiClient {
   failNext = false;
@@ -735,6 +735,154 @@ describe("fichiers privés et sauvegarde", () => {
 });
 
 describe("jobs IA asynchrones — moteur de test explicite", () => {
+  it("régénère depuis l’OCR corrigé, lit les nouveaux fichiers et conserve la version du brouillon", async () => {
+    const session = await setup(),
+      headers = bearer(session.token);
+    const first = (
+      await upload(session.token, session.profiles[0].id, "premier.png")
+    ).json();
+    const appended = (
+      await upload(session.token, session.profiles[0].id, "nouveau.png")
+    ).json();
+    const corrected =
+      "Texte corrigé par le parent : pour additionner deux nombres de même signe, on additionne les distances à zéro et on conserve leur signe commun.";
+    const newText =
+      "Un document ajouté indique que pour des signes contraires on soustrait les distances à zéro et on garde le signe du nombre le plus éloigné de zéro.";
+    const sourceText = `[premier.png · page 1 · source ${first.id}]\n${corrected}`;
+    const state = await envelope(session.token);
+    state.data.courses.push({
+      id: "corrected-draft",
+      subjectId: "maths",
+      title: "Ma fiche corrigée",
+      description: "",
+      status: "draft",
+      updatedAt: new Date().toISOString(),
+      revision: 1,
+      sections: [],
+      sources: [
+        { ...first, page: 1, extractedText: corrected, uncertain: false },
+      ],
+      sourceText,
+    });
+    expect(
+      (await save(session.token, state.data, state.revision)).statusCode,
+    ).toBe(200);
+    let visionCalls = 0;
+    const generations: {
+      sourceText: string;
+      pages: { sourceId: string; page: number; text: string }[];
+    }[] = [];
+    vi.spyOn(ai, "json").mockImplementation(
+      async (_settings, messages, schema) => {
+        const properties = schema.properties as Record<string, unknown>;
+        if (properties.text) {
+          visionCalls++;
+          return { text: newText, uncertain: false };
+        }
+        const input = JSON.parse(
+          messages.find((message) => message.role === "user")!.content,
+        );
+        generations.push(input);
+        const page = input.pages[0];
+        return {
+          title: input.title,
+          description: "",
+          sections: [
+            {
+              kind: "essential",
+              title: "L’essentiel",
+              content: page.text,
+              example: "",
+              sourceRefs: [
+                {
+                  sourceId: page.sourceId,
+                  page: page.page,
+                  excerpt: page.text,
+                },
+              ],
+            },
+          ],
+        };
+      },
+    );
+    async function regenerate(text: string) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/ai/course",
+        headers,
+        payload: {
+          profileId: session.profiles[0].id,
+          existingCourseId: "corrected-draft",
+          subjectId: "maths",
+          title: "Ma fiche corrigée",
+          sourceIds: [first.id, appended.id],
+          sourceText: text,
+        },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      const outcome = await job(session.token, response.json().job.id);
+      expect(outcome.status, String(outcome.error)).toBe("succeeded");
+      return (outcome.result as { course: Course }).course;
+    }
+    const proposal = await regenerate(sourceText);
+    expect(visionCalls).toBe(1);
+    expect(generations[0].pages).toEqual([
+      {
+        sourceId: first.id,
+        name: "premier.png",
+        page: 1,
+        text: corrected,
+        uncertain: false,
+      },
+      {
+        sourceId: appended.id,
+        name: "nouveau.png",
+        page: 1,
+        text: newText,
+        uncertain: false,
+      },
+    ]);
+    expect(proposal.sourceText!.split(corrected)).toHaveLength(2);
+    expect(proposal.sourceText!.split(newText)).toHaveLength(2);
+    expect(proposal).toMatchObject({
+      title: "Ma fiche corrigée",
+      status: "draft",
+      revision: 1,
+    });
+    expect(proposal.originId).toBeUndefined();
+    expect(proposal.sources.map((source) => source.extractedText)).toEqual([
+      corrected,
+      newText,
+    ]);
+    const unchanged = await envelope(session.token);
+    expect(unchanged.data.courses[0]).toEqual(state.data.courses[0]);
+    // Adoption is explicit, then regenerating the same draft performs no OCR.
+    unchanged.data.courses[0] = { ...unchanged.data.courses[0], ...proposal };
+    expect(
+      (await save(session.token, unchanged.data, unchanged.revision))
+        .statusCode,
+    ).toBe(200);
+    const regenerated = await regenerate(proposal.sourceText!);
+    expect(visionCalls).toBe(1);
+    expect(regenerated.sourceText).toBe(proposal.sourceText);
+    expect(regenerated.revision).toBe(1);
+    // A published original is never modified; only its proposed revision grows.
+    const published = await envelope(session.token);
+    published.data.courses[0].status = "published";
+    expect(
+      (await save(session.token, published.data, published.revision))
+        .statusCode,
+    ).toBe(200);
+    const version = await regenerate(proposal.sourceText!);
+    expect(version).toMatchObject({
+      status: "draft",
+      revision: 2,
+      originId: "corrected-draft",
+    });
+    expect((await envelope(session.token)).data.courses[0]).toEqual(
+      published.data.courses[0],
+    );
+  });
   it("prépare un brouillon sans publier de cours et conserve le résultat dans les jobs", async () => {
     const session = await setup();
     const r = await app.inject({

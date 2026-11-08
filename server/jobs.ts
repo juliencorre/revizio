@@ -132,6 +132,11 @@ export class JobQueue {
     });
     const settings = this.database.settings(job.familyId);
     const payload = job.payload;
+    const data = this.database.data(job.profileId).data;
+    const old =
+      job.kind === "course" && typeof payload.existingCourseId === "string"
+        ? data.courses.find((course) => course.id === payload.existingCourseId)
+        : undefined;
     const ids = Array.isArray(payload.sourceIds)
       ? payload.sourceIds.filter((id): id is string => typeof id === "string")
       : [];
@@ -149,13 +154,36 @@ export class JobQueue {
         stage: "lecture",
         message: `Lecture de ${upload.name} (${ids.indexOf(id) + 1}/${ids.length}).`,
       });
-      const extracted = await extractUpload(
-        upload,
-        this.client,
-        settings,
-        join(this.database.dataDir, "temporary"),
-        signal,
+      const retained = (old?.sources ?? []).filter(
+        (source) => (source.storageId ?? source.id) === id,
       );
+      const savedPage = (source: CourseSource): ExtractedPage => ({
+        sourceId: id,
+        name: source.name,
+        page: source.page ?? 1,
+        text: source.extractedText!,
+        uncertain: !!source.uncertain,
+      });
+      const extracted =
+        retained.length &&
+        retained.every((source) => typeof source.extractedText === "string")
+          ? retained.map(savedPage)
+          : (
+              await extractUpload(
+                upload,
+                this.client,
+                settings,
+                join(this.database.dataDir, "temporary"),
+                signal,
+              )
+            ).map((page) => {
+              const saved = retained.find(
+                (source) =>
+                  (source.page ?? 1) === page.page &&
+                  typeof source.extractedText === "string",
+              );
+              return saved ? savedPage(saved) : page;
+            });
       pages.push(...extracted);
       sources.push(
         ...extracted.map((page) => ({
@@ -171,23 +199,26 @@ export class JobQueue {
         })),
       );
     }
-    const data = this.database.data(job.profileId).data;
     let result: AiJob["result"];
     if (job.kind === "course") {
-      const old =
-        typeof payload.existingCourseId === "string"
-          ? data.courses.find((c) => c.id === payload.existingCourseId)
-          : undefined;
-      let sourceText = [
-        old?.sourceText,
-        typeof payload.sourceText === "string" ? payload.sourceText : "",
-        ...pages.map(
-          (p) =>
-            `[${p.name} · page ${p.page} · source ${p.sourceId}]\n${p.text}`,
-        ),
-      ]
-        .filter(Boolean)
-        .join("\n\n");
+      // The submitted text is the current parent edit, not a second source to
+      // append to its stored copy. Add only pages not already represented there.
+      let sourceText =
+        typeof payload.sourceText === "string"
+          ? payload.sourceText
+          : (old?.sourceText ?? "");
+      const compact = (text: string) => text.replace(/\s+/g, " ").trim();
+      for (const page of pages)
+        if (
+          page.text.trim() &&
+          !compact(sourceText).includes(compact(page.text))
+        )
+          sourceText = [
+            sourceText,
+            `[${page.name} · page ${page.page} · source ${page.sourceId}]\n${page.text}`,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
       if (!sourceText.trim())
         throw new Error(
           "Ajoutez un document lisible ou le texte du cours avant de générer la fiche.",
@@ -200,7 +231,7 @@ export class JobQueue {
         stage: "fiche",
         message: "L’IA prépare les notions, méthodes et exemples à relire.",
       });
-      // Fresh OCR metadata replaces the upload placeholder already in the draft.
+      // Reused parent corrections and new OCR pages replace upload placeholders.
       const order = [
         ...new Set(
           [...(old?.sources ?? []), ...sources].map(
@@ -233,12 +264,17 @@ export class JobQueue {
       result = {
         course: {
           ...course,
-          ...(old
+          ...(old?.status === "published"
             ? {
                 originId: old.originId ?? old.id,
                 revision: (old.revision ?? 1) + 1,
               }
-            : {}),
+            : old
+              ? {
+                  ...(old.originId ? { originId: old.originId } : {}),
+                  revision: old.revision ?? 1,
+                }
+              : {}),
           generationJobId: job.id,
         },
       };
