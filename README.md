@@ -2,7 +2,7 @@
 
 [Dépôt GitHub public](https://github.com/juliencorre/revizio)
 
-Application familiale de révision, conçue pour l’iPad : les parents importent les cours et relisent les fiches et exercices préparés avec une IA locale ; l’enfant retrouve les contenus publiés, ses plans et ses résultats. Expo, React Native et TypeScript partagent le même socle web et natif.
+Application familiale de révision, conçue pour l’iPad : les parents importent les cours et relisent les fiches et exercices préparés avec une IA locale ; l’enfant retrouve les contenus publiés, ses plans et ses résultats. Expo, React Native et TypeScript partagent le même socle web et natif, avec une interface neuromorphique et de grandes cartes tactiles.
 
 ## Ouvrir l’espace familial
 
@@ -61,7 +61,7 @@ Les photos manuscrites, formules et schémas nécessitent une relecture attentiv
 npm run typecheck
 npm test
 npm run export:web
-npx playwright install chromium webkit
+npx playwright install --with-deps chromium webkit
 npm run test:e2e
 ```
 

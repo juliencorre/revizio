@@ -66,7 +66,7 @@ export async function exportJsonBackup(value: unknown) {
       );
     const file = new NativeFile(Paths.cache, name);
     file.create({ overwrite: true });
-    file.write(content);
+    await file.write(content);
     await Sharing.shareAsync(file.uri, {
       mimeType: "application/json",
       dialogTitle: "Enregistrer la sauvegarde Révizo",

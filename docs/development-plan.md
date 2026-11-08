@@ -38,7 +38,7 @@ L’installation reproductible est dans le [README](../README.md), les frontièr
 
 ## Étapes de recette et consolidation
 
-1. Terminer les campagnes automatiques de parcours familiaux, publication, reprise, synchronisation, plans et anglais sur Chromium et WebKit, paysage/portrait ; conserver captures et échecs résolus dans le rapport de validation.
+1. Campagnes automatiques terminées : parcours familiaux, publication, reprise, synchronisation, plans, anglais et schémas sur Chromium et WebKit, paysage/portrait. Les résultats exécutés et captures sont décrits dans [la validation](validation.md).
 2. Faire la recette sur iPad physique, Safari puis application native : clavier ouvert, gestes tactiles, permissions Photos/Fichiers/caméra, rotation, audio FR/EN et interruptions. Les cibles tactiles visées restent d’au moins 44 px.
 3. Évaluer un corpus familial anonymisé d’imprimés, manuscrits, formules et schémas. Mesurer les lectures erronées et citations manquantes, corriger les cas reproductibles, conserver la relecture parent pour tout partage.
 4. Vérifier les parcours à deux appareils, les conflits sur le même contenu, la perte réseau et une restauration à partir d’une copie exportée hors du serveur.
@@ -47,7 +47,7 @@ L’installation reproductible est dans le [README](../README.md), les frontièr
 
 - Aucun test de navigateur de bureau ne valide la caméra, les voix et les permissions d’un iPad physique. L’audio dépend des voix et capacités du système ; un appel de synthèse vocale testé ne prouve pas un son réellement entendu.
 - L’OCR/vision peut confondre les signes ou le manuscrit. Les contrôles arithmétiques portent sur des expressions explicites prises en charge, sans garantir tous les problèmes rédigés.
-- Les schémas sont des données structurées bornées, sans éditeur de dessin ni interprétation générale d’images géométriques. Le quiz lexical automatique d’anglais travaille les mots et formes approuvés ; il ne constitue pas un dialogue libre.
+- Les schémas sont des données structurées bornées, avec un éditeur structuré, sans dessin libre ni interprétation générale d’images géométriques. Le quiz lexical automatique d’anglais travaille les mots et formes approuvés ; il ne constitue pas un dialogue libre.
 - La révision espacée utilise un intervalle simple après une lecture déclarée. Il n’y a pas de notification push ni d’estimation de mémorisation.
 - L’interface hors connexion demande une première ouverture en ligne et l’installation du service worker en contexte sécurisé. Sur iPad, une adresse LAN en HTTP ne suffit pas : prévoir HTTPS. Les documents doivent être conservés au préalable ; l’IA et l’envoi vers un autre appareil restent en ligne. Voir [le guide iPad](ipad-offline.md).
 - L’instance ne fournit pas de récupération de mot de passe par e-mail ni de portail public pour plusieurs familles. Le compte parent et le répertoire de données doivent être conservés pour exploiter durablement cette installation.
