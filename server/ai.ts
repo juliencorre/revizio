@@ -700,6 +700,30 @@ export async function generateExercises(
           );
         if (!choiceType && !expectedAnswers.length)
           throw new Error("Une réponse attendue est manquante.");
+        if (!choiceType) {
+          const finalNumbers = expectedAnswers
+            .map(calculate)
+            .filter((value): value is number => value !== null);
+          if (
+            finalNumbers.some(
+              (value) =>
+                Math.abs(value - finalNumbers[0]) >
+                Math.max(1, Math.abs(finalNumbers[0])) * 1e-10,
+            )
+          )
+            throw new Error(
+              "Une question doit demander une seule réponse finale : plusieurs résultats numériques différents ne sont pas des variantes acceptables. Crée une seule consigne avec un seul résultat.",
+            );
+          if (
+            (text(q.prompt).match(/(?:^|\n)\s*\d+[.)]\s/g)?.length ?? 0) > 1 ||
+            /\b(?:justifie|explique|détaille|démontre|rédige)\b/iu.test(
+              text(q.prompt),
+            )
+          )
+            throw new Error(
+              "La correction automatique demande une seule consigne et une réponse finale courte, sans justification rédigée ni liste de sous-exercices.",
+            );
+        }
         if (
           !choiceType &&
           expectedAnswers.some(

@@ -267,7 +267,10 @@ export function StudentPlansScreen() {
                               ? "Fait"
                               : stepIsLate(step)
                                 ? "À reprendre"
-                                : planStepLabels[step.kind]}
+                                : step.kind === "mistakes" &&
+                                    step.title === "Consolider les notions"
+                                  ? "Consolidation"
+                                  : planStepLabels[step.kind]}
                           </Badge>
                         </View>
                         {stepIsLate(step) && (
@@ -357,7 +360,9 @@ export function StudentPlansScreen() {
                               variant="ghost"
                               onPress={() => router.push("/student/progress")}
                             >
-                              Retrouver mes erreurs
+                              {step.title === "Consolider les notions"
+                                ? "Voir mes progrès"
+                                : "Retrouver mes erreurs"}
                             </Button>
                           )}
                         </View>

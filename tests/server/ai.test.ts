@@ -72,6 +72,44 @@ describe("périmètre anglais", () => {
   });
 });
 describe("garde-fous de fidélité", () => {
+  it("régénère un problème qui mélange plusieurs résultats dans les réponses acceptées", async () => {
+    let calls = 0;
+    const client = {
+      available: async () => true,
+      json: async () => ({
+        questions: [
+          {
+            type: "problem",
+            prompt:
+              ++calls === 1
+                ? "Calcule :\n1. 2 + 3 =\n2. 4 + 5 ="
+                : "Calcule 2 + 3.",
+            choices: [],
+            expectedAnswers: calls === 1 ? ["5", "9"] : ["5", "+5"],
+            correctChoiceIndex: 0,
+            explanation: "On additionne les deux nombres.",
+            concept: "Addition",
+            hint: "",
+            rubric: "",
+            sourceRefs: [],
+          },
+        ],
+      }),
+    };
+    const [question] = await generateExercises(
+      client,
+      { baseUrl: "http://localhost", model: "test" },
+      {
+        courses: [initialData.courses[0]],
+        types: ["problem"],
+        level: "practice",
+        count: 1,
+      },
+    );
+    expect(calls).toBe(2);
+    expect(question.prompt).toBe("Calcule 2 + 3.");
+    expect(question.expectedAnswers).toEqual(["5"]);
+  });
   it("présente une notion lisible et retire les marqueurs Markdown du texte généré", async () => {
     const course = {
       ...initialData.courses[0],
