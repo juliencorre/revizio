@@ -1,11 +1,17 @@
 import { expect, test } from "@playwright/test";
 
-test("choisir un profil et retrouver les matières", async ({ page }) => {
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("revizo.mode", "demo"));
+});
+
+test("choisir un profil et retrouver les matières", async ({
+  page,
+}, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Qui se connecte ?" }),
+    page.getByRole("heading", { name: /Qui se connecte/ }),
   ).toBeVisible();
   await page.getByTestId("profile-child").click();
   await expect(page).toHaveURL(/\/student$/);
@@ -18,6 +24,10 @@ test("choisir un profil et retrouver les matières", async ({ page }) => {
       ),
     )
     .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("matieres.png"),
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
 });
 

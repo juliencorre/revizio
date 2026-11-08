@@ -25,7 +25,13 @@ export function ParentLayout({
   children,
 }: {
   active:
-    "dashboard" | "import" | "exercises" | "controls" | "english" | "settings";
+    | "dashboard"
+    | "import"
+    | "exercises"
+    | "controls"
+    | "english"
+    | "settings"
+    | "preparations";
   children: ReactNode;
 }) {
   const navigation: NavigationItem[] = [
@@ -64,6 +70,12 @@ export function ParentLayout({
       href: "/parent/settings",
       icon: "users",
       active: active === "settings",
+    },
+    {
+      label: "Mes préparations",
+      href: "/parent/preparations",
+      icon: "refresh",
+      active: active === "preparations",
     },
   ];
   return (

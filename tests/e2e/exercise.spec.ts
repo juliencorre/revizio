@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("revizo.mode", "demo"));
+});
 import { initialData } from "../../src/domain/fixtures";
 const practice = initialData.series.find(
   (series) => series.id === "maths-relative-practice",

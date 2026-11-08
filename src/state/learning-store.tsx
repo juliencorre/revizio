@@ -405,7 +405,15 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         ...dataRef.current,
         series: dataRef.current.series.map((item) =>
           item.id === id && item.status === "draft"
-            ? { ...item, ...clone(updates), id, status: "draft" }
+            ? {
+                ...item,
+                ...clone(updates),
+                ...(Object.prototype.hasOwnProperty.call(updates, "dueDate")
+                  ? { dueDate: updates.dueDate }
+                  : {}),
+                id,
+                status: "draft",
+              }
             : item,
         ),
       });

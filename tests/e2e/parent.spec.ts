@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("revizo.mode", "demo"));
+});
 const storageKey = "revizo.learning.v1";
 
 test("importer une source et publier une fiche relue pour l’enfant", async ({
