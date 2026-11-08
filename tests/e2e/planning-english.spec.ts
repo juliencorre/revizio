@@ -22,21 +22,29 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("revizo.mode", "demo");
     if (window.speechSynthesis) {
-      Object.defineProperty(window.speechSynthesis, "speak", {
-        configurable: true,
-        value: (utterance: SpeechSynthesisUtterance) => {
-          sessionStorage.setItem(
-            "revizo.test.spoken",
-            utterance.text + "|" + utterance.lang,
-          );
-          utterance.dispatchEvent(new Event("start"));
-          setTimeout(() => utterance.dispatchEvent(new Event("end")), 0);
+      Object.defineProperty(
+        Object.getPrototypeOf(window.speechSynthesis),
+        "speak",
+        {
+          configurable: true,
+          value: (utterance: SpeechSynthesisUtterance) => {
+            sessionStorage.setItem(
+              "revizo.test.spoken",
+              utterance.text + "|" + utterance.lang,
+            );
+            utterance.dispatchEvent(new Event("start"));
+            setTimeout(() => utterance.dispatchEvent(new Event("end")), 0);
+          },
         },
-      });
-      Object.defineProperty(window.speechSynthesis, "cancel", {
-        configurable: true,
-        value: () => undefined,
-      });
+      );
+      Object.defineProperty(
+        Object.getPrototypeOf(window.speechSynthesis),
+        "cancel",
+        {
+          configurable: true,
+          value: () => undefined,
+        },
+      );
     }
   });
 });
@@ -270,11 +278,26 @@ test("conserver le brouillon anglais, relire les listes puis apprendre avec cart
   await card.click();
   await expect(card).toContainText("phare");
   await page.getByTestId("speak-english-word").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => sessionStorage.getItem("revizo.test.spoken")),
+  if (
+    await page.evaluate(
+      () =>
+        !!window.speechSynthesis &&
+        typeof SpeechSynthesisUtterance !== "undefined",
     )
-    .toBe("lighthouse|en-GB");
+  ) {
+    await expect
+      .poll(() =>
+        page.evaluate(() => sessionStorage.getItem("revizo.test.spoken")),
+      )
+      .toBe("lighthouse|en-GB");
+  } else {
+    await expect(
+      page.getByText(
+        "La lecture audio est indisponible sur cet appareil. Tu peux continuer avec les cartes écrites.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+  }
   await capture(page, testInfo, "enfant-carte-anglais");
   await page.getByTestId("start-english-quiz").click();
   const series = (await saved(page)).series.find(

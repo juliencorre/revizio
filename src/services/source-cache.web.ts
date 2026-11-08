@@ -15,16 +15,29 @@ async function cachedBlob(id: string): Promise<Blob | undefined> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction("files");
     const request = transaction.objectStore("files").get(id);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const value = request.result;
+      resolve(
+        value instanceof Blob
+          ? value
+          : value?.bytes instanceof ArrayBuffer
+            ? new Blob([value.bytes], {
+                type: value.type || "application/octet-stream",
+              })
+            : undefined,
+      );
+    };
     request.onerror = () => reject(request.error);
     transaction.oncomplete = () => db.close();
   });
 }
 async function saveBlob(id: string, blob: Blob) {
+  // ArrayBuffer avoids WebKit's asynchronous Blob backing-file transaction failure.
+  const bytes = await blob.arrayBuffer();
   const db = await database();
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction("files", "readwrite");
-    transaction.objectStore("files").put(blob, id);
+    transaction.objectStore("files").put({ bytes, type: blob.type }, id);
     transaction.oncomplete = () => {
       db.close();
       resolve();

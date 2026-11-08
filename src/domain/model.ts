@@ -100,6 +100,7 @@ export interface Course {
   revision?: number;
   profileId?: string;
   generationJobId?: string;
+  generationAppliedJobId?: string;
 }
 export interface Choice {
   id: string;
@@ -180,6 +181,7 @@ export interface CourseDraftInput {
   originId?: string;
   revision?: number;
   generationJobId?: string;
+  generationAppliedJobId?: string;
 }
 export type SeriesDraftInput = Omit<ExerciseSeries, "id" | "status">;
 

@@ -3,6 +3,7 @@ import { View } from "react-native";
 import * as Speech from "expo-speech";
 import { AppText, Button } from "./ui";
 import { colors } from "@/theme";
+import { speechSupported } from "@/services/speech-supported";
 export function ReadAloud({
   text,
   language = "fr-FR",
@@ -14,11 +15,15 @@ export function ReadAloud({
   const [error, setError] = useState("");
   useEffect(
     () => () => {
-      void Speech.stop();
+      if (speechSupported()) void Speech.stop().catch(() => undefined);
     },
     [text],
   );
   function play() {
+    if (!speechSupported()) {
+      setError("La lecture audio n’est pas disponible sur cet appareil.");
+      return;
+    }
     if (speaking) {
       void Speech.stop();
       setSpeaking(false);

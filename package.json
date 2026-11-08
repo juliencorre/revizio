@@ -10,7 +10,7 @@
     "android": "expo start --android",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
     "test": "vitest run",
-    "export:web": "expo export --platform web",
+    "export:web": "expo export --platform web && node scripts/prepare-pwa.mjs",
     "test:e2e": "playwright test",
     "preview:web": "node scripts/serve-web.mjs",
     "server": "tsx server/index.ts",

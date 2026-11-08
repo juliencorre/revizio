@@ -106,7 +106,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const savedMode = await AsyncStorage.getItem(MODE_KEY);
       const locked = await AsyncStorage.getItem(LOCK_KEY);
       if (locked) {
-        await apiFetch("/logout", { method: "POST" });
+        await apiFetch("/logout", { method: "POST" }).catch((error) => {
+          if (!(error instanceof ApiError && error.status === 401)) throw error;
+        });
         await rememberToken();
         if (savedMode !== "demo") {
           setUser(null);

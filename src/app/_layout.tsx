@@ -6,6 +6,8 @@ import { LearningProvider, useLearning } from "@/state/learning-store";
 import { AppText, Brand, Button } from "@/components/ui";
 import { SessionProvider } from "@/state/session";
 import { colors } from "@/theme";
+import { useEffect } from "react";
+import { registerOfflineShell } from "@/services/offline-shell";
 export { ErrorBoundary } from "expo-router";
 function AppNavigator() {
   const { isReady, storageError, syncStatus, syncNow, resolveSyncConflict } =
@@ -68,6 +70,9 @@ function AppNavigator() {
   );
 }
 export default function RootLayout() {
+  useEffect(() => {
+    void registerOfflineShell();
+  }, []);
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>

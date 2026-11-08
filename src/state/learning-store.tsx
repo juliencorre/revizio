@@ -794,7 +794,11 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       const done = await waitForJob(job.id, onProgress);
       if (!done.result?.course)
         throw new Error("La génération n’a pas produit de fiche à relire.");
-      updateCourse(id, { ...done.result.course, generationJobId: job.id });
+      updateCourse(id, {
+        ...done.result.course,
+        generationJobId: job.id,
+        generationAppliedJobId: job.id,
+      });
     },
     [requireAi, storeSources, updateCourse],
   );
@@ -868,16 +872,31 @@ export function LearningProvider({ children }: { children: ReactNode }) {
             : {}),
         });
       }
-      const existing = dataRef.current.courses.find(
-        (c) => c.generationJobId === job.id,
+      const adopted = dataRef.current.courses.find(
+        (c) =>
+          c.generationAppliedJobId === job.id ||
+          (c.status === "published" && c.generationJobId === job.id),
       );
-      if (existing) {
-        if (existing.status === "draft" && job.result?.course)
-          updateCourse(existing.id, job.result.course);
-        return existing.id;
-      }
+      if (adopted) return adopted.id;
       if (job.kind === "course" && job.result?.course) {
         const course = job.result.course;
+        const pending = dataRef.current.courses.find(
+          (c) =>
+            c.status === "draft" &&
+            (c.generationJobId === job.id ||
+              c.id === job.input?.existingCourseId),
+        );
+        if (
+          pending &&
+          !pending.sections.some((section) => section.content.trim())
+        ) {
+          updateCourse(pending.id, {
+            ...course,
+            generationJobId: job.id,
+            generationAppliedJobId: job.id,
+          });
+          return pending.id;
+        }
         return addCourse({
           subjectId: course.subjectId ?? "maths",
           title: course.title ?? "Cours à relire",
@@ -886,6 +905,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           sources: course.sources,
           sourceText: course.sourceText,
           generationJobId: job.id,
+          generationAppliedJobId: job.id,
         });
       }
       return null;

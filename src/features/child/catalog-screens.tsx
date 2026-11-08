@@ -14,6 +14,7 @@ import { colors } from "@/theme";
 import { SourceViewer } from "@/components/source-viewer";
 import { ReadAloud } from "@/components/read-aloud";
 import { LearningDiagram } from "@/components/learning-diagram";
+import { cacheSource } from "@/services/source-cache";
 import type { CourseSource, RevisionSection } from "@/domain/model";
 import {
   ChildShell,
@@ -326,6 +327,8 @@ export function StudentCourseScreen() {
   const series = data.publishedSeries.filter((s) => s.courseIds.includes(id));
   const reviewed = data.reviewedCourseIds.includes(id);
   const [source, setSource] = useState<CourseSource | null>(null);
+  const [downloadState, setDownloadState] = useState("");
+  const [downloading, setDownloading] = useState(false);
   const split = width >= 880;
   const [recall, setRecall] = useState(false);
   const [revealed, setRevealed] = useState<string[]>([]);
@@ -547,6 +550,38 @@ export function StudentCourseScreen() {
                   <AppText variant="small" color={colors.muted}>
                     Les documents utilisés pour préparer cette fiche.
                   </AppText>
+                  <Button
+                    variant="secondary"
+                    icon="download"
+                    disabled={downloading}
+                    onPress={() => {
+                      setDownloading(true);
+                      setDownloadState("");
+                      Promise.all(
+                        course.sources.filter((s) => s.uri).map(cacheSource),
+                      )
+                        .then(() =>
+                          setDownloadState(
+                            "Documents conservés sur cet appareil pour les relire hors connexion.",
+                          ),
+                        )
+                        .catch(() =>
+                          setDownloadState(
+                            "Certains documents n’ont pas pu être téléchargés. Vérifie ta connexion et réessaie.",
+                          ),
+                        )
+                        .finally(() => setDownloading(false));
+                    }}
+                  >
+                    {downloading
+                      ? "Téléchargement…"
+                      : "Garder les documents hors connexion"}
+                  </Button>
+                  {!!downloadState && (
+                    <AppText variant="small" accessibilityLiveRegion="polite">
+                      {downloadState}
+                    </AppText>
+                  )}
                   {course.sources.map((item, index) => (
                     <View
                       key={item.id}

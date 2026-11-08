@@ -16,6 +16,7 @@ import { colors } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import { englishFlashcards, englishTenses } from "@/domain/english";
 import { StudyWorkspace } from "@/features/planning/shared";
+import { speechSupported } from "@/services/speech-supported";
 
 export function StudentEnglishScreen() {
   const data = useLearning();
@@ -42,7 +43,7 @@ export function StudentEnglishScreen() {
   );
   useEffect(
     () => () => {
-      void Speech.stop();
+      if (speechSupported()) void Speech.stop().catch(() => undefined);
     },
     [],
   );
@@ -50,17 +51,23 @@ export function StudentEnglishScreen() {
     setFilter(next);
     setIndex(0);
     setFlipped(false);
-    void Speech.stop();
+    if (speechSupported()) void Speech.stop().catch(() => undefined);
     setSpeaking(false);
   }
   function next(direction: number) {
     setIndex((current) => (current + direction + cards.length) % cards.length);
     setFlipped(false);
-    void Speech.stop();
+    if (speechSupported()) void Speech.stop().catch(() => undefined);
     setSpeaking(false);
   }
   async function speak() {
     if (!card) return;
+    if (!speechSupported()) {
+      setSpeechError(
+        "La lecture audio est indisponible sur cet appareil. Tu peux continuer avec les cartes écrites.",
+      );
+      return;
+    }
     setSpeechError("");
     try {
       await Speech.stop();

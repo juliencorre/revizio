@@ -13,7 +13,7 @@ import sharp from "sharp";
 import type { Course, LearningData } from "../../src/domain/model";
 
 // The dedicated E2E server owns an ephemeral database. The production server has no reset route.
-test.describe.configure({ mode: "serial", timeout: 60000 });
+test.describe.configure({ mode: "default", timeout: 60000 });
 const parentEmail = "parent-famille@example.test";
 const parentPassword = "Famille-Test-2026!";
 const childPin = "4268";

@@ -77,8 +77,9 @@ export function StudentExerciseScreen() {
     mode: exam ? ("exam" as const) : ("practice" as const),
     ...(exam
       ? {
-          timeLimitSeconds:
-            Math.max(1, Math.min(120, Number(minutes) || 20)) * 60,
+          timeLimitSeconds: minutes
+            ? Math.max(1, Math.min(120, Number(minutes) || 20)) * 60
+            : (publishedSeries?.timeLimitSeconds ?? 1200),
         }
       : {}),
     planId,
