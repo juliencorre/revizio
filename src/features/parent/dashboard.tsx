@@ -9,6 +9,7 @@ import {
   EmptyState,
   PageHeading,
   ProgressBar,
+  useWindowClass,
 } from "@/components/ui";
 import { colors } from "@/theme";
 import { useLearning } from "@/state/learning-store";
@@ -26,6 +27,7 @@ import { usePreparationJobs } from "./preparations";
 export function ParentDashboard() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const compact = useWindowClass() === "compact";
   const data = useLearning();
   const session = useSession();
   const jobs = usePreparationJobs(
@@ -115,10 +117,15 @@ export function ParentDashboard() {
                 icon="pencil"
                 variant="secondary"
                 onPress={() => router.push("/parent/exercises")}
+                style={compact && { flexGrow: 1 }}
               >
                 Préparer des exercices
               </Button>
-              <Button icon="plus" onPress={() => router.push("/parent/import")}>
+              <Button
+                icon="plus"
+                onPress={() => router.push("/parent/import")}
+                style={compact && { flexGrow: 1 }}
+              >
                 Ajouter un cours
               </Button>
             </View>
@@ -142,7 +149,7 @@ export function ParentDashboard() {
           </View>
         )}
         {data.storageError && <Notice error>{data.storageError}</Notice>}
-        <View style={common.grid}>
+        <View style={[common.grid, compact && { gap: 10 }]}>
           {[
             {
               value: published.length,
@@ -159,17 +166,39 @@ export function ParentDashboard() {
               label: "séances terminées",
               icon: "check" as const,
             },
-          ].map((stat) => (
-            <Card key={stat.label} style={{ flex: 1, minWidth: 180, gap: 12 }}>
-              <View style={common.row}>
-                <View style={common.bubble}>
-                  <AppIcon name={stat.icon} />
+          ].map((stat) =>
+            compact ? (
+              // Three compact tiles on one line keep the essentials visible.
+              <Card
+                key={stat.label}
+                style={{ flex: 1, padding: 12, gap: 4, alignItems: "center" }}
+              >
+                <AppText variant="title" color={colors.primary}>
+                  {stat.value}
+                </AppText>
+                <AppText
+                  variant="small"
+                  color={colors.muted}
+                  style={{ textAlign: "center", fontSize: 13, lineHeight: 17 }}
+                >
+                  {stat.label}
+                </AppText>
+              </Card>
+            ) : (
+              <Card
+                key={stat.label}
+                style={{ flex: 1, minWidth: 180, gap: 12 }}
+              >
+                <View style={common.row}>
+                  <View style={common.bubble}>
+                    <AppIcon name={stat.icon} />
+                  </View>
+                  <AppText variant="title">{stat.value}</AppText>
                 </View>
-                <AppText variant="title">{stat.value}</AppText>
-              </View>
-              <AppText color={colors.muted}>{stat.label}</AppText>
-            </Card>
-          ))}
+                <AppText color={colors.muted}>{stat.label}</AppText>
+              </Card>
+            ),
+          )}
         </View>
         <View
           style={[
@@ -454,7 +483,61 @@ export function ParentDashboard() {
             {published.length} publié{published.length > 1 ? "s" : ""}
           </Badge>
         </View>
-        {published.length ? (
+        {published.length && compact ? (
+          // On phones, a list keeps every published course one tap away.
+          <View style={{ gap: 12 }}>
+            {published.map((course) => {
+              const subject = data.subjects.find(
+                (subject) => subject.id === course.subjectId,
+              );
+              const count = data.series.filter(
+                (series) =>
+                  series.status === "published" &&
+                  series.courseIds.includes(course.id),
+              ).length;
+              return (
+                <Pressable
+                  key={course.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={"Consulter la fiche " + course.title}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/parent/review/[id]",
+                      params: { id: course.id },
+                    })
+                  }
+                  style={({ pressed }) => [
+                    common.choice,
+                    { padding: 14 },
+                    pressed && common.selected,
+                  ]}
+                >
+                  <View
+                    style={[
+                      common.bubble,
+                      {
+                        backgroundColor:
+                          (subject?.color ?? colors.primary) + "16",
+                      },
+                    ]}
+                  >
+                    <AppIcon
+                      name={subject?.icon ?? "book"}
+                      color={subject?.color}
+                    />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                    <AppText variant="label">{course.title}</AppText>
+                    <AppText variant="small" color={colors.muted}>
+                      {subject?.title} · {count} série{count > 1 ? "s" : ""}
+                    </AppText>
+                  </View>
+                  <AppIcon name="chevron-right" />
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : published.length ? (
           <View style={common.grid}>
             {published.map((course) => {
               const subject = data.subjects.find(

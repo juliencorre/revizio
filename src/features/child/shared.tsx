@@ -1,11 +1,5 @@
 import React, { type ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   AppIcon,
@@ -15,9 +9,11 @@ import {
   Button,
   Card,
   EmptyState,
+  useContentWidth,
+  useWindowClass,
   type NavigationItem,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { colors, neumorphic } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import type { Attempt, Course, ExerciseSeries, Subject } from "@/domain/model";
 export function useChildData() {
@@ -36,22 +32,30 @@ export function ChildShell({
   children,
   active = "home",
   subject,
+  focus,
 }: {
   children: ReactNode;
-  active?: "home" | "courses" | "exercises" | "progress";
+  active?: "home" | "courses" | "exercises" | "progress" | "plans" | "english";
   subject?: Subject;
+  /** Keeps the phone screen for the task only (exercise in progress). */
+  focus?: boolean;
 }) {
+  // The phone navigation bar keeps the same five destinations everywhere:
+  // the subject's courses stay reachable from the subject page itself.
+  const compact = useWindowClass() === "compact";
   const navigation: NavigationItem[] = [
     {
       label: "Mes matières",
+      shortLabel: "Matières",
       href: "/student",
       icon: "home",
-      active: active === "home",
+      active: active === "home" || (compact && active === "courses"),
     },
-    ...(subject
+    ...(subject && !compact
       ? [
           {
             label: "Mes cours",
+            shortLabel: "Cours",
             href: `/student/subject/${subject.id}` as const,
             icon: "book" as const,
             active: active === "courses",
@@ -60,6 +64,7 @@ export function ChildShell({
       : []),
     {
       label: "Mes exercices",
+      shortLabel: "Exercices",
       href: subject
         ? `/student/exercises?subjectId=${subject.id}`
         : "/student/exercises",
@@ -68,15 +73,33 @@ export function ChildShell({
     },
     {
       label: "Mes progrès",
+      shortLabel: "Progrès",
       href: "/student/progress",
       icon: "chart",
       active: active === "progress",
     },
-    { label: "Mes contrôles", href: "/student/plans", icon: "calendar" },
-    { label: "Mon anglais", href: "/student/english", icon: "languages" },
+    {
+      label: "Mes contrôles",
+      shortLabel: "Contrôles",
+      href: "/student/plans",
+      icon: "calendar",
+      active: active === "plans",
+    },
+    {
+      label: "Mon anglais",
+      shortLabel: "Anglais",
+      href: "/student/english",
+      icon: "languages",
+      active: active === "english",
+    },
   ];
   return (
-    <AppShell role="child" navigation={navigation} subject={subject}>
+    <AppShell
+      role="child"
+      navigation={navigation}
+      subject={subject}
+      focus={focus}
+    >
       {children}
     </AppShell>
   );
@@ -103,13 +126,7 @@ export function Unavailable({ kind = "cours" }: { kind?: string }) {
     </EmptyState>
   );
 }
-export function useContentWidth() {
-  const { width } = useWindowDimensions();
-  return Math.max(
-    240,
-    Math.min(1360, width >= 1000 ? width - 336 : width - 40),
-  );
-}
+export { useContentWidth };
 export function subjectFor(subjects: Subject[], id: string) {
   return subjects.find((s) => s.id === id);
 }
@@ -290,4 +307,8 @@ export const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   stack: { gap: 18 },
+  quietCard: {
+    boxShadow: neumorphic.small.boxShadow,
+    backgroundColor: colors.background,
+  },
 });

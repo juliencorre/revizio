@@ -138,7 +138,7 @@ export function ServerConnectionCard({
     <Card inset style={{ gap: 16 }} testID={testPrefix + "-server"}>
       <View style={accountStyles.row}>
         <AppIcon name="wifi" />
-        <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 200, gap: 4 }}>
           <AppText variant="heading">Le serveur de la famille</AppText>
           <AppText variant="small" color={colors.muted}>
             {session.serverAvailable && !session.offline

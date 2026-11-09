@@ -223,7 +223,11 @@ export function StudentExerciseScreen() {
     resetQuestion();
   }
   return (
-    <ChildShell active="exercises" subject={subject}>
+    <ChildShell
+      active="exercises"
+      subject={subject}
+      focus={!!attempt && !showSummary && !!question}
+    >
       {!data.isReady ? (
         <Loading />
       ) : !series ? (

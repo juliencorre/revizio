@@ -9,6 +9,7 @@ import {
   Card,
   EmptyState,
   PageHeading,
+  useWindowClass,
 } from "@/components/ui";
 import { colors } from "@/theme";
 import { SourceViewer } from "@/components/source-viewer";
@@ -35,7 +36,9 @@ export function StudentHomeScreen() {
   const router = useRouter();
   const data = useChildData();
   const width = useContentWidth();
-  const columns = width >= 1000 ? 4 : width >= 660 ? 3 : width >= 400 ? 2 : 1;
+  const compact = useWindowClass() === "compact";
+  const columns = width >= 1000 ? 4 : width >= 660 ? 3 : width >= 280 ? 2 : 1;
+  const gap = compact ? 12 : 18;
   const nextSeries = [...data.publishedSeries]
     .sort((a, b) => {
       const as = data.attempts.some(
@@ -169,7 +172,7 @@ export function StudentHomeScreen() {
                 )}
               </AppText>
             </View>
-            <View style={styles.grid}>
+            <View style={[styles.grid, { gap }]}>
               {data.subjects.map((subject) => {
                 const count = data.publishedCourses.filter(
                   (c) => c.subjectId === subject.id,
@@ -179,6 +182,7 @@ export function StudentHomeScreen() {
                     s.subjectId === subject.id &&
                     !latestAttempt(data.attempts, s.id)?.completedAt,
                 ).length;
+                const iconSize = compact ? 44 : 54;
                 return (
                   <Tappable
                     key={subject.id}
@@ -188,31 +192,43 @@ export function StudentHomeScreen() {
                       router.push(`/student/subject/${subject.id}`)
                     }
                     style={{
-                      width: (width - (columns - 1) * 18) / columns,
-                      minHeight: 214,
+                      width: (width - (columns - 1) * gap) / columns,
+                      minHeight: compact ? 150 : 200,
                     }}
                   >
-                    <Card style={{ flex: 1, padding: 23, gap: 16 }}>
+                    <Card
+                      style={[
+                        { flex: 1, gap: compact ? 10 : 14 },
+                        compact ? { padding: 14 } : { padding: 23 },
+                        // Subjects without lessons yet stay quieter, so the
+                        // available ones stand out first.
+                        !count && styles.quietCard,
+                      ]}
+                    >
                       <View
                         style={[
                           styles.row,
-                          { justifyContent: "space-between" },
+                          {
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                          },
                         ]}
                       >
                         <View
                           style={{
                             backgroundColor: subject.color,
-                            width: 54,
-                            height: 54,
-                            borderRadius: 18,
+                            width: iconSize,
+                            height: iconSize,
+                            borderRadius: compact ? 15 : 18,
                             alignItems: "center",
                             justifyContent: "center",
+                            opacity: count ? 1 : 0.55,
                           }}
                         >
                           <AppIcon
                             name={subject.icon}
                             color="#FFFFFF"
-                            size={28}
+                            size={compact ? 24 : 28}
                           />
                         </View>
                         {todo > 0 && (
@@ -222,14 +238,21 @@ export function StudentHomeScreen() {
                       <View style={{ flex: 1 }} />
                       <AppText
                         variant="heading"
-                        style={{ fontSize: 20, lineHeight: 27 }}
+                        color={count ? colors.ink : colors.muted}
+                        style={
+                          compact
+                            ? { fontSize: 17, lineHeight: 22 }
+                            : { fontSize: 20, lineHeight: 27 }
+                        }
                       >
                         {subject.title}
                       </AppText>
                       <AppText variant="small" color={colors.muted}>
                         {count
                           ? plural(count, "cours", "cours")
-                          : "Bientôt tes premiers cours"}
+                          : compact
+                            ? "Bientôt"
+                            : "Bientôt tes premiers cours"}
                       </AppText>
                     </Card>
                   </Tappable>

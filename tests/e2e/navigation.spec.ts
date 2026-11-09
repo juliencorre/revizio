@@ -57,3 +57,52 @@ test("une adresse inconnue propose de revenir aux profils", async ({
   await page.getByRole("button", { name: "Revenir aux profils" }).click();
   await expect(page.getByTestId("profile-child")).toBeVisible();
 });
+
+test.describe("sur smartphone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test("naviguer avec la barre du bas et le menu Plus", async ({ page }) => {
+    await page.goto("/parent");
+    const navigation = page.getByRole("navigation", {
+      name: "Navigation principale",
+    });
+    await expect(
+      navigation.getByRole("button", { name: "Tableau de bord" }),
+    ).toHaveAttribute("aria-current", "page");
+    await page.getByTestId("navigation-more").click();
+    await expect(page.getByTestId("navigation-more")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    const sheet = page.getByRole("dialog", { name: "Plus de rubriques" });
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole("button", { name: "Réglages" }).click();
+    await expect(page).toHaveURL(/\/parent\/settings$/);
+    await expect(page.getByTestId("navigation-more")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      )
+      .toBe(true);
+  });
+
+  test("garder l’exercice en plein écran", async ({ page }) => {
+    await page.goto("/student");
+    await expect(page.getByTestId("subject-card-maths")).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Navigation principale" }),
+    ).toBeVisible();
+    await page.goto("/student/exercise/maths-relative-practice");
+    await expect(
+      page.getByRole("button", { name: "Quitter et garder ma place" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Navigation principale" }),
+    ).toHaveCount(0);
+  });
+});
