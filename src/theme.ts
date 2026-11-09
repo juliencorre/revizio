@@ -22,6 +22,31 @@ export const colors = {
 };
 
 export const radius = { sm: 14, md: 22, lg: 30, xl: 38 };
+
+/**
+ * Material Design window size classes, adapted to the family devices:
+ * compact phones, medium tablets in portrait, expanded tablets in
+ * landscape and computers.
+ */
+export type WindowClass = "compact" | "medium" | "expanded";
+export const breakpoints = { medium: 600, expanded: 1000 };
+export function windowClassFor(width: number): WindowClass {
+  return width < breakpoints.medium
+    ? "compact"
+    : width < breakpoints.expanded
+      ? "medium"
+      : "expanded";
+}
+/** Page margins, navigation sizes and readable content width. */
+export const layout = {
+  gutter: { compact: 16, medium: 24, expanded: 32 },
+  sectionGap: { compact: 20, medium: 24, expanded: 26 },
+  rail: 96,
+  drawer: 280,
+  topBar: 64,
+  navigationBar: 76,
+  maxContent: 1280,
+} as const;
 export const fontFamily = Platform.select({
   ios: "Avenir Next",
   android: "sans-serif",
@@ -59,6 +84,19 @@ export const neumorphic = {
   colored: {
     boxShadow:
       "5px 5px 11px rgba(154,166,190,0.76), -5px -5px 11px rgba(255,255,255,0.85)",
+  },
+  /** Softer relief for phones, where large shadows eat the margins. */
+  raisedCompact: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.42)",
+    boxShadow:
+      "5px 5px 12px rgba(174,186,205,0.6), -5px -5px 12px rgba(255,255,255,0.85)",
+  },
+  /** Hover state layer for pointer devices. */
+  hover: {
+    boxShadow:
+      "6px 6px 14px rgba(174,186,205,0.72), -6px -6px 14px rgba(255,255,255,0.95)",
   },
   coloredPressed: {
     boxShadow:
