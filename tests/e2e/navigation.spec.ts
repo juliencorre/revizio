@@ -104,5 +104,13 @@ test.describe("sur smartphone", () => {
     await expect(
       page.getByRole("navigation", { name: "Navigation principale" }),
     ).toHaveCount(0);
+    // The action stays within thumb reach and the correction comes into view.
+    await expect(page.getByTestId("verify-answer")).toBeInViewport();
+    await page.getByText("−3", { exact: true }).first().click();
+    await page.getByTestId("verify-answer").click();
+    await expect(
+      page.getByText("Bien joué !", { exact: true }),
+    ).toBeInViewport();
+    await expect(page.getByTestId("next-question")).toBeInViewport();
   });
 });

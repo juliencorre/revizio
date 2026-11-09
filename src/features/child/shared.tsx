@@ -1,5 +1,11 @@
 import React, { type ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  View,
+  type ScrollViewInstance,
+} from "react-native";
 import { useRouter } from "expo-router";
 import {
   AppIcon,
@@ -33,12 +39,17 @@ export function ChildShell({
   active = "home",
   subject,
   focus,
+  footer,
+  scrollRef,
 }: {
   children: ReactNode;
   active?: "home" | "courses" | "exercises" | "progress" | "plans" | "english";
   subject?: Subject;
   /** Keeps the phone screen for the task only (exercise in progress). */
   focus?: boolean;
+  /** Actions pinned under the page, within thumb reach. */
+  footer?: ReactNode;
+  scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
   // The phone navigation bar keeps the same five destinations everywhere:
   // the subject's courses stay reachable from the subject page itself.
@@ -99,6 +110,8 @@ export function ChildShell({
       navigation={navigation}
       subject={subject}
       focus={focus}
+      footer={footer}
+      scrollRef={scrollRef}
     >
       {children}
     </AppShell>

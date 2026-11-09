@@ -1,5 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import {
+  Pressable,
+  TextInput,
+  View,
+  type ScrollViewInstance,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AppIcon,
@@ -10,6 +15,7 @@ import {
   EmptyState,
   PageHeading,
   ProgressBar,
+  useWindowClass,
 } from "@/components/ui";
 import { colors, fontFamily, neumorphic } from "@/theme";
 import { expectedAnswerLabel } from "@/domain/answers";
@@ -44,6 +50,8 @@ export function StudentExerciseScreen() {
   const data = useChildData();
   const router = useRouter();
   const width = useContentWidth();
+  const compact = useWindowClass() === "compact";
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const archived = data.attempts.find(
     (a) => a.id === requestedAttemptId && a.seriesId === id,
   );
@@ -205,6 +213,9 @@ export function StudentExerciseScreen() {
       selectedChoice.trim(),
       hintUsed,
     );
+    // On a phone the correction appears below the choices: bring it into view.
+    if (compact && reveal)
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
   }
   function next() {
     resetQuestion();
@@ -215,7 +226,41 @@ export function StudentExerciseScreen() {
       setReviewingErrors(false);
       setReviewingAll(false);
     } else setQuestionIndex(questionIndex + 1);
+    // Each question (or the summary) starts from its top.
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
   }
+  const questionVisible =
+    data.isReady &&
+    !!series &&
+    !startError &&
+    !!attempt &&
+    questionIndex !== null &&
+    !showSummary &&
+    !!question;
+  const action = !questionVisible ? null : answer ? (
+    <Button
+      testID="next-question"
+      icon="arrow-right"
+      onPress={next}
+      style={compact && { flex: 1 }}
+    >
+      {questionIndex + 1 === displayed.length
+        ? reviewingErrors
+          ? "Retour à mon bilan"
+          : "Voir mon bilan"
+        : "Question suivante"}
+    </Button>
+  ) : (
+    <Button
+      testID="verify-answer"
+      icon="check"
+      disabled={!selectedChoice?.trim()}
+      onPress={verify}
+      style={compact && { flex: 1 }}
+    >
+      {isExam ? "Enregistrer ma réponse" : "Vérifier ma réponse"}
+    </Button>
+  );
   function reviewErrors() {
     setReviewingErrors(true);
     setShowSummary(false);
@@ -226,7 +271,10 @@ export function StudentExerciseScreen() {
     <ChildShell
       active="exercises"
       subject={subject}
-      focus={!!attempt && !showSummary && !!question}
+      focus={questionVisible}
+      // Phones keep the main action within thumb reach under the question.
+      footer={compact ? action : undefined}
+      scrollRef={scrollRef}
     >
       {!data.isReady ? (
         <Loading />
@@ -535,28 +583,7 @@ export function StudentExerciseScreen() {
                       ? "Écris ta réponse, puis valide."
                       : "Choisis une réponse, puis valide."}
               </AppText>
-              {answer ? (
-                <Button
-                  testID="next-question"
-                  icon="arrow-right"
-                  onPress={next}
-                >
-                  {questionIndex + 1 === displayed.length
-                    ? reviewingErrors
-                      ? "Retour à mon bilan"
-                      : "Voir mon bilan"
-                    : "Question suivante"}
-                </Button>
-              ) : (
-                <Button
-                  testID="verify-answer"
-                  icon="check"
-                  disabled={!selectedChoice?.trim()}
-                  onPress={verify}
-                >
-                  {isExam ? "Enregistrer ma réponse" : "Vérifier ma réponse"}
-                </Button>
-              )}
+              {!compact && action}
             </View>
           </Card>
           <View style={[styles.row, { justifyContent: "center" }]}>

@@ -1,6 +1,7 @@
 import React, {
   createContext,
   useContext,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -14,6 +15,7 @@ import {
   View,
   useWindowDimensions,
   type PressableStateCallbackType,
+  type ScrollViewInstance,
   type StyleProp,
   type ViewStyle,
   type TextStyle,
@@ -802,6 +804,8 @@ export function AppShell({
   navigation,
   subject,
   focus = false,
+  footer,
+  scrollRef,
 }: {
   children: ReactNode;
   role: "child" | "parent";
@@ -809,12 +813,17 @@ export function AppShell({
   subject?: { title: string; color: string; icon: IconName };
   /** Hides the phone navigation bar during a focused task (exercise). */
   focus?: boolean;
+  /** Actions kept within thumb reach, under the page (bottom app bar). */
+  footer?: ReactNode;
+  /** Lets the page bring new content into view in the shell scroll. */
+  scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
   const { width } = useWindowDimensions();
   const windowClass = windowClassFor(width);
   const session = useSession();
   const router = useRouter();
   const [measured, setMeasured] = useState<number | null>(null);
+  const ownScrollRef = useRef<ScrollViewInstance>(null);
   const gutter = layout.gutter[windowClass];
   const navigate = (item: NavigationItem) => {
     if (!item.active) router.push(item.href);
@@ -895,6 +904,7 @@ export function AppShell({
           </View>
         )}
         <ScrollView
+          ref={scrollRef ?? ownScrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={[
             styles.page,
@@ -944,6 +954,7 @@ export function AppShell({
             </View>
           </View>
         </ScrollView>
+        {footer && <View style={styles.footerBar}>{footer}</View>}
         {windowClass === "compact" && !focus && (
           <NavigationBar
             items={navigation}
@@ -1193,6 +1204,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingTop: 10,
     paddingBottom: 8,
+    backgroundColor: colors.surface,
+    boxShadow: "0px -6px 16px rgba(174,186,205,0.38)",
+    zIndex: 1,
+  },
+  footerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
     backgroundColor: colors.surface,
     boxShadow: "0px -6px 16px rgba(174,186,205,0.38)",
     zIndex: 1,
