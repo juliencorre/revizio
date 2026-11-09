@@ -69,7 +69,7 @@ import {
   Wifi,
   Headphones,
 } from "lucide-react-native";
-import { useRouter, type Href } from "expo-router";
+import { usePathname, useRouter, type Href } from "expo-router";
 import {
   colors,
   radius,
@@ -822,11 +822,15 @@ export function AppShell({
   const windowClass = windowClassFor(width);
   const session = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const [measured, setMeasured] = useState<number | null>(null);
   const ownScrollRef = useRef<ScrollViewInstance>(null);
   const gutter = layout.gutter[windowClass];
   const navigate = (item: NavigationItem) => {
-    if (!item.active) router.push(item.href);
+    // A destination can be highlighted for a nested page (a subject's
+    // courses): only skip the navigation when this exact page is shown.
+    if (typeof item.href === "string" && item.href === pathname) return;
+    router.push(item.href);
   };
   const switchProfile = () => router.replace("/");
   return (

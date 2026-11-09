@@ -91,6 +91,17 @@ test.describe("sur smartphone", () => {
       .toBe(true);
   });
 
+  test("revenir aux matières depuis une matière", async ({ page }) => {
+    await page.goto("/student/subject/maths");
+    const home = page
+      .getByRole("navigation", { name: "Navigation principale" })
+      .getByRole("button", { name: "Mes matières" });
+    await expect(home).toHaveAttribute("aria-current", "page");
+    await home.click();
+    await expect(page).toHaveURL(/\/student$/);
+    await expect(page.getByTestId("subject-card-maths")).toBeVisible();
+  });
+
   test("garder l’exercice en plein écran", async ({ page }) => {
     await page.goto("/student");
     await expect(page.getByTestId("subject-card-maths")).toBeVisible();
