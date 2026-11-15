@@ -81,13 +81,13 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
       >
         <AppIcon
           name={subject.icon}
-          size={26}
+          size={20}
           color={subjectAccent(subject.color)}
         />
-        <AppText variant="title" style={styles.title}>
+        <AppText variant="heading" style={styles.title}>
           {subject.title}
         </AppText>
-        <AppIcon name="chevron-down" size={18} color={colors.ink} />
+        <AppIcon name="chevron-down" size={16} color={colors.ink} />
       </Pressable>
       <Modal
         visible={!!anchor}
@@ -186,13 +186,13 @@ const useStyles = createThemedStyles(({ colors }) => ({
     minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    gap: spacing.sm,
     alignSelf: "flex-start",
     maxWidth: "100%",
     paddingHorizontal: 4,
     borderRadius: 6,
   },
-  title: { fontSize: 30, lineHeight: 38, fontWeight: "600", flexShrink: 1 },
+  title: { fontSize: 20, lineHeight: 27, fontWeight: "600", flexShrink: 1 },
   focus: {
     outlineWidth: 2,
     outlineStyle: "solid",
