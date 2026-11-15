@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "revizo",
+  "main": "cloud/index.ts",
+  "compatibility_date": "2026-11-15",
+  "workers_dev": true,
+  "preview_urls": false,
+  "build": {
+    "command": "npm run export:web",
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*"],
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "FAMILIES",
+        "class_name": "FamilyServer",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["FamilyServer"],
+    },
+  ],
+  "ai": {
+    "binding": "AI",
+  },
+  "vars": {
+    "FAMILY_ID": "famille",
+  },
+  "observability": {
+    "enabled": true,
+  },
+}
