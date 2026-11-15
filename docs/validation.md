@@ -74,3 +74,13 @@ Les captures ont été examinées pour l’accueil enfant, la bibliothèque, le 
 - La revue Impeccable a validé les deux corrections demandées : accès au vocabulaire visible à 390 px et cohérence du répertoire anglais historique. Les cibles tactiles contrôlées font au moins 44 px. Les captures sont celles de données et de comptes fictifs.
 
 Ces vérifications utilisent les navigateurs de test et les formats d’iPad simulés ; elles ne remplacent pas une recette sur iPad physique.
+
+## Navigation persistante et menus Material 3 — 15 novembre 2026
+
+- `npm run typecheck`, `npm test` et `npm run export:web` : réussis ; 172 tests métier, serveur et cloud passent, avec un test IA réelle opt-in ignoré.
+- Campagne générale : 164 réussites, puis les 24 contrôles de navigation relancés après correction du contexte de cache du test de latence ; au total, 168 parcours distincts validés et huit variantes IA réelle opt-in ignorées. Les rapports séparés et le bilan sont conservés dans `artifacts/persistent-navigation/`.
+- Les 24 contrôles de `persistent-navigation.spec.ts`, exécutés en Chromium et WebKit en portrait et paysage, vérifient que le menu reste monté, immobile et visible pendant une navigation et un chargement volontairement ralenti. Ils couvrent aussi le rail réduit/étendu, la navigation au clavier, les cibles tactiles, le défilement indépendant du menu et le retour en haut du contenu.
+- Le scénario de latence désactive le service worker dans son contexte navigateur pour intercepter le téléchargement réel du script de page ; la campagne hors connexion conserve son vrai cache PWA.
+- L’intégration locale avec les accès familiaux privés et le guide PWA est également vérifiée : TypeScript, export web, 179 tests automatisés et 88 parcours navigateur réussis sur les quatre configurations.
+
+Les captures du menu étendu, du rail réduit et des espaces parent/enfant ont été examinées. Les formats d’iPad simulés sous WebKit ne remplacent pas une vérification sur iPad physique.
