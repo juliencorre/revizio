@@ -94,3 +94,11 @@ La publication d’accès conserve l’IA Workers AI déjà en service. Le code 
 - L’intégration locale avec les accès familiaux privés et le guide PWA est également vérifiée : TypeScript, export web, 179 tests automatisés et 88 parcours navigateur réussis sur les quatre configurations.
 
 Les captures du menu étendu, du rail réduit et des espaces parent/enfant ont été examinées. Les formats d’iPad simulés sous WebKit ne remplacent pas une vérification sur iPad physique.
+
+## Sélection de l’enfant dans l’espace parent — 15 novembre 2026
+
+- `npm run typecheck`, `npm test` et `npm run export:web` : réussis ; 179 tests automatisés réussis, un test IA réelle opt-in ignoré.
+- 28 contrôles navigateur réussis sur Chromium et WebKit, portrait et paysage : menu avec sélection cochée, isolation des contenus entre les deux enfants, conservation du choix après rechargement, navigation montée, touches Entrée/flèches/Début/Échap, fermeture à l’extérieur, rotation, noms longs et enfant unique. Les contrôles de bibliothèque compacte et de cibles tactiles restent valides.
+- La revue indépendante Impeccable a rendu le verdict `ship` pour ce sélecteur. Les captures à 1440, 1280 et 390 px, les formats tablette et les noms longs ont été comparés à l’exemple fourni. Les surfaces claires et la palette indigo existantes sont conservées. Le détecteur exécuté sur les deux composants modifiés ne signale aucun problème.
+
+Les comptes et contenus utilisés pour ces vérifications sont fictifs. Les essais WebKit utilisent des formats d’iPad simulés.

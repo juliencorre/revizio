@@ -16,6 +16,8 @@ Le menu gauche reprend les [recommandations Material 3 de Google pour les rails 
 
 Les layouts `/parent` et `/student` conservent chacun un cadre commun autour du `Slot` Expo Router. La navigation et son défilement restent montés pendant que le contenu change. Côté parent, le bandeau affiche la matière de la page et donne accès à son menu. La carte de matière se trouve après les destinations pour ne pas déplacer les liens. `PageShell` transmet uniquement le contexte de la page, sa référence de défilement et ses actions fixes au cadre commun. Chaque nouvelle page revient en haut ; le chargement d’une page ou d’un profil est limité à la zone de contenu.
 
+Dans l’en-tête parent, le choix de l’enfant utilise un menu ancré à droite avec initiale colorée, prénom et coche de sélection. Le choix conserve la rubrique et charge les données propres au profil ; il reste mémorisé après rechargement. Le menu est utilisable au toucher et au clavier, se ferme par Échap ou à l’extérieur, et reste dans la fenêtre sur les petits écrans. Un espace avec un seul enfant affiche son identité sans proposer de choix supplémentaire.
+
 Marges, titres, cartes et grilles s’ajustent à la classe ; `useContentWidth` donne la largeur réellement mesurée dans le cadre. La destination courante est annoncée par `aria-current` et l’anneau de focus n’apparaît qu’à la navigation au clavier. Toutes les zones tactiles gardent au moins 44 px.
 
 ## Serveur d’une famille
