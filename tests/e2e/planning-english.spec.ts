@@ -99,7 +99,7 @@ test("préparer un contrôle, publier son plan et terminer lecture et contrôle 
     .toBe("published");
   const plan = (await saved(page)).plans!.find((plan) => plan.title === title)!;
   await page
-    .getByRole("heading", { name: "Contrôles et plans", exact: true })
+    .getByRole("heading", { name: "Contrôles", exact: true })
     .scrollIntoViewIfNeeded();
   await capture(page, testInfo, "parent-plan-publie");
   await page.goto("/student/plans");

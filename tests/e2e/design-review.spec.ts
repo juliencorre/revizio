@@ -10,6 +10,9 @@ test.beforeEach(async ({ page }) => {
 
 const screens = [
   { name: "accueil-eleve", path: "/student", ready: "student-home" },
+  { name: "bibliotheque-parent", path: "/parent/library", ready: "main" },
+  { name: "suivi-parent", path: "/parent/progress", ready: "main" },
+  { name: "matieres-eleve", path: "/student/subjects", ready: "main" },
   { name: "cours-maths", path: "/student/subject/maths", ready: "course-card" },
   { name: "exercices", path: "/student/exercises", ready: "main" },
   { name: "progression", path: "/student/progress", ready: "main" },

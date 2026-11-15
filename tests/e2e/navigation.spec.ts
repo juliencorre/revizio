@@ -61,34 +61,29 @@ test("une adresse inconnue propose de revenir aux profils", async ({
 test.describe("sur smartphone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-  test("naviguer avec la barre du bas et le menu Plus", async ({ page }) => {
+  test("retrouver les cinq rubriques sans menu supplémentaire", async ({
+    page,
+  }) => {
     await page.goto("/parent");
     const navigation = page.getByRole("navigation", {
       name: "Navigation principale",
     });
     await expect(
-      navigation.getByRole("button", { name: "Tableau de bord" }),
+      navigation.getByRole("button", { name: "Accueil", exact: true }),
     ).toHaveAttribute("aria-current", "page");
-    await page.getByTestId("navigation-more").click();
-    await expect(page.getByTestId("navigation-more")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    const sheet = page.getByRole("dialog", { name: "Plus de rubriques" });
-    await expect(sheet).toBeVisible();
-    await sheet.getByRole("button", { name: "Réglages" }).click();
+    await expect(navigation.getByRole("button")).toHaveCount(5);
+    await navigation
+      .getByRole("button", { name: "Famille", exact: true })
+      .click();
     await expect(page).toHaveURL(/\/parent\/settings$/);
-    await expect(page.getByTestId("navigation-more")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => document.documentElement.scrollWidth <= window.innerWidth,
-        ),
-      )
-      .toBe(true);
+    await expect(
+      navigation.getByRole("button", { name: "Famille", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
   });
 
   test("revenir aux matières depuis une matière", async ({ page }) => {
@@ -98,7 +93,7 @@ test.describe("sur smartphone", () => {
       .getByRole("button", { name: "Mes matières" });
     await expect(home).toHaveAttribute("aria-current", "page");
     await home.click();
-    await expect(page).toHaveURL(/\/student$/);
+    await expect(page).toHaveURL(/\/student\/subjects$/);
     await expect(page.getByTestId("subject-card-maths")).toBeVisible();
   });
 

@@ -8,7 +8,7 @@ Les composants de `src/components/ui.tsx` et les tokens de `src/theme.ts` porten
 
 La mise en page suit les classes de taille de fenêtre de Material Design (`windowClassFor` dans `src/theme.ts`) :
 
-- **compacte** (< 600 px, smartphone) : barre supérieure, barre de navigation en bas limitée à cinq destinations et feuille « Plus » pour les autres ; pendant un exercice, la barre laisse place à l’action principale fixée sous la question ;
+- **compacte** (< 600 px, smartphone) : barre supérieure, barre de navigation en bas avec cinq destinations stables ; pendant un exercice, la barre laisse place à l’action principale fixée sous la question ;
 - **moyenne** (600 à 999 px, tablette en portrait, smartphone en paysage) : rail de navigation vertical ;
 - **étendue** (≥ 1000 px, tablette en paysage, ordinateur) : tiroir latéral.
 

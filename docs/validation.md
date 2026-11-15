@@ -54,3 +54,13 @@ WebKit sur Linux avec profil iPad ne remplace pas un iPad physique. La caméra, 
 - Workers AI réel : réponse JSON structurée correcte à un calcul simple, transcription fidèle d’une image imprimée de nombres relatifs, fiche extractive de trois sections conforme aux citations du texte fourni, puis cinq formats d’exercices validés par les règles serveur. Le mode JSON des exercices évite le blocage constaté avec leur schéma de décodage contraint ; la validation métier et le contrôle des calculs restent appliqués. Ces essais utilisent des sources synthétiques, sans document familial privé. Les résultats restent des brouillons à relire.
 
 Le serveur Node.js/Ollama conserve son parcours local. Les différences de capacité de l’installation hébergée (photos, stockage et sauvegardes) sont détaillées dans le [guide Cloudflare](cloudflare.md). WebKit sur Linux ne remplace pas une vérification sur iPad physique.
+
+## Organisation des parcours — 15 novembre 2026
+
+- `npm run typecheck` : client, serveur Node.js et Worker sans erreur.
+- `npm test` : 129 tests réussis ; un test Ollama opt-in ignoré. Les nouveaux cas vérifient la priorité des reprises, le contexte et la durée des contrôles, l’exclusion des brouillons, les relectures à échéance, les erreurs corrigées, les erreurs répétées et les réponses historiques réellement présentées.
+- `npm run export:web` : export web et cache PWA construits avec les nouvelles routes de bibliothèque, suivi parent et matières enfant.
+- Campagne navigateur complète : 112 parcours réussis sur Chromium et WebKit, chacun en portrait et paysage. Les huit variantes de génération Ollama opt-in n’ont pas été relancées pour cette refonte de navigation.
+- Après les derniers ajustements de mise en page, `npx playwright test tests/e2e/organization.spec.ts tests/e2e/navigation.spec.ts tests/e2e/design-review.spec.ts` : 56 contrôles réussis sur les quatre configurations. Ils incluent les cinq destinations stables, les filtres de bibliothèque, les brouillons conservés par cours, l’anglais accessible depuis sa matière, la reprise du même essai, les corrections visibles côté parent, les contenus privés et les zones tactiles d’au moins 44 px. Sur téléphone 390 × 844, le titre du premier cours est visible sans défiler et les filtres restent accessibles.
+
+Les captures ont été examinées pour l’accueil enfant, la bibliothèque, le tableau de bord et le suivi parent, ainsi que pour la bibliothèque sur téléphone. Les rapports locaux sont conservés dans `artifacts/organization/`. Les données des tests sont synthétiques. WebKit sur Linux ne remplace pas une vérification sur iPad physique.
