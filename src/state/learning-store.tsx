@@ -27,6 +27,16 @@ import {
   normalizeEnglish,
 } from "../domain/english";
 import { dateOnly, planValidation, reschedulePlan } from "../domain/planning";
+import {
+  answerVocabularySession,
+  createVocabularySession,
+  isVocabularyList,
+  legacyEnglishListId,
+  legacyEnglishVocabulary,
+  normalizeVocabularyList,
+  vocabularyListError,
+  vocabularyListsFor,
+} from "../domain/vocabulary";
 import type {
   AiJob,
   ChildProfile,
@@ -40,6 +50,9 @@ import type {
   QuestionType,
   RevisionPlan,
   SeriesDraftInput,
+  VocabularyList,
+  VocabularyMode,
+  VocabularySession,
 } from "../domain/model";
 import { createLearningPersistence, STORAGE_KEY } from "./persistence";
 import { useSession } from "./session";
@@ -65,11 +78,13 @@ export interface GenerateSeriesInput {
 }
 export interface LearningContextValue extends Omit<
   LearningData,
-  "version" | "plans" | "english"
+  "version" | "plans" | "english" | "vocabularyLists" | "vocabularySessions"
 > {
   subjects: typeof subjects;
   plans: RevisionPlan[];
   english: EnglishSettings;
+  vocabularyLists: VocabularyList[];
+  vocabularySessions: VocabularySession[];
   isReady: boolean;
   storageError: string | null;
   childName: string;
@@ -111,6 +126,20 @@ export interface LearningContextValue extends Omit<
   completePlanStep(planId: string, stepId: string): void;
   postponePlan(id: string, examDate: string): PublicationResult;
   updateEnglish(settings: EnglishSettings): void;
+  saveVocabularyList(list: VocabularyList): void;
+  deleteVocabularyList(id: string): void;
+  startVocabularySession(
+    listId: string,
+    mode: VocabularyMode,
+    scope: "all" | "review",
+    restart?: boolean,
+  ): string | null;
+  answerVocabulary(
+    sessionId: string,
+    questionId: string,
+    response: string,
+  ): void;
+  completeVocabulary(sessionId: string): void;
   extractEnglish(sources: CourseSource[]): Promise<EnglishSettings>;
   storeSources(sources: CourseSource[]): Promise<CourseSource[]>;
   generateCourse(id: string, onProgress?: (job: AiJob) => void): Promise<void>;
@@ -130,6 +159,8 @@ export const emptyLearningData = (): LearningData => ({
   english: clone(emptyEnglishSettings),
   readingRecords: [],
   spacedReviews: [],
+  vocabularyLists: [],
+  vocabularySessions: [],
 });
 const LearningContext = createContext<LearningContextValue | null>(null);
 let sequence = 0;
@@ -684,6 +715,12 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       commit({
         ...current,
         english,
+        vocabularyLists: [
+          ...vocabularyListsFor(current).filter(
+            (list) => list.id !== legacyEnglishListId,
+          ),
+          ...legacyEnglishVocabulary(english),
+        ],
         courses: material
           ? [
               ...current.courses.filter((c) => c.id !== material.course.id),
@@ -714,6 +751,119 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       });
     },
     [assertParent, commit],
+  );
+  const saveVocabularyList = useCallback(
+    (input: VocabularyList) => {
+      assertParent();
+      if (!isVocabularyList(input))
+        throw new Error(
+          "Cette liste de vocabulaire est invalide (200 mots maximum).",
+        );
+      const list = normalizeVocabularyList(input);
+      if (!list.title) throw new Error("Donnez un titre à la liste.");
+      const error =
+        list.status === "published" ? vocabularyListError(list) : null;
+      if (error) throw new Error(error);
+      const current = dataRef.current;
+      const lists = vocabularyListsFor(current);
+      const previous = lists.find((item) => item.id === list.id);
+      if (previous && previous.language !== list.language)
+        throw new Error(
+          "La langue d’une liste existante ne peut pas être changée.",
+        );
+      commit({
+        ...current,
+        vocabularyLists: [
+          ...lists.filter((item) => item.id !== list.id),
+          clone(list),
+        ],
+      });
+    },
+    [assertParent, commit],
+  );
+  const deleteVocabularyList = useCallback(
+    (id: string) => {
+      assertParent();
+      commit({
+        ...dataRef.current,
+        vocabularyLists: vocabularyListsFor(dataRef.current).filter(
+          (list) => list.id !== id,
+        ),
+      });
+    },
+    [assertParent, commit],
+  );
+  const startVocabularySession = useCallback(
+    (
+      listId: string,
+      mode: VocabularyMode,
+      scope: "all" | "review",
+      restart = false,
+    ) => {
+      assertReady();
+      const current = dataRef.current;
+      const list = vocabularyListsFor(current).find(
+        (list) => list.id === listId && list.status === "published",
+      );
+      if (!list) return null;
+      const sessions = current.vocabularySessions ?? [];
+      const pending = [...sessions]
+        .reverse()
+        .find(
+          (session) =>
+            session.listId === listId &&
+            session.mode === mode &&
+            session.scope === scope &&
+            !session.completedAt,
+        );
+      if (pending && !restart) return pending.id;
+      const session = createVocabularySession(list, sessions, {
+        id: newId("vocabulary-session"),
+        mode,
+        scope,
+        startedAt: now(),
+      });
+      if (!session) return null;
+      commit({
+        ...current,
+        vocabularyLists: vocabularyListsFor(current),
+        vocabularySessions: [...sessions, session],
+      });
+      return session.id;
+    },
+    [assertReady, commit],
+  );
+  const answerVocabulary = useCallback(
+    (id: string, questionId: string, response: string) => {
+      assertReady();
+      const current = dataRef.current;
+      commit({
+        ...current,
+        vocabularySessions: (current.vocabularySessions ?? []).map((session) =>
+          session.id === id
+            ? answerVocabularySession(session, questionId, response, now())
+            : session,
+        ),
+      });
+    },
+    [assertReady, commit],
+  );
+  const completeVocabulary = useCallback(
+    (id: string) => {
+      assertReady();
+      const current = dataRef.current;
+      commit({
+        ...current,
+        vocabularySessions: (current.vocabularySessions ?? []).map((session) =>
+          session.id === id &&
+          !session.completedAt &&
+          session.answers.length === session.questions.length
+            ? { ...session, completedAt: now() }
+            : session,
+        ),
+      });
+    },
+    [assertReady, commit],
   );
   const storeSources = useCallback(
     async (sources: CourseSource[]) => {
@@ -918,6 +1068,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       subjects,
       plans: data.plans ?? [],
       english: data.english ?? clone(emptyEnglishSettings),
+      vocabularyLists: vocabularyListsFor(data),
+      vocabularySessions: data.vocabularySessions ?? [],
       isReady: session.ready && loadedKey === key,
       storageError,
       childName: session.childName,
@@ -951,6 +1103,11 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       completePlanStep,
       postponePlan,
       updateEnglish,
+      saveVocabularyList,
+      deleteVocabularyList,
+      startVocabularySession,
+      answerVocabulary,
+      completeVocabulary,
       extractEnglish,
       storeSources,
       generateCourse,
@@ -988,6 +1145,11 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       completePlanStep,
       postponePlan,
       updateEnglish,
+      saveVocabularyList,
+      deleteVocabularyList,
+      startVocabularySession,
+      answerVocabulary,
+      completeVocabulary,
       extractEnglish,
       storeSources,
       generateCourse,

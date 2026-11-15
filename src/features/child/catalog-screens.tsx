@@ -18,6 +18,7 @@ import { LearningDiagram } from "@/components/learning-diagram";
 import { cacheSource } from "@/services/source-cache";
 import { NextControl } from "./next-control";
 import type { CourseSource, RevisionSection } from "@/domain/model";
+import { vocabularyLanguages } from "@/domain/vocabulary";
 import {
   ChildShell,
   CourseCard,
@@ -64,8 +65,40 @@ export function StudentSubjectScreen() {
             }
           />
           <View style={styles.wrap}>
-            <Button variant="secondary" icon="pencil" onPress={() => router.push(`/student/exercises?subjectId=${subject.id}`)}>Les exercices de cette matière</Button>
-            {subject.id === "english" && <Button icon="languages" onPress={() => router.push("/student/english")}>Vocabulaire et verbes</Button>}
+            <Button
+              variant="secondary"
+              icon="pencil"
+              onPress={() =>
+                router.push(`/student/exercises?subjectId=${subject.id}`)
+              }
+            >
+              Les exercices de cette matière
+            </Button>
+            {vocabularyLanguages.some(
+              (language) => language.id === subject.id,
+            ) && (
+              <Button
+                icon="languages"
+                testID="subject-vocabulary"
+                onPress={() =>
+                  router.push({
+                    pathname: "/student/vocabulary",
+                    params: { language: subject.id },
+                  })
+                }
+              >
+                Mes listes de vocabulaire
+              </Button>
+            )}
+            {subject.id === "english" && (
+              <Button
+                variant="secondary"
+                icon="book"
+                onPress={() => router.push("/student/english")}
+              >
+                Vocabulaire et verbes
+              </Button>
+            )}
           </View>
           <NextControl subjectId={subject.id} />
           {courses.length === 0 ? (
@@ -152,8 +185,17 @@ export function StudentCourseScreen() {
             </Button>
             <Badge tone="green">Vérifiée par un parent</Badge>
           </View>
-          <View style={{ backgroundColor: colors.primaryLight, borderRadius: 22, padding: width < 600 ? 18 : 26 }}>
-            <PageHeading title={course.title} description={course.description} />
+          <View
+            style={{
+              backgroundColor: colors.primaryLight,
+              borderRadius: 22,
+              padding: width < 600 ? 18 : 26,
+            }}
+          >
+            <PageHeading
+              title={course.title}
+              description={course.description}
+            />
           </View>
           <View style={styles.wrap}>
             <ReadAloud

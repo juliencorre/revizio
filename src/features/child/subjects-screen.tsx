@@ -29,6 +29,9 @@ export function SubjectGrid() {
             series.subjectId === subject.id &&
             !latestAttempt(data.attempts, series.id)?.completedAt,
         ).length;
+        const lists = data.vocabularyLists.filter(
+          (list) => list.language === subject.id && list.status === "published",
+        ).length;
         return (
           <ActionCard
             key={subject.id}
@@ -51,7 +54,14 @@ export function SubjectGrid() {
             <View style={{ gap: spacing.xs, flex: 1 }}>
               <AppText variant="label">{subject.title}</AppText>
               <AppText variant="small" color={colors.muted}>
-                {count ? `${count} cours` : "À découvrir"}
+                {[
+                  count ? `${count} cours` : "",
+                  lists
+                    ? `${lists} ${lists === 1 ? "liste de vocabulaire" : "listes de vocabulaire"}`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "À découvrir"}
               </AppText>
             </View>
             {todo > 0 && <Badge>{todo} à faire</Badge>}
@@ -73,8 +83,9 @@ export function StudentSubjectsScreen() {
       {!data.isReady ? <Loading /> : <SubjectGrid />}
       <Card inset>
         <AppText color={colors.muted}>
-          Les cours, le vocabulaire et les verbes d’anglais sont réunis dans la
-          matière Anglais.
+          Retrouve les listes de vocabulaire dans les matières Anglais, Espagnol
+          et Latin. Les verbes et les temps d’anglais restent dans la matière
+          Anglais.
         </AppText>
       </Card>
     </ChildShell>

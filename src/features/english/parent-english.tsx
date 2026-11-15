@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRouter } from "expo-router";
 import { Platform, Pressable, View, useWindowDimensions } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -90,6 +91,7 @@ function mergeExtracted(
   };
 }
 export function ParentEnglishScreen() {
+  const router = useRouter();
   const data = useLearning();
   const { width } = useWindowDimensions();
   const [settings, setSettings, draft] = useLocalDraft<EnglishSettings>(
@@ -328,6 +330,17 @@ export function ParentEnglishScreen() {
           title="Son répertoire d’anglais"
           description="Les exercices utiliseront les mots, les verbes et les temps que vous avez vérifiés."
         />
+        <Button
+          icon="languages"
+          onPress={() =>
+            router.push({
+              pathname: "/parent/vocabulary",
+              params: { language: "english" },
+            })
+          }
+        >
+          Gérer mes listes de vocabulaire et leur suivi
+        </Button>
         {draft.error && <Notice error>{draft.error}</Notice>}
         {error && <Notice error>{error}</Notice>}
         {message && <Notice success>{message}</Notice>}

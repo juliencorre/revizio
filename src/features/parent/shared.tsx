@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
   type TextInputProps,
+  type ScrollViewInstance,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -26,6 +27,7 @@ import { SourceThumbnail, SourceViewer } from "@/components/source-viewer";
 export function ParentLayout({
   active,
   children,
+  scrollRef,
 }: {
   active:
     | "library"
@@ -35,9 +37,11 @@ export function ParentLayout({
     | "exercises"
     | "controls"
     | "english"
+    | "vocabulary"
     | "settings"
     | "preparations";
   children: ReactNode;
+  scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
   const router = useRouter();
   const data = useLearning();
@@ -47,6 +51,7 @@ export function ParentLayout({
     "import",
     "exercises",
     "english",
+    "vocabulary",
     "preparations",
   ].includes(active);
   const navigation: NavigationItem[] = [
@@ -83,7 +88,7 @@ export function ParentLayout({
     },
   ];
   return (
-    <AppShell role="parent" navigation={navigation}>
+    <AppShell role="parent" navigation={navigation} scrollRef={scrollRef}>
       <View
         style={{
           flexDirection: "row",
@@ -129,6 +134,13 @@ export function ParentLayout({
             onPress={() => router.push("/parent/preparations")}
           >
             Préparations IA
+          </Button>
+          <Button
+            variant={active === "vocabulary" ? "secondary" : "ghost"}
+            icon="languages"
+            onPress={() => router.push("/parent/vocabulary")}
+          >
+            Vocabulaire
           </Button>
           <Button
             variant={active === "english" ? "secondary" : "ghost"}

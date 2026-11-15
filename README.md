@@ -46,14 +46,17 @@ Le premier compte se crée avec un code d’installation privé conservé dans `
 1. **Ajouter un cours** : choisir matière et titre, joindre photos/PDF ou texte, conserver le brouillon.
 2. **Préparer la fiche** : lancer la vraie préparation IA ou rédiger à la main, comparer aux documents, corriger et confirmer la relecture avant de publier.
 3. **Préparer des exercices** : choisir les cours, les formats, le niveau et le nombre ; relire les questions et corrections avant publication.
-4. **Contrôles** : choisir une date et un temps quotidien, ajuster les séances puis partager le plan. **Anglais** définit le vocabulaire, les verbes et temps autorisés.
-5. L’enfant entre avec son profil et son code ; il lit, s’exerce, reprend ses essais et revoit ses erreurs. La rubrique **Famille** gère les profils et l’export/restauration des sauvegardes.
+4. **Contrôles** : choisir une date et un temps quotidien, ajuster les séances puis partager le plan. **Anglais** définit les verbes, temps et éléments autorisés dans les exercices d’anglais.
+5. **Cours et exercices → Vocabulaire** : créer des listes en anglais, espagnol ou latin, ajouter les mots et leurs traductions puis publier pour l’enfant. Les mots peuvent être saisis un par un ou collés au format `mot = traduction`, une paire par ligne. Un point-virgule sépare les variantes acceptées.
+6. L’enfant entre avec son profil et son code ; il lit, s’exerce, reprend ses essais et revoit ses erreurs. La rubrique **Famille** gère les profils et l’export/restauration des sauvegardes.
 
 Les générations continuent sur le serveur et se retrouvent dans **Préparations IA**. Aucun résultat IA n’est publié automatiquement. La rédaction manuelle et le quiz lexical déterministe ne sont pas présentés comme de l’IA.
 
 ## Se repérer dans l’application
 
-L’enfant retrouve cinq rubriques stables : **Aujourd’hui**, **Matières**, **Exercices**, **Contrôles** et **Progrès**. L’accueil propose une prochaine séance : reprise d’un essai commencé, séance prévue aujourd’hui, relecture à échéance, puis exercice ou fiche à découvrir. Les durées indicatives sont annoncées comme des estimations. Dans **Matières → Anglais**, les cours donnent accès au vocabulaire et aux verbes.
+L’enfant retrouve cinq rubriques stables : **Aujourd’hui**, **Matières**, **Exercices**, **Contrôles** et **Progrès**. L’accueil propose une prochaine séance : reprise d’un essai commencé, séance prévue aujourd’hui, relecture à échéance, puis exercice ou fiche à découvrir. Les durées indicatives sont annoncées comme des estimations. Dans **Matières → Anglais, Espagnol ou Latin → Mes listes de vocabulaire**, il consulte les mots, écrit leurs traductions dans un sens ou dans les deux et reprend une séance interrompue. Les verbes et les temps restent accessibles dans la matière Anglais.
+
+Chaque liste distingue les mots **À découvrir**, **En cours**, **À revoir** et **Connus**. Un mot devient connu après **deux réussites consécutives dans chaque sens** ; une erreur le remet à revoir. Le suivi détaille les deux sens, peut être filtré et permet de travailler seulement les mots non connus. Les accents comptent, tandis que les majuscules et les espaces autour d’une réponse sont ignorés. Consulter les traductions ne valide aucun mot. Le parent retrouve le même suivi, séparé pour chaque enfant. Les corrections utilisent les traductions publiées, sans appel à une IA.
 
 L’espace parent comporte **Accueil**, **Cours et exercices**, **Contrôles**, **Suivi** et **Famille**. La bibliothèque permet de rechercher et filtrer les fiches et séries par matière, type et statut. **Brouillon** désigne un contenu encore vide ; **À vérifier** un brouillon contenant une fiche ou des questions ; **Publié** un contenu partagé après confirmation parentale. Les préparations IA et les outils d’anglais se trouvent dans cet espace. Les éditeurs ouverts depuis un cours conservent leur brouillon séparément.
 
@@ -71,7 +74,7 @@ Utiliser un client Expo compatible avec le SDK 58 ou un development build. Confi
 
 ## Périmètre actuel
 
-Photos/PDF durables, comptes parent/enfant, plusieurs profils, synchronisation par révisions, préparations Ollama, cinq formats d’exercices, contrôles blancs chronométrés, plans modifiables, cartes d’anglais et lecture audio sont implémentés. Les tentatives conservent les questions et corrections réellement affichées.
+Photos/PDF durables, comptes parent/enfant, plusieurs profils, synchronisation par révisions, préparations Ollama, cinq formats d’exercices, contrôles blancs chronométrés, plans modifiables, listes de vocabulaire dans trois langues, cartes d’anglais et lecture audio sont implémentés. Les tentatives et séances de vocabulaire conservent les questions et corrections réellement affichées.
 
 Les photos manuscrites, formules et schémas nécessitent une relecture attentive ; une extraction incertaine est signalée. Après installation du cache en contexte sécurisé, l’interface et les contenus déjà conservés peuvent être repris hors connexion ; les générations et la synchronisation nécessitent le serveur. La caméra, les voix système et l’application native restent à vérifier sur iPad physique. Voir la [matrice fonctionnelle et les étapes restantes](docs/development-plan.md).
 

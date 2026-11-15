@@ -112,6 +112,17 @@ export function StudentEnglishScreen() {
           title="Vocabulaire et verbes"
           description="Retrouve les mots et les verbes que tu as étudiés en classe."
         />
+        <Button
+          icon="languages"
+          onPress={() =>
+            router.push({
+              pathname: "/student/vocabulary",
+              params: { language: "english" },
+            })
+          }
+        >
+          Mes listes de vocabulaire et mon suivi
+        </Button>
         {!englishFlashcards(data.english).length ? (
           <EmptyState
             icon="languages"
