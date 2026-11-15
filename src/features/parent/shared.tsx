@@ -9,10 +9,9 @@ import {
   type TextInputProps,
   type ScrollViewInstance,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import {
   AppIcon,
-  AppShell,
   AppText,
   Button,
   Card,
@@ -20,6 +19,7 @@ import {
   type NavigationItem,
 } from "@/components/ui";
 import { colors, fontFamily, neumorphic } from "@/theme";
+import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import { useSession } from "@/state/session";
@@ -43,6 +43,14 @@ export function ParentLayout({
   children: ReactNode;
   scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
+  return <PageShell scrollRef={scrollRef}>{children}</PageShell>;
+}
+
+/** The context bar, navigation and content viewport outlive individual pages. */
+export function ParentWorkspace({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const section = pathname.split("/")[2];
+  const active = section === "review" ? "library" : (section ?? "dashboard");
   const router = useRouter();
   const data = useLearning();
   const session = useSession();
@@ -92,78 +100,88 @@ export function ParentLayout({
     },
   ];
   return (
-    <AppShell role="parent" navigation={navigation} scrollRef={scrollRef}>
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <AppText variant="label">Pour {data.childName}</AppText>
-        {data.profiles.length > 1 &&
-          data.profiles.map((profile) => (
-            <Button
-              key={profile.id}
-              selected={profile.id === data.activeProfileId}
-              variant={
-                profile.id === data.activeProfileId ? "primary" : "secondary"
-              }
-              accessibilityLabel={`Suivre ${profile.name}`}
-              onPress={() => session.selectProfile(profile.id)}
+    <PersistentAppShell
+      role="parent"
+      navigation={navigation}
+      loading={!data.isReady}
+      header={
+        <>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <AppText variant="label">Pour {data.childName}</AppText>
+            {data.profiles.length > 1 &&
+              data.profiles.map((profile) => (
+                <Button
+                  key={profile.id}
+                  selected={profile.id === data.activeProfileId}
+                  variant={
+                    profile.id === data.activeProfileId
+                      ? "primary"
+                      : "secondary"
+                  }
+                  accessibilityLabel={`Suivre ${profile.name}`}
+                  onPress={() => session.selectProfile(profile.id)}
+                >
+                  {profile.name}
+                </Button>
+              ))}
+          </View>
+          {inLibrary && (
+            <View
+              accessibilityLabel="Rubriques des cours et exercices"
+              style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
             >
-              {profile.name}
-            </Button>
-          ))}
-      </View>
-      {inLibrary && (
-        <View
-          accessibilityLabel="Rubriques des cours et exercices"
-          style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
-        >
-          <Button
-            variant={active === "library" ? "secondary" : "ghost"}
-            selected={active === "library"}
-            accessibilityLabel="Bibliothèque"
-            style={tabStyle}
-            icon={compact ? undefined : "book"}
-            onPress={() => router.push("/parent/library")}
-          >
-            {compact ? "Cours" : "Bibliothèque"}
-          </Button>
-          <Button
-            variant={active === "vocabulary" ? "secondary" : "ghost"}
-            selected={active === "vocabulary"}
-            style={tabStyle}
-            icon={compact ? undefined : "languages"}
-            onPress={() => router.push("/parent/vocabulary")}
-          >
-            Vocabulaire
-          </Button>
-          <Button
-            variant={active === "preparations" ? "secondary" : "ghost"}
-            selected={active === "preparations"}
-            accessibilityLabel="Préparations IA"
-            style={tabStyle}
-            icon={compact ? undefined : "refresh"}
-            onPress={() => router.push("/parent/preparations")}
-          >
-            {compact ? "IA" : "Préparations IA"}
-          </Button>
-          <Button
-            variant={active === "english" ? "secondary" : "ghost"}
-            selected={active === "english"}
-            style={tabStyle}
-            icon={compact ? undefined : "languages"}
-            onPress={() => router.push("/parent/english")}
-          >
-            Anglais
-          </Button>
-        </View>
-      )}
+              <Button
+                variant={active === "library" ? "secondary" : "ghost"}
+                selected={active === "library"}
+                accessibilityLabel="Bibliothèque"
+                style={tabStyle}
+                icon={compact ? undefined : "book"}
+                onPress={() => router.push("/parent/library")}
+              >
+                {compact ? "Cours" : "Bibliothèque"}
+              </Button>
+              <Button
+                variant={active === "vocabulary" ? "secondary" : "ghost"}
+                selected={active === "vocabulary"}
+                style={tabStyle}
+                icon={compact ? undefined : "languages"}
+                onPress={() => router.push("/parent/vocabulary")}
+              >
+                Vocabulaire
+              </Button>
+              <Button
+                variant={active === "preparations" ? "secondary" : "ghost"}
+                selected={active === "preparations"}
+                accessibilityLabel="Préparations IA"
+                style={tabStyle}
+                icon={compact ? undefined : "refresh"}
+                onPress={() => router.push("/parent/preparations")}
+              >
+                {compact ? "IA" : "Préparations IA"}
+              </Button>
+              <Button
+                variant={active === "english" ? "secondary" : "ghost"}
+                selected={active === "english"}
+                style={tabStyle}
+                icon={compact ? undefined : "languages"}
+                onPress={() => router.push("/parent/english")}
+              >
+                Anglais
+              </Button>
+            </View>
+          )}
+        </>
+      }
+    >
       {children}
-    </AppShell>
+    </PersistentAppShell>
   );
 }
 export function Field({

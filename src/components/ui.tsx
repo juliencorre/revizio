@@ -1,11 +1,13 @@
 import React, {
   createContext,
   useContext,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -148,7 +150,7 @@ export function useWindowClass(): WindowClass {
   return useContext(WindowClassContext) ?? "expanded";
 }
 /** Width estimated before the page content has been measured. */
-export function estimateContentWidth(width: number) {
+export function estimateContentWidth(width: number, navigationWidth?: number) {
   const windowClass = windowClassFor(width);
   const navigation =
     windowClass === "expanded"
@@ -160,7 +162,7 @@ export function estimateContentWidth(width: number) {
     240,
     Math.min(
       layout.maxContent,
-      width - navigation - 2 * layout.gutter[windowClass],
+      width - (navigationWidth ?? navigation) - 2 * layout.gutter[windowClass],
     ),
   );
 }
@@ -347,30 +349,38 @@ export function IconButton({
   onPress,
   color = colors.primary,
   testID,
+  dark = false,
+  expanded,
 }: {
   icon: IconName;
   label: string;
   onPress: () => void;
   color?: string;
   testID?: string;
+  dark?: boolean;
+  expanded?: boolean;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ expanded }}
+      aria-expanded={expanded}
       testID={testID}
       onPress={onPress}
       onFocus={onFocus}
       onBlur={onBlur}
       style={(state) => [
         styles.iconButton,
-        isHovered(state) && styles.raisedHover,
-        focused && styles.focusRing,
-        state.pressed && neumorphic.inset,
+        dark && { backgroundColor: "transparent", borderColor: "transparent" },
+        isHovered(state) &&
+          (dark ? styles.drawerItemHover : styles.raisedHover),
+        focused && (dark ? styles.focusRingDark : styles.focusRing),
+        state.pressed && (dark ? styles.drawerItemHover : neumorphic.inset),
       ]}
     >
-      <AppIcon name={icon} color={color} />
+      <AppIcon name={icon} color={dark ? colors.onPrimary : color} />
     </Pressable>
   );
 }
@@ -561,7 +571,7 @@ export function PageHeading({
 }
 
 /* ----------------------------------------------------------------------- */
-/* Adaptive navigation: bar (phone), rail (tablet portrait), drawer        */
+/* Material 3 navigation: bar, collapsed rail and expanded rail            */
 /* ----------------------------------------------------------------------- */
 
 export interface NavigationItem {
@@ -594,7 +604,7 @@ function DrawerItem({
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const tint = dark
     ? item.active
-      ? colors.onPrimary
+      ? colors.primaryDark
       : colors.navigationMuted
     : item.active
       ? colors.primaryDark
@@ -617,13 +627,13 @@ function DrawerItem({
         focused && (dark ? styles.focusRingDark : styles.focusRing),
       ]}
     >
-      <AppIcon name={item.icon} color={tint} />
+      <AppIcon name={item.icon} color={tint} size={24} />
       <AppText
-        color={dark ? colors.onPrimary : colors.ink}
+        color={tint}
         style={{
           fontSize: 16,
           lineHeight: 22,
-          fontWeight: item.active ? "700" : "600",
+          fontWeight: "600",
           flex: 1,
         }}
       >
@@ -657,8 +667,8 @@ function StackedNavItem({
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const tint = dark
     ? active
-      ? "#FFFFFF"
-      : "#D1D9FF"
+      ? colors.onPrimary
+      : colors.navigationMuted
     : active
       ? colors.primaryDark
       : colors.muted;
@@ -673,14 +683,16 @@ function StackedNavItem({
       onPress={onPress}
       onFocus={onFocus}
       onBlur={onBlur}
-      style={[styles.stackedItem, stretch ? { flex: 1 } : { width: 84 }]}
+      style={[styles.stackedItem, stretch ? { flex: 1 } : { width: 80 }]}
     >
       {(state) => (
         <>
           <View
             style={[
               styles.indicator,
-              isHovered(state) && !active && styles.indicatorHover,
+              isHovered(state) &&
+                !active &&
+                (dark ? styles.drawerItemHover : styles.indicatorHover),
               (active || state.pressed) &&
                 (dark ? styles.indicatorActiveDark : styles.indicatorActive),
               focused && (dark ? styles.focusRingDark : styles.focusRing),
@@ -689,21 +701,16 @@ function StackedNavItem({
             <AppIcon
               name={icon}
               color={
-                dark
-                  ? active
-                    ? "#FFFFFF"
-                    : "#D1D9FF"
-                  : active
-                    ? colors.primary
+                active
+                  ? colors.primaryDark
+                  : dark
+                    ? colors.navigationMuted
                     : colors.muted
               }
+              size={24}
             />
           </View>
-          <AppText
-            numberOfLines={2}
-            color={tint}
-            style={[styles.navLabel, active && { fontWeight: "800" }]}
-          >
+          <AppText numberOfLines={2} color={tint} style={styles.navLabel}>
             {shortLabel ?? label}
           </AppText>
         </>
@@ -825,54 +832,141 @@ function NavigationBar({
     </View>
   );
 }
+/** The same leading rail stays mounted in both Material 3 configurations. */
 function NavigationRail({
   role,
   items,
+  expanded,
+  onToggle,
   onNavigate,
   onSwitchProfile,
+  subject,
+  grade,
 }: {
   role: "child" | "parent";
   items: NavigationItem[];
+  expanded: boolean;
+  onToggle: () => void;
   onNavigate: (item: NavigationItem) => void;
   onSwitchProfile: () => void;
+  subject?: { title: string; color: string; icon: IconName };
+  grade: string;
 }) {
   return (
     <View
       role="navigation"
       aria-label="Navigation principale"
-      style={styles.rail}
+      style={[styles.rail, { width: expanded ? layout.drawer : layout.rail }]}
     >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.railContent}
-      >
-        <BrandMark dark />
+      <View style={[styles.railHeader, !expanded && { alignItems: "center" }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <IconButton
+            icon="menu"
+            dark
+            expanded={expanded}
+            label={expanded ? "Réduire le menu" : "Étendre le menu"}
+            onPress={onToggle}
+          />
+          {expanded && (
+            <AppText variant="heading" color={colors.onPrimary}>
+              Révizo
+            </AppText>
+          )}
+        </View>
         <AppText
           variant="small"
-          color={role === "parent" ? "#FFD59E" : "#D1D9FF"}
-          style={styles.railRole}
+          color={role === "parent" ? "#FFD59E" : colors.navigationMuted}
+          style={[styles.railRole, expanded && { paddingHorizontal: 14 }]}
         >
-          {role === "parent" ? "Parent" : "Élève"}
+          {expanded
+            ? role === "parent"
+              ? "Espace parent"
+              : "Mon espace de révision"
+            : role === "parent"
+              ? "Parent"
+              : "Élève"}
         </AppText>
-        <View style={{ gap: 6, alignItems: "center" }}>
-          {items.map((item) => (
-            <StackedNavItem
-              key={item.label}
-              {...item}
-              dark
-              onPress={() => onNavigate(item)}
-            />
-          ))}
+      </View>
+      <ScrollView
+        testID="navigation-scroll"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.railContent,
+          !expanded && { alignItems: "center" },
+        ]}
+      >
+        <View
+          style={{
+            gap: 4,
+            alignSelf: "stretch",
+            alignItems: expanded ? "stretch" : "center",
+          }}
+        >
+          {items.map((item) =>
+            expanded ? (
+              <DrawerItem
+                key={item.label}
+                item={item}
+                onPress={() => onNavigate(item)}
+              />
+            ) : (
+              <StackedNavItem
+                key={item.label}
+                {...item}
+                dark
+                onPress={() => onNavigate(item)}
+              />
+            ),
+          )}
         </View>
-        <View style={{ flex: 1, minHeight: 16 }} />
-        <StackedNavItem
-          label="Changer de profil"
-          shortLabel="Profils"
-          icon="users"
-          dark
-          onPress={onSwitchProfile}
-        />
+        {/* Context follows the destinations so it cannot shift their position. */}
+        {expanded && subject && (
+          <View style={[styles.subject, { backgroundColor: subject.color }]}>
+            <AppIcon name={subject.icon} color={colors.onPrimary} size={28} />
+            <AppText variant="label" color={colors.onPrimary}>
+              {subject.title}
+            </AppText>
+            <AppText variant="small" color={colors.onPrimary}>
+              {grade} · À ton rythme
+            </AppText>
+          </View>
+        )}
       </ScrollView>
+      <View style={[styles.railFooter, !expanded && { alignItems: "center" }]}>
+        {expanded ? (
+          <DrawerItem
+            item={{ label: "Changer de profil", icon: "users" }}
+            onPress={onSwitchProfile}
+          />
+        ) : (
+          <StackedNavItem
+            label="Changer de profil"
+            shortLabel="Profils"
+            icon="users"
+            dark
+            onPress={onSwitchProfile}
+          />
+        )}
+      </View>
+    </View>
+  );
+}
+
+/** Route loading is confined to the page, leaving navigation usable. */
+export function PageLoading() {
+  return (
+    <View
+      role="status"
+      accessibilityLiveRegion="polite"
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 16,
+        paddingVertical: 48,
+      }}
+    >
+      <ActivityIndicator color={colors.primary} size="large" />
+      <AppText color={colors.muted}>Chargement de la page…</AppText>
     </View>
   );
 }
@@ -884,6 +978,8 @@ export function AppShell({
   focus = false,
   footer,
   scrollRef,
+  contentLoading = false,
+  pageKey,
 }: {
   children: ReactNode;
   role: "child" | "parent";
@@ -895,14 +991,40 @@ export function AppShell({
   footer?: ReactNode;
   /** Lets the page bring new content into view in the shell scroll. */
   scrollRef?: React.RefObject<ScrollViewInstance | null>;
+  contentLoading?: boolean;
+  pageKey: string;
 }) {
   const { width } = useWindowDimensions();
   const windowClass = windowClassFor(width);
   const session = useSession();
   const router = useRouter();
   const pathname = usePathname();
-  const [measured, setMeasured] = useState<number | null>(null);
+  const [menuExpanded, setMenuExpanded] = useState<boolean | null>(null);
+  const expanded = menuExpanded ?? windowClass === "expanded";
+  const navigationWidth =
+    windowClass === "compact" ? 0 : expanded ? layout.drawer : layout.rail;
+  const layoutKey = `${width}:${navigationWidth}`;
+  const [measured, setMeasured] = useState<{
+    key: string;
+    width: number;
+  } | null>(null);
+  const contentWidth =
+    measured?.key === layoutKey
+      ? measured.width
+      : estimateContentWidth(width, navigationWidth);
   const ownScrollRef = useRef<ScrollViewInstance>(null);
+  // Keep the host ref stable: RN Web does not reattach it when only its
+  // forwarded ref changes. A page can acquire this existing viewport later.
+  useLayoutEffect(() => {
+    if (!scrollRef) return;
+    scrollRef.current = ownScrollRef.current;
+    return () => {
+      scrollRef.current = null;
+    };
+  }, [scrollRef]);
+  useLayoutEffect(() => {
+    ownScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [pageKey]);
   const gutter = layout.gutter[windowClass];
   const navigate = (item: NavigationItem) => {
     // A destination can be highlighted for a nested page (a subject's
@@ -913,68 +1035,16 @@ export function AppShell({
   const switchProfile = () => router.replace("/");
   return (
     <View style={styles.shell}>
-      {windowClass === "expanded" && (
-        <View
-          role="navigation"
-          aria-label="Navigation principale"
-          style={styles.sidebar}
-        >
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.sidebarContent}
-          >
-            <Brand dark />
-            <AppText
-              variant="small"
-              color={role === "parent" ? "#FFD59E" : "#BFC8FB"}
-              style={{ fontWeight: "600", paddingHorizontal: 12 }}
-            >
-              {role === "parent" ? "Espace parent" : "Mon espace de révision"}
-            </AppText>
-            {subject && (
-              <View
-                style={[styles.subject, { backgroundColor: subject.color }]}
-              >
-                <AppIcon name={subject.icon} color="#FFFFFF" size={28} />
-                <AppText variant="label" color={colors.onPrimary}>
-                  {subject.title}
-                </AppText>
-                <AppText variant="small" color="#FFFFFF">
-                  {session.childGrade} · À ton rythme
-                </AppText>
-              </View>
-            )}
-            <View style={{ gap: 6, marginTop: 12 }}>
-              {navigation.map((item) => (
-                <DrawerItem
-                  key={item.label}
-                  item={item}
-                  onPress={() => navigate(item)}
-                />
-              ))}
-            </View>
-            <View style={{ flex: 1, minHeight: 24 }} />
-            <View
-              style={{
-                borderTopWidth: 1,
-                borderTopColor: "rgba(255,255,255,0.18)",
-                paddingTop: 15,
-              }}
-            >
-              <DrawerItem
-                item={{ label: "Changer de profil", icon: "users" }}
-                onPress={switchProfile}
-              />
-            </View>
-          </ScrollView>
-        </View>
-      )}
-      {windowClass === "medium" && (
+      {windowClass !== "compact" && (
         <NavigationRail
           role={role}
           items={navigation}
+          expanded={expanded}
+          onToggle={() => setMenuExpanded(!expanded)}
           onNavigate={navigate}
           onSwitchProfile={switchProfile}
+          subject={subject}
+          grade={session.childGrade}
         />
       )}
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -994,58 +1064,81 @@ export function AppShell({
             />
           </View>
         )}
-        <ScrollView
-          ref={scrollRef ?? ownScrollRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={[
-            styles.page,
-            {
-              paddingHorizontal: gutter,
-              paddingTop: windowClass === "compact" ? 12 : gutter,
-            },
-          ]}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View
-            role="main"
-            onLayout={(event) => {
-              const next = Math.floor(event.nativeEvent.layout.width);
-              if (next > 0 && next !== measured) setMeasured(next);
-            }}
-            style={{
-              width: "100%",
-              maxWidth: layout.maxContent,
-              alignSelf: "center",
-              gap: layout.sectionGap[windowClass],
-            }}
+        <View style={{ flex: 1, minHeight: 0 }}>
+          <ScrollView
+            ref={ownScrollRef}
+            testID="page-scroll"
+            aria-hidden={contentLoading}
+            pointerEvents={contentLoading ? "none" : "auto"}
+            style={{ flex: 1, opacity: contentLoading ? 0 : 1 }}
+            contentContainerStyle={[
+              styles.page,
+              {
+                paddingHorizontal: gutter,
+                paddingTop: windowClass === "compact" ? 12 : gutter,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
           >
-            <ContentWidthContext.Provider value={measured}>
-              {children}
-            </ContentWidthContext.Provider>
-            <View style={styles.demo}>
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: colors.orange,
-                }}
-              />
-              <AppText
-                variant="small"
-                color={colors.muted}
-                style={{ textAlign: "center" }}
-              >
-                {session.mode === "demo"
-                  ? "Démonstration locale · Données enregistrées sur cet appareil"
-                  : session.offline
-                    ? "Hors connexion · Modifications conservées sur cet appareil"
-                    : `Espace familial · ${session.childName}`}
-              </AppText>
+            <View
+              role="main"
+              aria-busy={contentLoading}
+              onLayout={(event) => {
+                const next = Math.floor(event.nativeEvent.layout.width);
+                if (
+                  next > 0 &&
+                  (measured?.key !== layoutKey || next !== measured.width)
+                )
+                  setMeasured({ key: layoutKey, width: next });
+              }}
+              style={{
+                width: "100%",
+                maxWidth: layout.maxContent,
+                alignSelf: "center",
+                gap: layout.sectionGap[windowClass],
+              }}
+            >
+              <ContentWidthContext.Provider value={contentWidth}>
+                {children}
+              </ContentWidthContext.Provider>
+              <View style={styles.demo}>
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: colors.orange,
+                  }}
+                />
+                <AppText
+                  variant="small"
+                  color={colors.muted}
+                  style={{ textAlign: "center" }}
+                >
+                  {session.mode === "demo"
+                    ? "Démonstration locale · Données enregistrées sur cet appareil"
+                    : session.offline
+                      ? "Hors connexion · Modifications conservées sur cet appareil"
+                      : `Espace familial · ${session.childName}`}
+                </AppText>
+              </View>
             </View>
-          </View>
-        </ScrollView>
-        {footer && <View style={styles.footerBar}>{footer}</View>}
+          </ScrollView>
+          {contentLoading && (
+            <View
+              testID="app-loading"
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: colors.background },
+              ]}
+            >
+              <PageLoading />
+            </View>
+          )}
+        </View>
+        {footer && !contentLoading && (
+          <View style={styles.footerBar}>{footer}</View>
+        )}
         {windowClass === "compact" && !focus && (
           <NavigationBar
             items={navigation}
@@ -1245,17 +1338,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   shell: { flex: 1, flexDirection: "row", backgroundColor: colors.background },
-  sidebar: {
-    width: layout.drawer,
-    backgroundColor: colors.navigation,
-    zIndex: 1,
-  },
-  sidebarContent: {
-    flexGrow: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 28,
-    gap: 20,
-  },
   subject: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
@@ -1265,8 +1347,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   drawerItem: {
-    minHeight: 52,
-    borderRadius: 15,
+    minHeight: 56,
+    borderRadius: 28,
     paddingHorizontal: 14,
     paddingVertical: 10,
     flexDirection: "row",
@@ -1279,11 +1361,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navigationHover,
   },
   drawerItemActive: {
-    backgroundColor: colors.primary,
-    borderColor: "rgba(255,255,255,0.25)",
+    backgroundColor: colors.primaryLight,
   },
   stackedItem: {
-    minHeight: 60,
+    minHeight: 64,
     alignItems: "center",
     justifyContent: "flex-start",
     gap: 4,
@@ -1306,8 +1387,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(96,69,217,0.10)",
   },
   indicatorActiveDark: {
-    backgroundColor: colors.primary,
-    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: colors.primaryLight,
   },
   navLabel: {
     fontSize: 14,
@@ -1338,23 +1418,32 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   rail: {
-    width: layout.rail,
     backgroundColor: colors.navigation,
     zIndex: 1,
   },
+  railHeader: {
+    minHeight: 120,
+    paddingTop: 20,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
   railContent: {
     flexGrow: 1,
-    alignItems: "center",
-    paddingVertical: 20,
-    gap: 10,
+    paddingHorizontal: 12,
+    paddingBottom: 20,
+    gap: 20,
+  },
+  railFooter: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 12,
+    paddingVertical: 16,
   },
   railRole: {
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    marginBottom: 6,
+    fontWeight: "600",
   },
   topBar: {
     minHeight: layout.topBar,

@@ -6,10 +6,9 @@ import {
   View,
   type ScrollViewInstance,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import {
   AppIcon,
-  AppShell,
   AppText,
   Badge,
   Button,
@@ -19,6 +18,7 @@ import {
   type NavigationItem,
 } from "@/components/ui";
 import { colors, neumorphic } from "@/theme";
+import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import { useLearning } from "@/state/learning-store";
 import { plural } from "@/domain/format";
 export { plural } from "@/domain/format";
@@ -52,6 +52,36 @@ export function ChildShell({
   footer?: ReactNode;
   scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
+  return (
+    <PageShell
+      subject={subject}
+      focus={focus}
+      footer={footer}
+      scrollRef={scrollRef}
+    >
+      {children}
+    </PageShell>
+  );
+}
+
+/** One mounted frame for every route in the student's space. */
+export function StudentWorkspace({ children }: { children: ReactNode }) {
+  const data = useLearning();
+  const pathname = usePathname();
+  const section = pathname.split("/")[2];
+  const active =
+    section === "progress"
+      ? "progress"
+      : section === "plans"
+        ? "plans"
+        : section === "exercise" || section === "exercises"
+          ? "exercises"
+          : section
+            ? "courses"
+            : "home";
+  const focus =
+    section === "exercise" ||
+    pathname.startsWith("/student/vocabulary/practice/");
   const navigation: NavigationItem[] = [
     {
       label: "Aujourd’hui",
@@ -65,7 +95,7 @@ export function ChildShell({
       shortLabel: "Matières",
       href: "/student/subjects",
       icon: "book",
-      active: active === "courses" || active === "english",
+      active: active === "courses",
     },
     {
       label: "Mes exercices",
@@ -90,18 +120,17 @@ export function ChildShell({
     },
   ];
   return (
-    <AppShell
+    <PersistentAppShell
       role="child"
       navigation={navigation}
-      subject={subject}
       focus={focus}
-      footer={footer}
-      scrollRef={scrollRef}
+      loading={!data.isReady}
     >
       {children}
-    </AppShell>
+    </PersistentAppShell>
   );
 }
+
 export function Loading() {
   return (
     <Card style={{ alignItems: "center", gap: 14, paddingVertical: 48 }}>
