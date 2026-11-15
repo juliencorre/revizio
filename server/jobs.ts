@@ -8,10 +8,12 @@ import type {
   QuestionType,
 } from "../src/domain/model";
 import type { FamilyDatabase } from "./database";
+import { isVocabularyLanguage } from "../src/domain/vocabulary";
 import {
   generateCourse,
   generateEnglish,
   generateExercises,
+  readVocabularyPhoto,
   type ExtractedPage,
 } from "./ai-core";
 import {
@@ -149,25 +151,64 @@ export class JobQueue {
     });
     const settings =
       this.options.settings ?? this.database.settings(job.familyId);
+    const result = await this.prepare(job, settings, signal);
+    this.database.updateJob(job.id, {
+      status: "succeeded",
+      stage: "relecture",
+      message: "Le brouillon est prêt. Vérifiez-le avant de le publier.",
+      result,
+      error: undefined,
+    });
+  }
+  private sourceFor(job: StoredJob, id: string) {
+    const upload = this.database.upload(id);
+    if (
+      !upload ||
+      upload.familyId !== job.familyId ||
+      upload.profileId !== job.profileId
+    )
+      throw new Error("Un document source est introuvable pour ce profil.");
+    return upload;
+  }
+  private async prepare(
+    job: StoredJob,
+    settings: AiSettings,
+    signal: AbortSignal,
+  ): Promise<NonNullable<AiJob["result"]>> {
     const payload = job.payload;
+    const ids = Array.isArray(payload.sourceIds)
+      ? payload.sourceIds.filter((id): id is string => typeof id === "string")
+      : [];
+    if (job.kind === "vocabulary") {
+      if (ids.length !== 1 || !isVocabularyLanguage(payload.subjectId))
+        throw new Error("Choisissez une photo et la langue de la liste.");
+      const photo = this.sourceFor(job, ids[0]);
+      if (photo.mimeType !== "image/png")
+        throw new Error("Le document doit être une photo de vocabulaire.");
+      this.database.updateJob(job.id, {
+        stage: "vocabulaire",
+        message: "L’IA lit les mots et leurs traductions sur la photo.",
+      });
+      const bytes = await this.database.files.read(photo.path);
+      return {
+        vocabulary: await readVocabularyPhoto(
+          this.client,
+          settings,
+          payload.subjectId,
+          bytes,
+          signal,
+        ),
+      };
+    }
     const data = this.database.data(job.profileId).data;
     const old =
       job.kind === "course" && typeof payload.existingCourseId === "string"
         ? data.courses.find((course) => course.id === payload.existingCourseId)
         : undefined;
-    const ids = Array.isArray(payload.sourceIds)
-      ? payload.sourceIds.filter((id): id is string => typeof id === "string")
-      : [];
     const pages: ExtractedPage[] = [];
     const sources: CourseSource[] = [];
     for (const id of ids) {
-      const upload = this.database.upload(id);
-      if (
-        !upload ||
-        upload.familyId !== job.familyId ||
-        upload.profileId !== job.profileId
-      )
-        throw new Error("Un document source est introuvable pour ce profil.");
+      const upload = this.sourceFor(job, id);
       this.database.updateJob(job.id, {
         stage: "lecture",
         message: `Lecture de ${upload.name} (${ids.indexOf(id) + 1}/${ids.length}).`,
@@ -217,7 +258,6 @@ export class JobQueue {
         })),
       );
     }
-    let result: AiJob["result"];
     if (job.kind === "course") {
       // The submitted text is the current parent edit, not a second source to
       // append to its stored copy. Add only pages not already represented there.
@@ -279,7 +319,7 @@ export class JobQueue {
         },
         signal,
       );
-      result = {
+      return {
         course: {
           ...course,
           ...(old?.status === "published"
@@ -362,7 +402,7 @@ export class JobQueue {
         );
         cursor += size;
       }
-      result = { questions };
+      return { questions };
     } else {
       this.database.updateJob(job.id, {
         stage: "anglais",
@@ -372,26 +412,26 @@ export class JobQueue {
         throw new Error(
           "Ajoutez au moins un document pour extraire le vocabulaire.",
         );
-      result = await generateEnglish(this.client, settings, pages, signal);
+      return generateEnglish(this.client, settings, pages, signal);
     }
-    this.database.updateJob(job.id, {
-      status: "succeeded",
-      stage: "relecture",
-      message: "Le brouillon est prêt. Vérifiez-le avant de le publier.",
-      result,
-      error: undefined,
-    });
   }
 }
 export function publicJob(job: StoredJob): AiJob {
   const input: Record<string, unknown> = {};
-  for (const key of ["title", "subjectId", "existingCourseId", "level"])
+  for (const key of [
+    "title",
+    "subjectId",
+    "existingCourseId",
+    "level",
+    "listId",
+  ])
     if (typeof job.payload[key] === "string") input[key] = job.payload[key];
   for (const key of ["courseIds", "types"])
     if (Array.isArray(job.payload[key]))
       input[key] = (job.payload[key] as unknown[]).filter(
         (value) => typeof value === "string",
       );
+  if (job.kind === "vocabulary") input.sourceIds = job.payload.sourceIds;
   if (typeof job.payload.count === "number") input.count = job.payload.count;
   return {
     id: job.id,

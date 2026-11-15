@@ -238,6 +238,12 @@ export interface VocabularyWord {
   term: string;
   translation: string;
 }
+export interface VocabularyPhotoWord extends Pick<
+  VocabularyWord,
+  "term" | "translation"
+> {
+  reading: "copied" | "suggested" | "uncertain";
+}
 export interface VocabularyList {
   id: string;
   language: VocabularyLanguage;
@@ -296,7 +302,7 @@ export interface AiJob {
   id: string;
   profileId?: string;
   input?: Record<string, unknown>;
-  kind: "course" | "exercises" | "english";
+  kind: "course" | "exercises" | "english" | "vocabulary";
   status: "queued" | "running" | "succeeded" | "failed";
   stage?: string;
   message?: string;
@@ -305,6 +311,7 @@ export interface AiJob {
     course?: Partial<Course>;
     questions?: Question[];
     words?: EnglishWord[];
+    vocabulary?: VocabularyPhotoWord[];
     verbs?: EnglishVerb[];
     tenses?: string[];
     toolWords?: string[];

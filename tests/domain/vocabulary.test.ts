@@ -15,6 +15,7 @@ import {
   evaluateVocabularyAnswer,
   legacyEnglishListId,
   parseVocabularyLines,
+  reviewVocabularyPhoto,
   vocabularyListError,
   vocabularyProgress,
   vocabularyQuestions,
@@ -115,6 +116,29 @@ describe("listes de vocabulaire dans trois langues", () => {
       { term: "árbol", translation: "arbre" },
     ]);
     expect(() => parseVocabularyLines("rosa = rose\naqua")).toThrow("Ligne 2");
+  });
+  it("repère les doublons d’une photo même parmi les variantes et garde les paires à compléter", () => {
+    expect(
+      reviewVocabularyPhoto(list().words, [
+        { term: "HOGAR", translation: "chez soi" },
+        { term: "la ventana", translation: "" },
+        { term: "la ventana", translation: "la fenêtre" },
+        { term: "ventana ; la ventana", translation: "fenêtre" },
+        { term: "", translation: "la porte" },
+        {
+          id: "arbol",
+          term: "mot mal recopié dans la photo",
+          translation: "arbre",
+        },
+      ]),
+    ).toEqual([
+      "duplicate",
+      "incomplete",
+      "ready",
+      "duplicate",
+      "incomplete",
+      "duplicate",
+    ]);
   });
 });
 describe("suivi des mots et snapshots des séances", () => {

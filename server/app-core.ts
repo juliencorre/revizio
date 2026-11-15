@@ -8,6 +8,7 @@ import type {
 } from "../src/domain/model";
 import { parseLearningData } from "../src/domain/learning";
 import { subjects } from "../src/domain/fixtures";
+import { isVocabularyLanguage } from "../src/domain/vocabulary";
 import {
   FAMILY_LIMITS,
   INITIAL_CHILD_GRADES,
@@ -641,7 +642,7 @@ export async function configureServerRoutes(
       throw new HttpError(404, "Cette génération est introuvable.");
     return { job: publicJob(queue.retry(job.id)) };
   });
-  for (const kind of ["course", "exercises", "english"] as const)
+  for (const kind of ["course", "exercises", "english", "vocabulary"] as const)
     app.post(`/api/ai/${kind}`, async (request) => {
       const { user } = auth(request, true);
       const body = objectBody(request.body);
@@ -699,6 +700,27 @@ export async function configureServerRoutes(
         );
         if (!(payload.sourceIds as string[]).length)
           throw new HttpError(400, "Ajoutez un document en anglais.");
+      }
+      if (kind === "vocabulary") {
+        if (!isVocabularyLanguage(body.subjectId))
+          throw new HttpError(400, "Choisissez la langue de la liste.");
+        payload.listId = requiredString(
+          body.listId,
+          "La liste de vocabulaire",
+          160,
+        );
+        if (body.title)
+          payload.title = requiredString(body.title, "Le titre", 160);
+        const sourceIds = validSourceIds(user, profile.id, body.sourceIds);
+        if (
+          sourceIds.length !== 1 ||
+          database.upload(sourceIds[0])?.mimeType !== "image/png"
+        )
+          throw new HttpError(
+            400,
+            "Choisissez une seule photo de vocabulaire.",
+          );
+        payload.sourceIds = sourceIds;
       }
       if (kind === "exercises") {
         if (

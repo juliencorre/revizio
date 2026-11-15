@@ -24,6 +24,7 @@ export type PreparationJob = AiJob & {
     subjectId?: string;
     courseIds?: string[];
     existingCourseId?: string;
+    listId?: string;
     level?: string;
     types?: string[];
     count?: number;
@@ -33,6 +34,7 @@ const jobLabels: Record<AiJob["kind"], string> = {
   course: "Fiche de révision",
   exercises: "Série d’exercices",
   english: "Répertoire d’anglais",
+  vocabulary: "Photo de vocabulaire",
 };
 const stateLabels: Record<AiJob["status"], string> = {
   queued: "En attente",
@@ -132,7 +134,9 @@ function JobSteps({ job }: { job: PreparationJob }) {
       ? 2
       : job.stage === "lecture"
         ? 0
-        : ["fiche", "exercices", "anglais"].includes(job.stage ?? "")
+        : ["fiche", "exercices", "anglais", "vocabulaire"].includes(
+              job.stage ?? "",
+            )
           ? 1
           : job.stage === "relecture"
             ? 2
@@ -254,6 +258,17 @@ export function ParentPreparationsScreen() {
   }
   function review(job: PreparationJob) {
     setActionError("");
+    if (job.kind === "vocabulary" && job.input?.listId) {
+      router.push({
+        pathname: "/parent/vocabulary/[id]",
+        params: {
+          id: job.input.listId,
+          language: job.input.subjectId,
+          photoJob: job.id,
+        },
+      });
+      return;
+    }
     if (job.kind === "english") {
       router.push({ pathname: "/parent/english", params: { jobId: job.id } });
       return;
@@ -517,7 +532,8 @@ export function ParentPreparationsScreen() {
                               ? adopted.status === "published"
                                 ? "Consulter le contenu"
                                 : "Reprendre la relecture"
-                              : job.kind === "english"
+                              : job.kind === "english" ||
+                                  job.kind === "vocabulary"
                                 ? "Relire la liste"
                                 : "Ouvrir le brouillon à relire"}
                           </Button>

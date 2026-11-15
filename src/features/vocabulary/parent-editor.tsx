@@ -12,7 +12,7 @@ import {
   useWindowClass,
 } from "@/components/ui";
 import { useLearning } from "@/state/learning-store";
-import type { VocabularyList } from "@/domain/model";
+import type { VocabularyList, VocabularyWord } from "@/domain/model";
 import {
   isVocabularyList,
   legacyEnglishListId,
@@ -26,6 +26,7 @@ import {
 import { Field, Notice, ParentLayout, localId } from "@/features/parent/shared";
 import { useLocalDraft } from "@/features/planning/use-local-draft";
 import { spacing } from "@/theme";
+import { VocabularyPhotoImport } from "./photo-import";
 import {
   MasteryRule,
   VocabularySummary,
@@ -51,9 +52,14 @@ function VocabularyEditor() {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const data = useLearning();
   const router = useRouter();
-  const { id, language: requestedLanguage } = useLocalSearchParams<{
+  const {
+    id,
+    language: requestedLanguage,
+    photoJob,
+  } = useLocalSearchParams<{
     id: string;
     language?: string;
+    photoJob?: string;
   }>();
   const saved = data.vocabularyLists.find((list) => list.id === id);
   const language = saved?.language ?? vocabularyLanguage(requestedLanguage);
@@ -141,22 +147,25 @@ function VocabularyEditor() {
       );
     }
   }
+  function appendWords(incoming: VocabularyWord[]) {
+    const words = [
+      ...list.words.filter(
+        (word) => word.term.trim() || word.translation.trim(),
+      ),
+      ...incoming,
+    ];
+    if (words.length > 200)
+      throw new Error(
+        "Une liste peut contenir jusqu’à 200 mots. Répartissez le vocabulaire dans plusieurs listes.",
+      );
+    change({ ...list, words });
+  }
   function importWords() {
     try {
       const incoming = parseVocabularyLines(bulkText);
       if (!incoming.length)
         throw new Error("Collez au moins une ligne de vocabulaire.");
-      const words = [
-        ...list.words.filter(
-          (word) => word.term.trim() || word.translation.trim(),
-        ),
-        ...incoming.map((word) => ({ ...word, id: localId("word") })),
-      ];
-      if (words.length > 200)
-        throw new Error(
-          "Une liste peut contenir jusqu’à 200 mots. Répartissez le vocabulaire dans plusieurs listes.",
-        );
-      change({ ...list, words });
+      appendWords(incoming.map((word) => ({ ...word, id: localId("word") })));
       setBulkText("");
       setBulk(false);
     } catch (cause) {
@@ -211,6 +220,19 @@ function VocabularyEditor() {
                 maxLength={160}
                 placeholder="À la maison, chapitre 3…"
                 onChangeText={(title) => change({ ...list, title })}
+              />
+              <VocabularyPhotoImport
+                key={photoJob ?? "photo"}
+                jobId={photoJob}
+                list={list}
+                onAdd={(words) => {
+                  appendWords(words);
+                  setMessage(
+                    words.length === 1
+                      ? "1 mot ajouté au brouillon."
+                      : `${words.length} mots ajoutés au brouillon.`,
+                  );
+                }}
               />
               <AppText variant="small">
                 Pour accepter plusieurs traductions ou variantes, séparez-les

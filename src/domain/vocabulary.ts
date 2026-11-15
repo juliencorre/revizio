@@ -32,10 +32,12 @@ export const vocabularyVariants = (text: string) => [
       .map((part) => [normalizeAnswer(part), part]),
   ).values(),
 ];
+export const isVocabularyLanguage = (
+  value: unknown,
+): value is VocabularyLanguage =>
+  vocabularyLanguages.some((item) => item.id === value);
 export const vocabularyLanguage = (value: unknown): VocabularyLanguage =>
-  vocabularyLanguages.some((item) => item.id === value)
-    ? (value as VocabularyLanguage)
-    : "english";
+  isVocabularyLanguage(value) ? value : "english";
 export const languageLabel = (language: VocabularyLanguage) =>
   vocabularyLanguages.find((item) => item.id === language)!.label;
 export function directionLabel(
@@ -470,4 +472,23 @@ export function parseVocabularyLines(
     .filter(
       (word): word is { term: string; translation: string } => word !== null,
     );
+}
+
+/** Identical to the publication rule for variants, but never overwrites a parent's word. */
+export function reviewVocabularyPhoto(
+  existing: VocabularyWord[],
+  proposals: (Pick<VocabularyWord, "term" | "translation"> & { id?: string })[],
+): ("ready" | "duplicate" | "incomplete")[] {
+  const keys = (term: string) => vocabularyVariants(term).map(normalizeAnswer);
+  const seen = new Set(existing.flatMap((word) => keys(word.term)));
+  const ids = new Set(existing.map((word) => word.id));
+  return proposals.map(({ id, term, translation }) => {
+    const variants = keys(term);
+    if ((id && ids.has(id)) || variants.some((key) => seen.has(key)))
+      return "duplicate";
+    if (!variants.length || !vocabularyVariants(translation).length)
+      return "incomplete";
+    variants.forEach((key) => seen.add(key));
+    return "ready";
+  });
 }

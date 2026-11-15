@@ -54,6 +54,7 @@ Les requêtes suivantes créent `{job}` et n’enregistrent aucun contenu publi�
 - `POST /api/ai/course` : `{profileId,subjectId,title,sourceIds,sourceText?,existingCourseId?}`.
 - `POST /api/ai/exercises` : `{profileId,courseIds,types,level,count,english?}`. Les formats sont `single-choice`, `true-false`, `fill-blank`, `short-answer`, `problem` ; le nombre est 5, 10, 15 ou 20. Le serveur répartit les questions entre tous les cours sélectionnés.
 - `POST /api/ai/english` : `{profileId,sourceIds}`. Le résultat propose les mots, verbes, temps et mots outils à valider par le parent.
+- `POST /api/ai/vocabulary` accepte `{profileId,subjectId,listId,sourceIds,title?}` pour une seule photo du profil et une matière parmi `english`, `spanish` et `latin`. Le parent retrouve les paires à relire dans `job.result.vocabulary`. Le traitement conserve la distinction entre texte transcrit, traduction proposée et lecture incertaine.
 
 `GET /api/jobs`, `GET /api/jobs/:id` et `POST /api/jobs/:id/retry` sont réservés au parent. Les états sont `queued`, `running`, `succeeded`, `failed`, accompagnés d’une étape, d’un message, de dates, du profil cible et des paramètres de reprise non sensibles. Les travaux interrompus par un redémarrage repartent en file d’attente. Le résultat reste consultable après fermeture du navigateur. Les entrées et résultats sont conservés en SQLite ; le traitement est séquentiel.
 

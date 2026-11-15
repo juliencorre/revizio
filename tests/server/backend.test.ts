@@ -590,6 +590,98 @@ describe("contenus publiés, réponses et concurrence", () => {
 });
 
 describe("fichiers privés et sauvegarde", () => {
+  it("lit une photo dans la langue de la liste et réserve ses propositions au parent du bon profil", async () => {
+    const { token, profiles } = await setup();
+    const profileId = profiles[0].id;
+    const image = (await upload(token, profileId)).json();
+    const childToken = await child(profileId);
+    const input = {
+      profileId,
+      subjectId: "latin",
+      listId: "latin-1",
+      sourceIds: [image.id],
+    };
+    const start = (payload: Record<string, unknown>, who = token) =>
+      app.inject({
+        method: "POST",
+        url: "/api/ai/vocabulary",
+        headers: bearer(who),
+        payload,
+      });
+    expect((await start(input, childToken)).statusCode).toBe(403);
+    expect((await start({ ...input, subjectId: "maths" })).statusCode).toBe(
+      400,
+    );
+    const sibling = (
+      await app.inject({
+        method: "POST",
+        url: "/api/profiles",
+        headers: bearer(token),
+        payload: { name: "Alex", grade: "5e", pin: "8326" },
+      })
+    ).json().profile.id;
+    expect((await start({ ...input, profileId: sibling })).statusCode).toBe(
+      404,
+    );
+    const json = vi
+      .spyOn(ai, "json")
+      .mockResolvedValueOnce({
+        words: [
+          { foreignOnPage: " rosa ", frenchOnPage: " rose ", uncertain: false },
+          { foreignOnPage: "aqua", frenchOnPage: "", uncertain: true },
+          { foreignOnPage: "", frenchOnPage: "la terre", uncertain: false },
+        ],
+      })
+      .mockResolvedValueOnce({
+        translations: [
+          { line: 1, text: "Ne doit pas remplacer une traduction du cahier" },
+          { line: 2, text: "Ne doit pas remplir une case illisible" },
+          { line: 3, text: "terra" },
+        ],
+      })
+      .mockResolvedValueOnce({ words: [] });
+    const initial = await envelope(token, profileId);
+    const first = await start(input);
+    expect(first.statusCode, first.body).toBe(200);
+    const result = await job(token, first.json().job.id);
+    expect(result).toMatchObject({
+      status: "succeeded",
+      profileId,
+      input: {
+        listId: input.listId,
+        sourceIds: input.sourceIds,
+        subjectId: "latin",
+      },
+      result: {
+        vocabulary: [
+          { term: "rosa", translation: "rose", reading: "copied" },
+          { term: "aqua", translation: "", reading: "uncertain" },
+          { term: "terra", translation: "la terre", reading: "suggested" },
+        ],
+      },
+    });
+    const userMessage = json.mock.calls[0][1].find(
+      (message) => message.role === "user",
+    )!;
+    expect(userMessage.content).toContain("latin");
+    expect(
+      Buffer.from(userMessage.images![0], "base64").subarray(1, 4).toString(),
+    ).toBe("PNG");
+    expect(
+      (
+        await app.inject({
+          url: "/api/jobs/" + result.id,
+          headers: bearer(childToken),
+        })
+      ).statusCode,
+    ).toBe(403);
+    const empty = await start(input);
+    expect(await job(token, empty.json().job.id)).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("Aucun mot lisible"),
+    });
+    expect(await envelope(token, profileId)).toEqual(initial);
+  });
   it("conserve une image normalisée, la fait pivoter et l’ouvre à l’enfant après publication seulement", async () => {
     const session = await setup();
     const response = await upload(session.token, session.profiles[0].id);

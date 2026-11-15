@@ -199,21 +199,28 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
 export function Field({
   label,
   optional,
+  hideLabel = false,
   multiline,
   style,
   onFocus,
   onBlur,
   ...props
-}: TextInputProps & { label: string; optional?: boolean }) {
+}: TextInputProps & {
+  label: string;
+  optional?: boolean;
+  hideLabel?: boolean;
+}) {
   const { colors, neumorphic } = useTheme();
   const styles = useStyles();
   const [focused, setFocused] = useState(false);
   return (
     <View style={{ gap: 8 }}>
-      <AppText variant="label">
-        {label}
-        {optional ? " · facultatif" : ""}
-      </AppText>
+      {!hideLabel && (
+        <AppText variant="label">
+          {label}
+          {optional ? " · facultatif" : ""}
+        </AppText>
+      )}
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={colors.muted}
