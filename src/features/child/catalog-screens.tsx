@@ -52,7 +52,7 @@ export function StudentSubjectScreen() {
           <PageHeading
             eyebrow={subject.title}
             title="Mes cours"
-            description="Choisis un cours pour retrouver l’essentiel et t’entraîner."
+            description="Retrouve tes leçons et entraîne-toi à ton rythme."
             action={
               <Button
                 variant="ghost"
@@ -70,7 +70,7 @@ export function StudentSubjectScreen() {
               description="Un parent peut ajouter un cours et vérifier sa fiche. Tu la retrouveras ici dès qu’elle sera prête."
             />
           ) : (
-            <View style={styles.grid}>
+            <View style={[styles.grid, { gap: 18 }]}>
               {courses.map((course) => (
                 <View
                   key={course.id}
@@ -148,7 +148,9 @@ export function StudentCourseScreen() {
             </Button>
             <Badge tone="green">Vérifiée par un parent</Badge>
           </View>
-          <PageHeading title={course.title} description={course.description} />
+          <View style={{ backgroundColor: colors.primaryLight, borderRadius: 22, padding: width < 600 ? 18 : 26 }}>
+            <PageHeading title={course.title} description={course.description} />
+          </View>
           <View style={styles.wrap}>
             <ReadAloud
               text={[
