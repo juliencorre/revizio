@@ -544,7 +544,7 @@ function DrawerItem({
   onPress: () => void;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
-  const tint = item.active ? colors.primary : colors.muted;
+  const tint = item.active ? "#FFFFFF" : "#CED5FF";
   return (
     <Pressable
       accessibilityRole="button"
@@ -562,7 +562,7 @@ function DrawerItem({
     >
       <AppIcon name={item.icon} color={tint} />
       <AppText
-        color={item.active ? colors.primaryDark : colors.ink}
+        color={item.active ? "#FFFFFF" : "#EDF0FF"}
         style={{
           fontSize: 16,
           lineHeight: 22,
@@ -845,10 +845,10 @@ export function AppShell({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.sidebarContent}
           >
-            <Brand />
+            <Brand dark />
             <AppText
               variant="small"
-              color={role === "parent" ? colors.orange : colors.muted}
+              color={role === "parent" ? "#FFD59E" : "#BFC8FB"}
               style={{ fontWeight: "700", letterSpacing: 1 }}
             >
               {role === "parent" ? "ESPACE PARENT" : "MON ESPACE DE RÉVISION"}
@@ -970,28 +970,29 @@ export function AppShell({
     </View>
   );
 }
-function BrandMark({ size = 44 }: { size?: number }) {
+function BrandMark({ size = 44, dark = false }: { size?: number; dark?: boolean }) {
   return (
     <View
       style={{
         width: size,
         height: size,
         borderRadius: 14,
-        ...neumorphic.small,
+        backgroundColor: dark ? "rgba(255,255,255,0.12)" : colors.primaryLight,
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <AppIcon name="sparkles" size={Math.round(size * 0.62)} />
+      <AppIcon name="book" color={dark ? "#FFFFFF" : colors.primary} size={Math.round(size * 0.62)} />
     </View>
   );
 }
-export function Brand({ compact = false }: { compact?: boolean }) {
+export function Brand({ compact = false, dark = false }: { compact?: boolean; dark?: boolean }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-      <BrandMark size={compact ? 36 : 42} />
+      <BrandMark dark={dark} size={compact ? 36 : 42} />
       <AppText
         variant={compact ? "heading" : "title"}
+        color={dark ? "#FFFFFF" : colors.ink}
         style={compact ? { fontSize: 22, lineHeight: 28 } : undefined}
       >
         Révizo
@@ -1001,19 +1002,19 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 }
 const textStyles = StyleSheet.create({
   hero: {
-    fontSize: 48,
+    fontSize: 44,
     lineHeight: 59,
     fontWeight: "800",
     letterSpacing: -1.5,
   },
   title: {
-    fontSize: 35,
+    fontSize: 32,
     lineHeight: 44,
     fontWeight: "800",
     letterSpacing: -0.8,
   },
   heading: {
-    fontSize: 23,
+    fontSize: 22,
     lineHeight: 31,
     fontWeight: "700",
     letterSpacing: -0.3,
@@ -1042,7 +1043,7 @@ const buttonStyles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
   },
   secondary: { ...neumorphic.small, backgroundColor: colors.surface },
-  ghost: { ...neumorphic.small, backgroundColor: colors.surface },
+  ghost: { backgroundColor: colors.primaryLight, borderColor: "transparent" },
   orange: {
     ...neumorphic.colored,
     backgroundColor: colors.orange,
@@ -1094,7 +1095,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  card: { ...neumorphic.raised, borderRadius: radius.lg, padding: 26 },
+  card: { ...neumorphic.raised, borderRadius: radius.lg, padding: 24 },
   cardCompact: {
     ...neumorphic.raisedCompact,
     borderRadius: 24,
@@ -1102,7 +1103,7 @@ const styles = StyleSheet.create({
   },
   cardMedium: { borderRadius: 28, padding: 22 },
   emptyIcon: {
-    ...neumorphic.inset,
+    backgroundColor: colors.primaryLight,
     width: 64,
     height: 64,
     borderRadius: 22,
@@ -1110,14 +1111,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   badge: {
-    ...neumorphic.inset,
+    backgroundColor: colors.primaryLight,
     alignSelf: "flex-start",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   track: {
-    ...neumorphic.inset,
+    backgroundColor: colors.primaryLight,
     height: 11,
     borderRadius: 9,
     overflow: "hidden",
@@ -1133,15 +1134,15 @@ const styles = StyleSheet.create({
   shell: { flex: 1, flexDirection: "row", backgroundColor: colors.background },
   sidebar: {
     width: layout.drawer,
-    backgroundColor: colors.surface,
-    boxShadow: "6px 0px 14px rgba(174,186,205,0.34)",
+    backgroundColor: "#192451",
+    boxShadow: "4px 0px 18px rgba(25,36,81,0.12)",
     zIndex: 1,
   },
   sidebarContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 28,
+    gap: 20,
   },
   subject: {
     ...neumorphic.colored,
@@ -1152,7 +1153,7 @@ const styles = StyleSheet.create({
   },
   drawerItem: {
     minHeight: 52,
-    borderRadius: 26,
+    borderRadius: 15,
     paddingHorizontal: 14,
     paddingVertical: 10,
     flexDirection: "row",
@@ -1162,13 +1163,12 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   drawerItemHover: {
-    ...neumorphic.small,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: "rgba(255,255,255,0.09)",
   },
   drawerItemActive: {
-    ...neumorphic.inset,
-    backgroundColor: colors.primaryLight,
-    borderColor: "rgba(81,76,207,0.14)",
+    backgroundColor: "#6045D9",
+    borderColor: "rgba(255,255,255,0.25)",
+    boxShadow: "0px 5px 14px rgba(17,16,83,0.2)",
   },
   stackedItem: {
     minHeight: 60,
@@ -1187,13 +1187,11 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   indicatorHover: {
-    ...neumorphic.small,
-    backgroundColor: colors.surfaceRaised,
+    backgroundColor: "rgba(96,69,217,0.10)",
   },
   indicatorActive: {
-    ...neumorphic.inset,
     backgroundColor: colors.primaryLight,
-    borderColor: "rgba(81,76,207,0.14)",
+    borderColor: "rgba(96,69,217,0.10)",
   },
   navLabel: {
     fontSize: 12,
@@ -1209,7 +1207,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 8,
     backgroundColor: colors.surface,
-    boxShadow: "0px -6px 16px rgba(174,186,205,0.38)",
+    boxShadow: "0px -4px 16px rgba(32,42,108,0.07)",
     zIndex: 1,
   },
   footerBar: {
@@ -1220,13 +1218,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 14,
     backgroundColor: colors.surface,
-    boxShadow: "0px -6px 16px rgba(174,186,205,0.38)",
+    boxShadow: "0px -4px 16px rgba(32,42,108,0.07)",
     zIndex: 1,
   },
   rail: {
     width: layout.rail,
-    backgroundColor: colors.surface,
-    boxShadow: "6px 0px 14px rgba(174,186,205,0.34)",
+    backgroundColor: "#192451",
+    boxShadow: "4px 0px 18px rgba(25,36,81,0.12)",
     zIndex: 1,
   },
   railContent: {
@@ -1251,7 +1249,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     backgroundColor: colors.surface,
-    boxShadow: "0px 4px 12px rgba(174,186,205,0.3)",
+    boxShadow: "0px 4px 12px rgba(32,42,108,0.06)",
     zIndex: 1,
   },
   sheetRoot: { flex: 1, justifyContent: "flex-end" },
