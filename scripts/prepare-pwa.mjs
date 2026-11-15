@@ -27,6 +27,7 @@ const tags = [
   '<meta name="apple-mobile-web-app-capable" content="yes" />',
   '<meta name="apple-mobile-web-app-title" content="Révizo" />',
   '<meta name="apple-mobile-web-app-status-bar-style" content="default" />',
+  '<meta name="mobile-web-app-capable" content="yes" />',
 ].filter((tag) => !html.includes(tag));
 if (tags.length) html = html.replace("</head>", tags.join("\n") + "\n</head>");
 await writeFile(indexPath, html);
@@ -74,11 +75,13 @@ self.addEventListener("activate", (event) => {
 });
 self.addEventListener("fetch", (event) => {
   const request = event.request, url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== self.location.origin || request.headers.has("Authorization") || url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/uploads/")) return;
+  if (request.method !== "GET" || url.origin !== self.location.origin || request.headers.has("Authorization") || url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname === "/uploads" || url.pathname.startsWith("/uploads/")) return;
+  // Use this worker's cache only. A waiting update has a separate cache and
+  // must not supply HTML or assets to pages still running the active version.
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).then(async (response) => response.status >= 500 ? (await caches.match("/index.html")) ?? response : response).catch(async () => (await caches.match("/index.html")) ?? Response.error()));
+    event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match("/index.html")) ?? fetch(request)));
   } else if (ALLOWED.has(url.pathname)) {
-    event.respondWith(caches.match(url.pathname).then((cached) => cached ?? fetch(request)));
+    event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match(url.pathname)) ?? fetch(request)));
   }
 });
 `;

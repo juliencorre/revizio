@@ -30,7 +30,7 @@ Pour accéder au serveur depuis l’iPad du même réseau :
 HOST=0.0.0.0 PORT=4173 npm run serve
 ```
 
-Ouvrir alors l’adresse réseau de cette machine dans Safari. Pour une installation durable, servir l’application et `/api` sous la même origine HTTPS ; définir `SECURE_COOKIES=true` derrière cette terminaison HTTPS. Safari permet ensuite **Partager → Sur l’écran d’accueil**. Le cache de l’interface s’installe après une première ouverture en ligne ; une adresse LAN en HTTP ne suffit pas sur iPad. Voir [installation iPad et hors connexion](docs/ipad-offline.md).
+Ouvrir alors l’adresse réseau de cette machine dans Safari. Pour une installation durable, servir l’application et `/api` sous la même origine HTTPS ; définir `SECURE_COOKIES=true` derrière cette terminaison HTTPS. La carte d’installation sur l’accueil et dans **Famille** guide l’ajout sur l’écran d’accueil de l’iPad et propose **Installer Révizo** sur les navigateurs compatibles. L’application s’ouvre ensuite dans une fenêtre dédiée, en portrait ou paysage. Le statut du cache et les mises à jour disponibles sont affichés dans cette carte. Le cache de l’interface s’installe après une première ouverture en ligne ; une adresse LAN en HTTP ne suffit pas sur iPad. Voir [installation iPad et hors connexion](docs/ipad-offline.md).
 
 ## Héberger sur Cloudflare
 

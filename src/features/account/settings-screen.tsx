@@ -19,6 +19,7 @@ import {
 import { colors, neumorphic } from "@/theme";
 import { FAMILY_LIMITS } from "@/domain/family";
 import { ParentAccountsCard } from "./parent-accounts";
+import { InstallAppCard } from "@/features/pwa/install-app-card";
 import { apiFetch, type SessionResponse } from "@/services/api";
 import { useSession } from "@/state/session";
 import { useLearning } from "@/state/learning-store";
@@ -345,6 +346,7 @@ export function ParentSettingsScreen() {
           sur cet appareil. Un espace familial permet de protéger les accès et
           de conserver les documents sur le serveur.
         </Notice>
+        <InstallAppCard />
         <Card style={{ gap: 18 }}>
           <AppText variant="heading">
             Créer ou rejoindre votre espace familial
@@ -453,6 +455,7 @@ export function ParentSettingsScreen() {
           }
         />
         {response("logout")}
+        <InstallAppCard />
         {!online && (
           <Notice>
             La connexion au serveur est interrompue. Vous pourrez modifier les

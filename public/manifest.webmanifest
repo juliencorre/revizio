@@ -4,12 +4,15 @@
   "short_name": "Révizo",
   "description": "Apprendre, réviser et s’exercer avec les cours préparés par ses parents.",
   "lang": "fr",
+  "dir": "ltr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "theme_color": "#514CCF",
-  "background_color": "#E4E9F2",
+  "theme_color": "#6045D9",
+  "background_color": "#F6F7FC",
+  "categories": ["education"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/pwa/icon-192.png",

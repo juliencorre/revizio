@@ -9,6 +9,7 @@ import { AppIcon, AppText, Badge, Brand, Card, Button } from "@/components/ui";
 import { useSession } from "@/state/session";
 import { NeumorphicProfileCard } from "@/components/NeumorphicProfileCard";
 import { colors, spacing } from "@/theme";
+import { InstallAppCard } from "@/features/pwa/install-app-card";
 
 export default function ProfilesScreen() {
   const router = useRouter();
@@ -198,6 +199,7 @@ export default function ProfilesScreen() {
           )}
         </View>
       )}
+      <InstallAppCard compact />
       <AppText
         variant="small"
         color={colors.muted}

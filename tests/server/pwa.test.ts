@@ -39,12 +39,18 @@ describe("shell PWA privé par construction", () => {
     );
     expect(manifest.display).toBe("standalone");
     expect(manifest.lang).toBe("fr");
+    expect(manifest.id).toBe("/");
+    expect(manifest.scope).toBe("/");
+    expect(manifest.start_url).toBe("/");
+    expect(manifest.orientation).toBe("any");
+    expect(manifest.prefer_related_applications).toBe(false);
     expect(manifest.icons.map((icon: { sizes: string }) => icon.sizes)).toEqual(
       ["192x192", "512x512"],
     );
     const html = await readFile(join(output, "index.html"), "utf8");
     expect(html).toContain('rel="apple-touch-icon"');
     expect(html).toContain("/manifest.webmanifest");
+    expect(html).toContain('name="mobile-web-app-capable"');
     const first = await readFile(join(output, "sw.js"), "utf8");
     build();
     expect(await readFile(join(output, "sw.js"), "utf8")).toBe(first);
@@ -64,7 +70,7 @@ describe("shell PWA privé par construction", () => {
     build();
     const listeners = new Map<string, (event: any) => void>();
     const addAll = vi.fn(async (_paths: string[]) => undefined),
-      fetchMock = vi.fn(async () => {
+      fetchMock = vi.fn(async (): Promise<Response> => {
         throw new Error("offline");
       });
     const cacheMatch = vi.fn(async (path: string) =>
@@ -82,8 +88,11 @@ describe("shell PWA privé par construction", () => {
           listeners.set(name, listener),
       },
       caches: {
-        open: async () => ({ addAll }),
-        match: cacheMatch,
+        open: async () => ({ addAll, match: cacheMatch }),
+        // Global lookup could return a different build's cache.
+        match: () => {
+          throw new Error("Cache lookup must be version-scoped");
+        },
         keys: async () => [],
         delete: async () => true,
       },
@@ -135,6 +144,7 @@ describe("shell PWA privé par construction", () => {
       "/api/uploads/file-id",
       "/api",
       "/uploads/photo.png",
+      "/uploads",
       "https://other.test/assets/app.js",
       "/private-document.json",
     ])
@@ -149,5 +159,13 @@ describe("shell PWA privé par construction", () => {
         new Headers({ Authorization: "Bearer test" }),
       ),
     ).toBeUndefined();
+    // Navigation keeps the active shell, even when the server has a newer build.
+    fetchMock.mockImplementation(
+      async () => new Response("newer network shell"),
+    );
+    expect(await (await dispatch("/student", "navigate"))!.text()).toBe(
+      "cached shell",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
