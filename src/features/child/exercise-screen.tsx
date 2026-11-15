@@ -382,7 +382,7 @@ export function StudentExerciseScreen() {
               }
             />
           </View>
-          <Card style={{ gap: 26, padding: width >= 650 ? 34 : 22 }}>
+          <Card style={{ gap: 26, padding: width >= 650 ? 34 : 22, width: "100%", maxWidth: 960, alignSelf: "center" }}>
             <View style={styles.sectionHeading}>
               <Badge>
                 {
@@ -492,7 +492,7 @@ export function StudentExerciseScreen() {
                         {
                           width: width >= 650 ? (width - 70 - 18) / 2 : "100%",
                           minHeight: 106,
-                          borderRadius: 20,
+                          borderRadius: 16,
                           borderWidth: 2,
                           borderColor: border,
                           backgroundColor: correct
