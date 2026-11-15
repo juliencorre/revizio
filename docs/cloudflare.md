@@ -75,6 +75,21 @@ Un dépassement sur l’offre gratuite bloque les opérations concernées ; il n
 
 Les limites et tarifs peuvent évoluer. Sources : [Workers](https://developers.cloudflare.com/workers/platform/pricing/), [fichiers statiques](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/), [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/), [Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/).
 
+## Publication automatique depuis GitHub
+
+Le workflow `.github/workflows/checks.yml` se lance à chaque push sur `main`, y compris pour les changements de documentation. Il exécute TypeScript, les tests métier, la construction, le contrôle du bundle Cloudflare et les parcours navigateur Chromium/WebKit en portrait et paysage. La publication n’a lieu que si ces vérifications réussissent. Les pull requests sont vérifiées sans accès aux secrets de publication. Un lancement manuel reste possible depuis l’onglet **Actions** du dépôt, sur `main`.
+
+Configurer une fois ces secrets dans **Settings → Secrets and variables → Actions** du dépôt :
+
+- `CLOUDFLARE_ACCOUNT_ID` : l’identifiant du compte qui héberge le Worker `revizo`.
+- `CLOUDFLARE_API_TOKEN` : un jeton API de déploiement Cloudflare, limité au compte et à la zone `gofel.fr`, avec les permissions du modèle **Edit Cloudflare Workers**.
+
+La connexion OAuth locale de Wrangler reste réservée au poste de développement ; elle n’est pas copiée dans GitHub. Le jeton API reste dans les secrets chiffrés Actions et n’est jamais intégré au client.
+
+Après les tests, le job **Publier cours.gofel.fr** reconstruit le même commit avec le lockfile du dépôt et lance `wrangler deploy`. Il conserve les variables distantes, le secret d’installation déjà configuré et le Durable Object familial existant. Il ne relance pas le script d’installation initiale ni la création de famille. Une publication en cours n’est pas interrompue par un nouveau push.
+
+Le contrôle final `node scripts/verify-cloud-deployment.mjs https://cours.gofel.fr` vérifie l’API et compare par empreinte la version PWA et tous ses fichiers publics avec l’export local. La comparaison HTML tolère uniquement le script de détection JavaScript ajouté par la protection Cloudflare. Il refuse une ancienne version, un fichier manquant ou une API indisponible. Les données privées ne sont pas consultées par ce contrôle.
+
 ## Développer et mettre à jour
 
 ```sh

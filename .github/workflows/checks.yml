@@ -1,16 +1,24 @@
-name: Vérifications
+name: Vérifications et publication
+
 on:
   push:
     branches: [main]
-    paths-ignore: ["**/*.md"]
   pull_request:
     paths-ignore: ["**/*.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 concurrency:
   group: checks-${{ github.ref }}
-  cancel-in-progress: true
+  # A new push can replace a pending build, but never interrupt a deployment.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,3 +38,38 @@ jobs:
           name: recette-tablette
           path: test-results/
           retention-days: 14
+
+  deploy:
+    name: Publier cours.gofel.fr
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://cours.gofel.fr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Vérifier les accès de publication
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Configurer CLOUDFLARE_ACCOUNT_ID et CLOUDFLARE_API_TOKEN dans les secrets Actions du dépôt."
+            exit 1
+          fi
+      - run: npm ci
+      - name: Publier la version vérifiée
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          EXPO_PUBLIC_API_URL: ""
+        # Existing Cloudflare secrets and the family Durable Object are preserved.
+        run: npx wrangler deploy --config wrangler.jsonc --keep-vars --message "GitHub main ${GITHUB_SHA}"
+      - name: Vérifier la version publiée
+        run: node scripts/verify-cloud-deployment.mjs https://cours.gofel.fr
