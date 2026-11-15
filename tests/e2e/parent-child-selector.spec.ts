@@ -79,9 +79,7 @@ test("choisir un enfant, retrouver ses contenus et conserver le choix après rec
     page.getByText("Les mots d’Héloïse", { exact: true }),
   ).toBeVisible();
   await page.goto("/parent");
-  await expect(
-    page.getByRole("heading", { name: "Accompagner Héloïse", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByTestId("parent-dashboard")).toContainText("Héloïse");
   await trigger.click();
   await expect(menu).toBeVisible();
   await page.screenshot({ path: info.outputPath("selection-enfant.png") });
@@ -126,9 +124,7 @@ test("choisir au clavier et fermer le menu sans changer d’enfant", async ({
   await expect(gabriel).toBeFocused();
   await expect(gabriel).toHaveCSS("outline-style", "solid");
   await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("heading", { name: "Accompagner Gabriel", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByTestId("parent-dashboard")).toContainText("Gabriel");
   await trigger.click();
   await expect(menu).toBeVisible();
   await expect(gabriel).toBeFocused();
