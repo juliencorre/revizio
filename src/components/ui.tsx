@@ -585,6 +585,7 @@ function StackedNavItem({
   testID,
   stretch,
   expanded,
+  dark = false,
 }: {
   label: string;
   shortLabel?: string;
@@ -594,9 +595,10 @@ function StackedNavItem({
   testID?: string;
   stretch?: boolean;
   expanded?: boolean;
+  dark?: boolean;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
-  const tint = active ? colors.primaryDark : colors.muted;
+  const tint = dark ? (active ? "#FFFFFF" : "#D1D9FF") : (active ? colors.primaryDark : colors.muted);
   return (
     <Pressable
       accessibilityRole="button"
@@ -616,13 +618,13 @@ function StackedNavItem({
             style={[
               styles.indicator,
               isHovered(state) && !active && styles.indicatorHover,
-              (active || state.pressed) && styles.indicatorActive,
+              (active || state.pressed) && (dark ? styles.indicatorActiveDark : styles.indicatorActive),
               focused && styles.focusRing,
             ]}
           >
             <AppIcon
               name={icon}
-              color={active ? colors.primary : colors.muted}
+              color={dark ? (active ? "#FFFFFF" : "#D1D9FF") : (active ? colors.primary : colors.muted)}
             />
           </View>
           <AppText
@@ -770,10 +772,10 @@ function NavigationRail({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.railContent}
       >
-        <BrandMark />
+        <BrandMark dark />
         <AppText
           variant="small"
-          color={role === "parent" ? colors.orange : colors.primary}
+          color={role === "parent" ? "#FFD59E" : "#D1D9FF"}
           style={styles.railRole}
         >
           {role === "parent" ? "Parent" : "Élève"}
@@ -783,6 +785,7 @@ function NavigationRail({
             <StackedNavItem
               key={item.label}
               {...item}
+              dark
               onPress={() => onNavigate(item)}
             />
           ))}
@@ -792,6 +795,7 @@ function NavigationRail({
           label="Changer de profil"
           shortLabel="Profils"
           icon="users"
+          dark
           onPress={onSwitchProfile}
         />
       </ScrollView>
@@ -876,9 +880,12 @@ export function AppShell({
               ))}
             </View>
             <View style={{ flex: 1, minHeight: 24 }} />
-            <Button variant="ghost" icon="users" onPress={switchProfile}>
-              Changer de profil
-            </Button>
+            <View style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.18)", paddingTop: 15 }}>
+              <Pressable accessibilityRole="button" onPress={switchProfile} style={{ minHeight: 48, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14 }}>
+                <AppIcon name="users" color="#FFFFFF" />
+                <AppText color="#FFFFFF" style={{ fontWeight: "600" }}>Changer de profil</AppText>
+              </Pressable>
+            </View>
           </ScrollView>
         </View>
       )}
@@ -1145,7 +1152,8 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   subject: {
-    ...neumorphic.colored,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
     borderRadius: 26,
     padding: 22,
     gap: 12,
@@ -1192,6 +1200,10 @@ const styles = StyleSheet.create({
   indicatorActive: {
     backgroundColor: colors.primaryLight,
     borderColor: "rgba(96,69,217,0.10)",
+  },
+  indicatorActiveDark: {
+    backgroundColor: "#6045D9",
+    borderColor: "rgba(255,255,255,0.18)",
   },
   navLabel: {
     fontSize: 12,
