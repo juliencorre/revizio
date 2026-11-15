@@ -1,3 +1,4 @@
+import { documentKind } from "@/domain/document-kind";
 import type { CourseSource } from "@/domain/model";
 import { absoluteApiUri, apiAuthHeaders } from "./api";
 const DB_NAME = "revizo-source-cache";
@@ -61,7 +62,14 @@ export async function cacheSource(source: CourseSource): Promise<CourseSource> {
     throw new Error(
       "Ce document n’est pas disponible pour être conservé hors connexion.",
     );
-  await saveBlob(key, await response.blob());
+  let blob = await response.blob();
+  if (documentKind(source) === "pdf") {
+    // Files on iPad can return a PDF as application/octet-stream, which Safari downloads instead of showing.
+    if ((await blob.slice(0, 5).text()) !== "%PDF-")
+      throw new Error(source.name + " : ce fichier n’est pas un PDF lisible.");
+    blob = blob.slice(0, blob.size, "application/pdf");
+  }
+  await saveBlob(key, blob);
   return { ...source, cachedUri: "revizo-cache://" + key };
 }
 export async function resolveSourceUri(source: CourseSource): Promise<string> {
@@ -91,4 +99,13 @@ export async function clearSourceCache() {
     request.onblocked = () => resolve();
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function readSourceText(uri: string) {
+  const response = await fetch(uri, {
+    headers: apiAuthHeaders(),
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error();
+  return response.text();
 }

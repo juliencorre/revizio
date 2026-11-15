@@ -573,10 +573,16 @@ export async function configureServerRoutes(
     if (original && user.role !== "parent")
       throw new HttpError(403, "L’original est réservé au parent.");
     reply
-      .type(original ? "application/octet-stream" : upload.mimeType)
+      .type(
+        original
+          ? "application/octet-stream"
+          : upload.mimeType === "text/plain"
+            ? "text/plain; charset=utf-8"
+            : upload.mimeType,
+      )
       .header(
         "Content-Disposition",
-        `inline; filename*=UTF-8''${encodeURIComponent(upload.name)}`,
+        `${original ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(upload.name)}`,
       );
     return reply.send(
       await database.files.read(original ? upload.originalPath : upload.path),
@@ -712,13 +718,10 @@ export async function configureServerRoutes(
         if (body.title)
           payload.title = requiredString(body.title, "Le titre", 160);
         const sourceIds = validSourceIds(user, profile.id, body.sourceIds);
-        if (
-          sourceIds.length !== 1 ||
-          database.upload(sourceIds[0])?.mimeType !== "image/png"
-        )
+        if (sourceIds.length !== 1)
           throw new HttpError(
             400,
-            "Choisissez une seule photo de vocabulaire.",
+            "Choisissez un seul document de vocabulaire.",
           );
         payload.sourceIds = sourceIds;
       }

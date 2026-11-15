@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Platform, Pressable, View, useWindowDimensions } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as DocumentPicker from "expo-document-picker";
+import {
+  pickDocuments as selectDocuments,
+  documentExamples,
+} from "@/services/pick-documents";
 import {
   AppIcon,
   AppText,
@@ -294,22 +297,15 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
   }
   async function documents() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/*"],
-        multiple: true,
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled)
-        await importSources(
-          result.assets.map((asset) => ({
-            id: localId("english-source"),
-            name: asset.name,
-            uri: asset.uri,
-            mimeType: asset.mimeType,
-          })),
-        );
-    } catch {
-      setError("Le fichier n’a pas pu être sélectionné.");
+      await importSources(
+        await selectDocuments(true, () => localId("english-source")),
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Le fichier n’a pas pu être sélectionné.",
+      );
     }
   }
   function openPreview() {
@@ -419,8 +415,8 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
                 <Badge tone="muted">Brouillon avant publication</Badge>
               </View>
               <AppText color={colors.muted}>
-                Photographiez les mots et les verbes étudiés. Vous pourrez
-                corriger la lecture avant de la partager.
+                Choisissez vos fichiers : {documentExamples}. Vous pourrez
+                corriger les mots et les verbes avant de les partager.
               </AppText>
               <View style={common.row}>
                 <Button
@@ -444,7 +440,7 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
                   onPress={() => void documents()}
                   disabled={busy}
                 >
-                  Fichiers / PDF
+                  Choisir des fichiers
                 </Button>
               </View>
               {busy && (

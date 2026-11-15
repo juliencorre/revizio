@@ -562,3 +562,62 @@ test("exporter et restaurer les profils, cours et documents avec confirmation pa
     await childContext.close();
   }
 });
+
+test("reprendre un import mixte de documents après le refus d’un fichier", async ({
+  page,
+}) => {
+  const profile = await setup(page);
+  await page.goto("/parent/import?subjectId=maths");
+  await page.getByTestId("course-title").fill("Mes documents");
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByTestId("ai-import-files").click();
+  await (
+    await chooser
+  ).setFiles([
+    {
+      name: "cours.docx",
+      mimeType: "application/octet-stream",
+      buffer: await readFile("tests/fixtures/vocabulaire.docx"),
+    },
+    {
+      name: "archive.bin",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from([0, 255, 0, 255]),
+    },
+    {
+      name: "cours.pdf",
+      mimeType: "application/octet-stream",
+      buffer: textPdf(),
+    },
+  ]);
+  await expect(page.getByText("cours.pdf", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("ai-source-rotate-0")).toHaveCount(0);
+  await expect(page.getByTestId("ai-source-rotate-2")).toHaveCount(0);
+  let uploads = 0;
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/api/uploads"
+    )
+      uploads++;
+  });
+  const save = page.getByRole("button", {
+    name: "Créer le brouillon",
+    exact: true,
+  });
+  await save.click();
+  await expect(page.getByTestId("ai-import-error")).toContainText(
+    "archive.bin",
+  );
+  await page.getByTestId("ai-source-remove-1").click();
+  await save.click();
+  await expect(page.getByTestId("parent-review")).toBeVisible();
+  await expect
+    .poll(async () =>
+      (await envelope(page, profile)).data.courses[0]?.sources.map(
+        (s) => s.mimeType,
+      ),
+    )
+    .toEqual(["text/plain", "application/pdf"]);
+  expect(uploads).toBe(3);
+});

@@ -25,7 +25,7 @@ test("importer une source et publier une fiche relue pour l’enfant", async ({
     .fill("Les températures — test familial");
   const chooser = page.waitForEvent("filechooser");
   await page
-    .getByRole("button", { name: "Fichiers / PDF", exact: true })
+    .getByRole("button", { name: "Choisir des fichiers", exact: true })
     .click();
   await (await chooser).setFiles("assets/brand/icon.png");
   await expect(page.getByText("icon.png", { exact: true })).toBeVisible();

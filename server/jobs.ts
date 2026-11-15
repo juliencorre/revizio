@@ -1,3 +1,4 @@
+import { sourceFor } from "./uploads";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type {
@@ -13,7 +14,7 @@ import {
   generateCourse,
   generateEnglish,
   generateExercises,
-  readVocabularyPhoto,
+  readVocabularyDocument,
   type ExtractedPage,
 } from "./ai-core";
 import {
@@ -22,6 +23,7 @@ import {
   type AiClient,
   type AiSettings,
   type StoredJob,
+  type StoredUpload,
 } from "./types";
 
 export class JobQueue {
@@ -179,23 +181,50 @@ export class JobQueue {
     const ids = Array.isArray(payload.sourceIds)
       ? payload.sourceIds.filter((id): id is string => typeof id === "string")
       : [];
+    const extract = async (upload: StoredUpload): Promise<ExtractedPage[]> => {
+      if (upload.mimeType === "text/plain")
+        return [
+          {
+            sourceId: upload.id,
+            name: upload.name,
+            page: 1,
+            text: (await this.database.files.read(upload.path)).toString(
+              "utf8",
+            ),
+            uncertain: false,
+          },
+        ];
+      return this.options.extractUpload(
+        upload,
+        this.client,
+        settings,
+        join(this.database.dataDir, "temporary"),
+        signal,
+      );
+    };
     if (job.kind === "vocabulary") {
       if (ids.length !== 1 || !isVocabularyLanguage(payload.subjectId))
-        throw new Error("Choisissez une photo et la langue de la liste.");
-      const photo = this.sourceFor(job, ids[0]);
-      if (photo.mimeType !== "image/png")
-        throw new Error("Le document doit être une photo de vocabulaire.");
+        throw new Error("Choisissez un document et la langue de la liste.");
+      const upload = this.sourceFor(job, ids[0]);
       this.database.updateJob(job.id, {
         stage: "vocabulaire",
-        message: "L’IA lit les mots et leurs traductions sur la photo.",
+        message: "Lecture des mots et de leurs traductions dans le document.",
       });
-      const bytes = await this.database.files.read(photo.path);
+      const input =
+        upload.mimeType === "image/png"
+          ? await this.database.files.read(upload.path)
+          : (await extract(upload)).map((page) => page.text).join("\n\n");
+      if (typeof input === "string" && input.length > 150000)
+        throw new Error(
+          "Ce document est trop long. Importez une liste plus courte.",
+        );
       return {
-        vocabulary: await readVocabularyPhoto(
+        source: sourceFor(upload),
+        vocabulary: await readVocabularyDocument(
           this.client,
           settings,
           payload.subjectId,
-          bytes,
+          input,
           signal,
         ),
       };
@@ -227,15 +256,7 @@ export class JobQueue {
         retained.length &&
         retained.every((source) => typeof source.extractedText === "string")
           ? retained.map(savedPage)
-          : (
-              await this.options.extractUpload(
-                upload,
-                this.client,
-                settings,
-                join(this.database.dataDir, "temporary"),
-                signal,
-              )
-            ).map((page) => {
+          : (await extract(upload)).map((page) => {
               const saved = retained.find(
                 (source) =>
                   (source.page ?? 1) === page.page &&

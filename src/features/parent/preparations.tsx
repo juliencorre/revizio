@@ -34,7 +34,7 @@ const jobLabels: Record<AiJob["kind"], string> = {
   course: "Fiche de révision",
   exercises: "Série d’exercices",
   english: "Répertoire d’anglais",
-  vocabulary: "Photo de vocabulaire",
+  vocabulary: "Document de vocabulaire",
 };
 const stateLabels: Record<AiJob["status"], string> = {
   queued: "En attente",

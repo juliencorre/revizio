@@ -1,3 +1,4 @@
+import { textPdf } from "../fixtures/text-pdf";
 import { expect, test, type Page } from "@playwright/test";
 import sharp from "sharp";
 import type { AiJob, LearningData } from "../../src/domain/model";
@@ -35,7 +36,7 @@ async function importPhoto(page: Page, monolingual = false, camera = false) {
     .jpeg()
     .toBuffer();
   await page
-    .getByRole("button", { name: "Importer une photo", exact: true })
+    .getByRole("button", { name: "Importer un document", exact: true })
     .click();
   const picker = page.waitForEvent("filechooser");
   await page
@@ -115,7 +116,7 @@ test("relit la photo et ajoute seulement les nouvelles paires acceptées au brou
   await expect(
     page.getByRole("button", { name: "Ajouter 1 mot au brouillon" }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Voir la photo" }).click();
+  await page.getByRole("button", { name: "Voir le document" }).click();
   await expect(
     page.getByRole("img", { name: "Photo de la liste à relire" }),
   ).toBeVisible();
@@ -137,7 +138,7 @@ test("relit la photo et ajoute seulement les nouvelles paires acceptées au brou
   await page.reload();
   await expect(page.getByTestId("vocabulary-term-1")).toHaveValue("la ventana");
   await expect(
-    page.getByRole("button", { name: "Importer une photo", exact: true }),
+    page.getByRole("button", { name: "Importer un document", exact: true }),
   ).toBeVisible();
   expect(await words()).toHaveLength(1);
   await page.getByTestId("publish-vocabulary-list").click();
@@ -181,5 +182,60 @@ for (const monolingual of [false, true]) {
     await expect(page.getByTestId("vocabulary-term-1")).toHaveValue(
       "la ventana",
     );
+  });
+}
+
+for (const format of ["DOCX", "PDF"]) {
+  test(`import de vocabulaire ${format} depuis Fichiers avec Ollama`, async ({
+    page,
+  }) => {
+    test.skip(
+      process.env.REVIZIO_LIVE_AI !== "1",
+      "Nécessite le modèle local.",
+    );
+    test.setTimeout(240000);
+    await openList(page);
+    await page.getByRole("button", { name: "Importer un document" }).click();
+    const button = page.getByRole("button", { name: "Choisir un fichier" });
+    const bounds = await button.boundingBox();
+    expect(Math.min(bounds!.width, bounds!.height)).toBeGreaterThanOrEqual(44);
+    const pending = page.waitForEvent("filechooser");
+    await button.click();
+    const picker = await pending;
+    if (format === "DOCX")
+      await picker.setFiles("tests/fixtures/vocabulaire.docx");
+    else
+      await picker.setFiles({
+        name: "vocabulaire.pdf",
+        mimeType: "application/pdf",
+        buffer: textPdf([
+          "Vocabulaire : espagnol - francais. el jardin = le jardin",
+          "Vocabulaire : espagnol - francais. la casa = la maison",
+        ]),
+      });
+    const expected = format === "DOCX" ? "la ventana" : "la casa";
+    await expect(
+      page.getByRole("button", { name: "Ajouter 2 mots au brouillon" }),
+    ).toBeEnabled({ timeout: 210000 });
+    await page.getByRole("button", { name: "Voir le document" }).click();
+    if (format === "DOCX")
+      await expect(page.getByText(/la ventana.*la fenêtre/s)).toBeVisible();
+    else
+      await expect(
+        page.locator('iframe[title="vocabulaire.pdf"]'),
+      ).toBeVisible();
+    await page.getByRole("button", { name: "Fermer le document" }).click();
+    await page
+      .getByRole("button", { name: "Ajouter 2 mots au brouillon" })
+      .click();
+    await expect
+      .poll(async () =>
+        Promise.all(
+          [0, 1].map((i) =>
+            page.getByTestId("vocabulary-term-" + i).inputValue(),
+          ),
+        ),
+      )
+      .toContain(expected);
   });
 }

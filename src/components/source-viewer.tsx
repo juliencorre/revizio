@@ -7,9 +7,14 @@ import {
   View,
 } from "react-native";
 import { AppText, Button, Card } from "./ui";
+import { documentKind } from "@/domain/document-kind";
 import { PdfDocument } from "./pdf-document";
 import type { CourseSource } from "@/domain/model";
-import { resolveSourceUri, cacheSource } from "@/services/source-cache";
+import {
+  resolveSourceUri,
+  cacheSource,
+  readSourceText,
+} from "@/services/source-cache";
 import { apiAuthHeaders } from "@/services/api";
 import { useTheme } from "@/theme";
 export function useSourceUri(source?: CourseSource | null) {
@@ -79,9 +84,25 @@ export function SourceViewer({
   const { colors } = useTheme();
   const { uri, error } = useSourceUri(source);
   const [zoom, setZoom] = useState(false);
-  const image =
-    source?.mimeType?.startsWith("image/") ||
-    /\.(png|jpe?g|webp|heic)$/i.test(source?.name || "");
+  const kind = source ? documentKind(source) : "other";
+  const image = kind === "image";
+  const [preview, setPreview] = useState("");
+  useEffect(() => {
+    let active = true;
+    setPreview("");
+    if (kind === "text" && uri) {
+      readSourceText(uri)
+        .then((value) => {
+          if (active) setPreview(value || "Le document est vide.");
+        })
+        .catch(() => {
+          if (active) setPreview("Le texte du document n’est pas disponible.");
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [uri, kind]);
   useEffect(() => setZoom(false), [source?.id]);
   return (
     <Modal
@@ -163,8 +184,17 @@ export function SourceViewer({
                 />
               </ScrollView>
             </ScrollView>
-          ) : (
+          ) : kind === "pdf" ? (
             <PdfDocument uri={uri} title={source?.name || "Mon document"} />
+          ) : kind === "text" ? (
+            <ScrollView style={{ flex: 1 }}>
+              <AppText>{preview || "Lecture du texte…"}</AppText>
+            </ScrollView>
+          ) : (
+            <AppText>
+              Fichier joint. Son texte pourra être consulté après l’import dans
+              l’espace familial.
+            </AppText>
           )}
         </Card>
       </View>

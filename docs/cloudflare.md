@@ -47,6 +47,8 @@ Les préparations sont conservées avant leur lancement et traitées par une ala
 
 La configuration sélectionne l’API Anthropic et `claude-sonnet-5-5`. Les textes et images utilisés pour la préparation sont transmis à Anthropic depuis le Worker. La clé est enregistrée avec `wrangler secret put ANTHROPIC_API_KEY` ; le modèle est configurable dans `wrangler.jsonc`. L’écran **Famille** affiche ce fournisseur et son état, avec des réglages contrôlés par le serveur. Voir le [guide Anthropic](anthropic.md) pour la configuration et l’alternative Workers AI.
 
+Le texte des documents Office récents, OpenDocument et des fichiers texte est extrait dans le Worker avant la préparation par le modèle. L’original est conservé dans le stockage privé.
+
 Les PDF textuels sont lus page par page avec PDF.js via `unpdf`. Pour les scans, les images de chaque page sont envoyées au modèle de vision ; une page trop complexe est refusée avec une demande de photo séparée ou de texte saisi. Les lectures par vision sont signalées comme incertaines et restent à relire par le parent. Les références conservent le numéro réel de la page.
 
 ## Limites de cette installation

@@ -11,8 +11,9 @@ import {
 import { SourceViewer } from "@/components/source-viewer";
 import type { AiJob, VocabularyList, VocabularyWord } from "@/domain/model";
 import { languageLabel, reviewVocabularyPhoto } from "@/domain/vocabulary";
-import { Field, Notice } from "@/features/parent/shared";
-import { apiFetch, waitForJob } from "@/services/api";
+import { Field, Notice, localId } from "@/features/parent/shared";
+import { pickDocuments, documentExamples } from "@/services/pick-documents";
+import { apiFetch, uploadCourseSource, waitForJob } from "@/services/api";
 import { useLearning } from "@/state/learning-store";
 import { radius, spacing, useTheme } from "@/theme";
 import { pickVocabularyPhoto } from "./photo-source";
@@ -42,6 +43,18 @@ function PhotoReview({
     Array.isArray(sources) && typeof sources[0] === "string"
       ? sources[0]
       : undefined;
+  // Jobs created before document import always used a single normalized photo.
+  const source =
+    job.result?.source ??
+    (photoId
+      ? {
+          id: photoId,
+          storageId: photoId,
+          name: "Photo de la liste à relire",
+          uri: "/api/uploads/" + encodeURIComponent(photoId),
+          mimeType: "image/png",
+        }
+      : null);
   const compact = useWindowClass() === "compact";
   const fieldStyle = {
     flex: compact ? undefined : 1,
@@ -78,27 +91,18 @@ function PhotoReview({
   }
   return (
     <>
-      {photoId && (
+      {source && (
         <Button
           icon="search"
           variant="ghost"
           style={{ alignSelf: "flex-start" }}
           onPress={() => setShowPhoto(true)}
         >
-          Voir la photo
+          Voir le document
         </Button>
       )}
-      {showPhoto && photoId && (
-        <SourceViewer
-          source={{
-            id: photoId,
-            storageId: photoId,
-            name: "Photo de la liste à relire",
-            uri: "/api/uploads/" + encodeURIComponent(photoId),
-            mimeType: "image/png",
-          }}
-          onClose={() => setShowPhoto(false)}
-        />
+      {showPhoto && source && (
+        <SourceViewer source={source} onClose={() => setShowPhoto(false)} />
       )}
       {!compact && rows.length > 0 && (
         <View style={vocabularyStyles.row}>
@@ -203,7 +207,7 @@ export function VocabularyPhotoImport({
   const [choosing, setChoosing] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(
-    jobId ? "Lecture de la photo en cours…" : "",
+    jobId ? "Lecture du document en cours…" : "",
   );
   const mounted = useRef(false);
   const { id, language } = list;
@@ -231,14 +235,14 @@ export function VocabularyPhotoImport({
           throw new Error(
             "Cette lecture ne correspond pas à la liste ouverte.",
           );
-        setProgress(update.message ?? "Lecture de la photo en cours…");
+        setProgress(update.message ?? "Lecture du document en cours…");
       },
       signal,
     )
       .then((result) => {
         if (signal.aborted) return;
         if (!result.result?.vocabulary?.length)
-          throw new Error("Aucun mot lisible sur cette photo.");
+          throw new Error("Aucun mot lisible dans ce document.");
         setJob(result);
       })
       .catch((cause) => {
@@ -246,7 +250,7 @@ export function VocabularyPhotoImport({
           setError(
             cause instanceof Error
               ? cause.message
-              : "La photo n’a pas pu être lue.",
+              : "Le document n’a pas pu être lu.",
           );
       })
       .finally(() => {
@@ -255,12 +259,24 @@ export function VocabularyPhotoImport({
     return () => controller.abort();
   }, [jobId, activeProfileId, id, language, isDemo]);
 
-  async function choose(camera: boolean) {
+  async function choose(mode: "camera" | "photos" | "files") {
     setError("");
     setChoosing(true);
     try {
-      const photo = await pickVocabularyPhoto(camera, activeProfileId);
-      if (!photo || !mounted.current) return;
+      let source;
+      if (mode === "files") {
+        const [file] = await pickDocuments(false, () =>
+          localId("vocabulary-source"),
+        );
+        if (!file) return;
+        try {
+          source = await uploadCourseSource(file, activeProfileId);
+        } finally {
+          if (file.uri?.startsWith("blob:")) URL.revokeObjectURL(file.uri);
+        }
+      } else
+        source = await pickVocabularyPhoto(mode === "camera", activeProfileId);
+      if (!source || !mounted.current) return;
       const { job: queued } = await apiFetch<{ job: AiJob }>("/ai/vocabulary", {
         method: "POST",
         body: JSON.stringify({
@@ -268,7 +284,7 @@ export function VocabularyPhotoImport({
           listId: id,
           subjectId: language,
           title: list.title.trim() || undefined,
-          sourceIds: [photo.id],
+          sourceIds: [source.id],
         }),
       });
       // A reload of the editor can resume this specific reading without submitting the photo again.
@@ -278,7 +294,7 @@ export function VocabularyPhotoImport({
         setError(
           cause instanceof Error
             ? cause.message
-            : "La photo n’a pas pu être importée. Réessayez avec une autre image.",
+            : "Le document n’a pas pu être importé.",
         );
     } finally {
       if (mounted.current) setChoosing(false);
@@ -297,7 +313,7 @@ export function VocabularyPhotoImport({
         style={{ alignSelf: "flex-start" }}
         onPress={() => setOpen(true)}
       >
-        Importer une photo
+        Importer un document
       </Button>
     );
   return (
@@ -311,50 +327,53 @@ export function VocabularyPhotoImport({
     >
       <View style={[vocabularyStyles.row, { justifyContent: "space-between" }]}>
         <AppText variant="heading">
-          {job ? "Relire les mots de la photo" : "Importer une photo"}
+          {job ? "Relire les mots du document" : "Importer un document"}
         </AppText>
         {!choosing && (
-          <IconButton
-            icon="close"
-            label="Fermer l’import photo"
-            onPress={close}
-          />
+          <IconButton icon="close" label="Fermer l’import" onPress={close} />
         )}
       </View>
       {error && <Notice error>{error}</Notice>}
       {isDemo ? (
         <Notice>
-          Connectez-vous à votre espace familial pour faire lire une photo par
+          Connectez-vous à votre espace familial pour faire lire un document par
           l’IA.
         </Notice>
       ) : job ? (
         <PhotoReview job={job} list={list} onAdd={onAdd} onClose={close} />
       ) : choosing || progress ? (
         <Notice>
-          {choosing ? "Sélection et envoi de la photo…" : progress}
+          {choosing ? "Sélection et envoi du document…" : progress}
         </Notice>
       ) : serverAvailable ? (
         <>
           <AppText>
-            Photographiez la page ou choisissez-la dans vos photos. Vous pourrez
-            corriger les mots avant de les ajouter.
+            Choisissez un fichier : {documentExamples}. Vous pourrez corriger
+            les mots avant de les ajouter.
           </AppText>
           <View style={vocabularyStyles.row}>
-            <Button icon="camera" onPress={() => void choose(true)}>
+            <Button icon="camera" onPress={() => void choose("camera")}>
               Prendre une photo
             </Button>
             <Button
               icon="upload"
               variant="secondary"
-              onPress={() => void choose(false)}
+              onPress={() => void choose("photos")}
             >
               Choisir une photo
+            </Button>
+            <Button
+              icon="file"
+              variant="secondary"
+              onPress={() => void choose("files")}
+            >
+              Choisir un fichier
             </Button>
           </View>
         </>
       ) : (
         <Notice>
-          Reconnectez-vous au serveur familial pour importer une photo.
+          Reconnectez-vous au serveur familial pour importer un document.
         </Notice>
       )}
     </View>

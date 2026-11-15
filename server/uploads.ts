@@ -1,3 +1,4 @@
+import { documentText, decodeDocumentText } from "./document-text";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ImageProcessor } from "./runtime";
@@ -31,18 +32,30 @@ export async function storeUpload(
   const originalPath = join(database.filesDir, id + ".original");
   let bytes = buffer,
     actualMime = "application/pdf";
-  if (!isPdf) {
+  const text = isPdf ? null : documentText(buffer, safeName, mimeType);
+  if (text !== null) {
+    actualMime = "text/plain";
+    bytes = Buffer.from(text);
+  } else if (!isPdf) {
     try {
       bytes = await images.normalize(buffer);
       actualMime = "image/png";
     } catch {
-      throw new HttpError(
-        415,
-        "Ce fichier n’est pas une image ou un PDF lisible. Essayez une photo JPEG/PNG ou un PDF.",
-      );
+      // Files providers sometimes supply no type for a perfectly readable text file.
+      if (
+        (!mimeType || mimeType === "application/octet-stream") &&
+        !/\.(?:pdf|png|jpe?g|webp|heic|gif|zip|bin|exe)$/i.test(safeName)
+      ) {
+        actualMime = "text/plain";
+        bytes = Buffer.from(decodeDocumentText(buffer));
+      } else
+        throw new HttpError(
+          415,
+          "Ce format ne peut pas être lu. Exportez le document en PDF ou en texte ; pour une photo, utilisez JPEG ou PNG.",
+        );
     }
   }
-  const path = join(database.filesDir, id + (isPdf ? ".pdf" : ".png"));
+  const path = join(database.filesDir, id + storedExtension(actualMime));
   await database.files.write(originalPath, buffer);
   try {
     await database.files.write(path, bytes);
@@ -90,10 +103,7 @@ export async function rotateUpload(
   rotation: number,
   images: ImageProcessor,
 ): Promise<StoredUpload> {
-  if (
-    ![0, 90, 180, 270].includes(rotation) ||
-    upload.mimeType === "application/pdf"
-  )
+  if (![0, 90, 180, 270].includes(rotation) || upload.mimeType !== "image/png")
     throw new HttpError(
       400,
       "Choisissez une rotation de 0, 90, 180 ou 270 degrés pour une image.",
@@ -113,4 +123,12 @@ export async function removeUploadFiles(
 ) {
   for (const path of new Set([upload.path, upload.originalPath]))
     await database.files.unlink(path).catch(() => {});
+}
+
+export function storedExtension(mimeType: string) {
+  return mimeType === "text/plain"
+    ? ".txt"
+    : mimeType === "application/pdf"
+      ? ".pdf"
+      : ".png";
 }

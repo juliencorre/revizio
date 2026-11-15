@@ -1,3 +1,4 @@
+import { documentKind } from "@/domain/document-kind";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import {
@@ -141,7 +142,9 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
               variant="ghost"
               icon="arrow-left"
               style={{ alignSelf: "flex-end" }}
-              onPress={() => router.navigate(subjectHref(subject.id, returnTab))}
+              onPress={() =>
+                router.navigate(subjectHref(subject.id, returnTab))
+              }
             >
               Menu de la matière
             </Button>
@@ -289,10 +292,7 @@ export function SourcePreview({
   const styles = useStyles();
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const image =
-    !!source.uri &&
-    (source.mimeType?.startsWith("image/") ||
-      /\.(jpe?g|png|heic|webp)(?:\?|$)/i.test(source.uri));
+  const image = documentKind(source) === "image";
   return (
     <View style={styles.source}>
       <Pressable

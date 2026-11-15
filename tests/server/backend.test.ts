@@ -141,6 +141,7 @@ async function upload(
   profileId: string,
   name = "page.png",
   bytes?: Buffer,
+  mime = "image/png",
 ) {
   const png =
     bytes ??
@@ -152,7 +153,7 @@ async function upload(
   const boundary = "revizio-test-boundary";
   const payload = Buffer.concat([
     Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\nContent-Type: image/png\r\n\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\nContent-Type: ${mime}\r\n\r\n`,
     ),
     png,
     Buffer.from(`\r\n--${boundary}--\r\n`),
@@ -590,6 +591,91 @@ describe("contenus publiés, réponses et concurrence", () => {
 });
 
 describe("fichiers privés et sauvegarde", () => {
+  it("transmet le texte du DOCX au modèle et conserve l’original privé après restauration", async () => {
+    const { token, profiles } = await setup();
+    const headers = bearer(token),
+      profileId = profiles[0].id;
+    const bytes = await readFile("tests/fixtures/vocabulaire.docx");
+    const response = await upload(
+      token,
+      profileId,
+      "vocabulaire.docx",
+      bytes,
+      "application/octet-stream",
+    );
+    expect(response.statusCode, response.body).toBe(200);
+    const source = response.json();
+    expect(source.mimeType).toBe("text/plain");
+    expect(
+      (
+        await app.inject({
+          method: "PATCH",
+          url: source.uri,
+          headers,
+          payload: { rotation: 90 },
+        })
+      ).statusCode,
+    ).toBe(400);
+    const read = () => app.inject({ url: source.uri, headers });
+    const text = (await read()).body;
+    expect(text).toMatch(/la ventana\s+la fenêtre/);
+    const backup = (await app.inject({ url: "/api/backup", headers })).json();
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/backup/restore",
+          headers,
+          payload: { backup },
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect((await read()).body).toBe(text);
+    expect(
+      (await app.inject({ url: source.uri + "?original=1", headers }))
+        .rawPayload,
+    ).toEqual(bytes);
+    expect(
+      (
+        await app.inject({
+          url: source.uri,
+          headers: bearer(await child(profileId)),
+        })
+      ).statusCode,
+    ).toBe(404);
+    const json = vi
+      .spyOn(ai, "json")
+      .mockResolvedValueOnce({
+        words: [
+          {
+            foreignOnPage: "la ventana",
+            frenchOnPage: "la fenêtre",
+            uncertain: false,
+          },
+        ],
+      });
+    const queued = await app.inject({
+      method: "POST",
+      url: "/api/ai/vocabulary",
+      headers,
+      payload: {
+        profileId,
+        subjectId: "spanish",
+        listId: "maison",
+        sourceIds: [source.id],
+      },
+    });
+    expect(queued.statusCode, queued.body).toBe(200);
+    expect(await job(token, queued.json().job.id)).toMatchObject({
+      status: "succeeded",
+      result: {
+        source: { id: source.id, mimeType: "text/plain" },
+        vocabulary: [{ term: "la ventana", translation: "la fenêtre" }],
+      },
+    });
+    expect(json.mock.calls[0][1].at(-1)?.content).toContain(text);
+    expect(json.mock.calls[0][1].at(-1)?.images).toBeUndefined();
+  });
   it("lit une photo dans la langue de la liste et réserve ses propositions au parent du bon profil", async () => {
     const { token, profiles } = await setup();
     const profileId = profiles[0].id;

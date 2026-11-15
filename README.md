@@ -47,11 +47,11 @@ Le premier compte se crée avec un code d’installation privé conservé dans `
 
 ## Premier parcours
 
-1. Sur l’accueil parent, choisir la matière, puis **Ajouter un cours** dans l’onglet **Cours**. Donner un titre au cours, joindre les photos, le PDF ou le texte, puis créer le brouillon.
+1. Sur l’accueil parent, choisir la matière, puis **Ajouter un cours** dans l’onglet **Cours**. Donner un titre au cours, choisir les documents dans **Choisir des fichiers** ou ajouter une photo, puis créer le brouillon.
 2. **Préparer la fiche** : lancer la vraie préparation IA ou rédiger à la main, comparer aux documents, corriger et confirmer la relecture avant de publier.
 3. Dans **Exercices**, toucher **Préparer des exercices** puis choisir les cours publiés de la matière, les formats, le niveau et le nombre de questions. Relire les questions et les corrections avant publication.
 4. **Contrôles** : choisir une date et un temps quotidien, ajuster les séances puis partager le plan. Dans **Anglais → Conjugaison**, le parent choisit les verbes et les temps étudiés.
-5. Dans **Anglais**, **Espagnol** ou **Latin**, ouvrir **Vocabulaire** pour créer une liste. Saisir les mots un par un, les coller au format `mot = traduction` ou choisir **Importer une photo** dans l’espace familial. L’IA lit la page et signale les traductions qu’elle propose quand une seule langue y figure. Relire, corriger ou écarter les propositions, puis ajouter les mots au brouillon. La liste devient accessible à l’enfant à la publication. Un point-virgule sépare les variantes acceptées.
+5. Dans **Anglais**, **Espagnol** ou **Latin**, ouvrir **Vocabulaire** pour créer une liste. Saisir les mots un par un, les coller au format `mot = traduction` ou choisir **Importer un document** dans l’espace familial. L’IA lit la page et signale les traductions qu’elle propose quand une seule langue y figure. Relire, corriger ou écarter les propositions, puis ajouter les mots au brouillon. La liste devient accessible à l’enfant à la publication. Un point-virgule sépare les variantes acceptées.
 6. L’enfant entre avec son profil et son code ; il lit, s’exerce, reprend ses essais et revoit ses erreurs. La rubrique **Famille** gère les profils et l’export/restauration des sauvegardes.
 
 Les générations continuent sur le serveur et se retrouvent dans **Préparations IA**. Aucun résultat IA n’est publié automatiquement. La rédaction manuelle et le quiz lexical déterministe ne sont pas présentés comme de l’IA.
@@ -79,6 +79,8 @@ Utiliser un client Expo compatible avec le SDK 58 ou un development build. Confi
 ## Périmètre actuel
 
 Photos/PDF durables, comptes parent/enfant, deux parents et deux enfants, synchronisation par révisions, préparations Ollama, cinq formats d’exercices, contrôles blancs chronométrés, plans modifiables, listes de vocabulaire dans trois langues, cartes d’anglais et lecture audio sont implémentés. Les tentatives et séances de vocabulaire conservent les questions et corrections réellement affichées.
+
+Les imports de cours, d’anglais et de vocabulaire acceptent les PDF, les photos, les documents Office récents (DOCX, PPTX, XLSX), OpenDocument (ODT, ODP, ODS) et les fichiers texte (TXT, Markdown, CSV, entre autres). Pour les documents bureautiques, Révizo lit le texte et les valeurs enregistrées des cellules. Pour conserver les figures, les équations mises en page ou un document composé uniquement d’images, exporter en PDF. Pour les anciens DOC, XLS et PPT ou les documents protégés, exporter une copie en PDF sans mot de passe.
 
 Les photos manuscrites, formules et schémas nécessitent une relecture attentive ; une extraction incertaine est signalée. Après installation du cache en contexte sécurisé, l’interface et les contenus déjà conservés peuvent être repris hors connexion ; les générations et la synchronisation nécessitent le serveur. La caméra, les voix système et l’application native restent à vérifier sur iPad physique. Voir la [matrice fonctionnelle et les étapes restantes](docs/development-plan.md).
 

@@ -523,7 +523,7 @@ test("Ollama réel : photo de vocabulaire anglais, relecture, cartes et quiz enf
     const created = await createdJob(page, "english", async () => {
       const chooser = page.waitForEvent("filechooser");
       await page
-        .getByRole("button", { name: "Fichiers / PDF", exact: true })
+        .getByRole("button", { name: "Choisir des fichiers", exact: true })
         .click();
       await (
         await chooser

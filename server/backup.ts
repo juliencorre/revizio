@@ -5,7 +5,8 @@ import type { LearningData } from "../src/domain/model";
 import { parseLearningData } from "../src/domain/learning";
 import type { FamilyDatabase } from "./database";
 import { HttpError, isoNow, type StoredUpload } from "./types";
-import { removeUploadFiles } from "./uploads";
+import { decodeDocumentText } from "./document-text";
+import { removeUploadFiles, storedExtension } from "./uploads";
 import { FAMILY_LIMITS, normalizeChildName } from "../src/domain/family";
 const row = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v)
@@ -120,7 +121,9 @@ export async function restoreBackup(
       if (
         !identifier(source.id) ||
         !profiles.some((p) => p.id === source.profileId) ||
-        !["application/pdf", "image/png"].includes(String(source.mimeType)) ||
+        !["application/pdf", "image/png", "text/plain"].includes(
+          String(source.mimeType),
+        ) ||
         !text(source.name, 180) ||
         typeof source.bytes !== "string" ||
         typeof source.originalBytes !== "string" ||
@@ -142,6 +145,16 @@ export async function restoreBackup(
       if (source.mimeType === "application/pdf") {
         if (bytes.subarray(0, 5).toString() !== "%PDF-")
           throw new HttpError(400, "Un PDF de la sauvegarde est invalide.");
+      } else if (source.mimeType === "text/plain") {
+        try {
+          if (!bytes.equals(Buffer.from(decodeDocumentText(bytes))))
+            throw new Error();
+        } catch {
+          throw new HttpError(
+            400,
+            "Un document texte de la sauvegarde est invalide.",
+          );
+        }
       } else {
         try {
           await images.validatePng(bytes);
@@ -152,7 +165,7 @@ export async function restoreBackup(
       const prefix = randomUUID();
       const path = join(
         database.filesDir,
-        prefix + (source.mimeType === "application/pdf" ? ".pdf" : ".png"),
+        prefix + storedExtension(String(source.mimeType)),
       );
       const originalPath = join(database.filesDir, prefix + ".original");
       await database.files.write(path, bytes);

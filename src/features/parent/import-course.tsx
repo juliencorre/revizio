@@ -1,9 +1,13 @@
+import { documentKind } from "@/domain/document-kind";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRef, useState } from "react";
 import { Platform, Pressable, View, useWindowDimensions } from "react-native";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import * as DocumentPicker from "expo-document-picker";
+import {
+  pickDocuments as selectDocuments,
+  documentExamples,
+} from "@/services/pick-documents";
 import {
   AppIcon,
   AppText,
@@ -205,21 +209,7 @@ function ImportEditor({
   }
   async function pickDocuments() {
     await run("Lecture des documents…", async () => {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/*"],
-        multiple: true,
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled)
-        await appendSources(
-          result.assets.map((asset) => ({
-            id: localId("source"),
-            name: asset.name,
-            uri: asset.uri,
-            mimeType: asset.mimeType,
-            rotation: 0,
-          })),
-        );
+      await appendSources(await selectDocuments(true, () => localId("source")));
     });
   }
   function move(index: number, direction: -1 | 1) {
@@ -243,8 +233,19 @@ function ImportEditor({
         throw new Error(
           "Ce cours n’est plus disponible. Choisissez un autre cours ou commencez un nouveau brouillon.",
         );
-      const sources = await data.storeSources(draft.sources);
-      change({ sources });
+      const sources: CourseSource[] = [];
+      for (const source of draft.sources) {
+        const [stored] = await data.storeSources([source]);
+        sources.push(stored);
+        // A bad file later in the selection must not upload earlier files again on retry.
+        if (stored.id !== source.id)
+          setDraft((current) => ({
+            ...current,
+            sources: current.sources.map((item) =>
+              item.id === source.id ? stored : item,
+            ),
+          }));
+      }
       let id: string;
       if (existing?.status === "draft") {
         id = existing.id;
@@ -453,8 +454,8 @@ function ImportEditor({
               <Badge tone="muted">{draft.sources.length} / 30</Badge>
             </View>
             <AppText color={colors.muted}>
-              Une page par photo, le cahier bien à plat. Importez aussi vos PDF,
-              puis vérifiez l’ordre et le sens de lecture.
+              Choisissez vos fichiers : {documentExamples}. Vérifiez ensuite
+              leur ordre.
             </AppText>
             <View style={s.row}>
               <Button
@@ -481,7 +482,7 @@ function ImportEditor({
                 disabled={!!busy || draft.sources.length >= 30}
                 testID="ai-import-files"
               >
-                Fichiers / PDF
+                Choisir des fichiers
               </Button>
             </View>
             {busy && <AppText color={colors.muted}>{busy}</AppText>}
@@ -520,7 +521,7 @@ function ImportEditor({
                         >
                           Descendre
                         </Button>
-                        {source.mimeType !== "application/pdf" &&
+                        {documentKind(source) === "image" &&
                           !source.storageId && (
                             <Button
                               variant="ghost"

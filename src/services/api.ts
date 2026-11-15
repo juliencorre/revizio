@@ -150,11 +150,22 @@ export async function uploadCourseSource(
       name: source.name,
       type: source.mimeType || "application/octet-stream",
     } as unknown as Blob);
-  let uploaded = await apiFetch<CourseSource>(
-    "/uploads" +
-      (profileId ? "?profileId=" + encodeURIComponent(profileId) : ""),
-    { method: "POST", body: form },
-  );
+  let uploaded: CourseSource;
+  try {
+    uploaded = await apiFetch<CourseSource>(
+      "/uploads" +
+        (profileId ? "?profileId=" + encodeURIComponent(profileId) : ""),
+      { method: "POST", body: form },
+    );
+  } catch (error) {
+    if (error instanceof ApiError && [413, 415, 422].includes(error.status))
+      throw new ApiError(
+        source.name + " : " + error.message,
+        error.status,
+        error.data,
+      );
+    throw error;
+  }
   if (source.rotation && [90, 180, 270].includes(source.rotation)) {
     uploaded = await apiFetch<CourseSource>("/uploads/" + uploaded.id, {
       method: "PATCH",

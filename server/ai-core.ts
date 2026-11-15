@@ -62,11 +62,11 @@ export interface ExtractedPage {
   text: string;
   uncertain: boolean;
 }
-export async function readVocabularyPhoto(
+export async function readVocabularyDocument(
   client: AiClient,
   settings: AiSettings,
   language: VocabularyLanguage,
-  image: Buffer,
+  document: Buffer | string,
   signal?: AbortSignal,
 ): Promise<VocabularyPhotoWord[]> {
   const label = languageLabel(language).toLocaleLowerCase("fr");
@@ -77,8 +77,14 @@ export async function readVocabularyPhoto(
         { role: "system", content: SYSTEM },
         {
           role: "user",
-          content: `Transcris uniquement l’encre visible sur cette photo, sans traduire. Une entrée de vocabulaire par ligne. foreignOnPage contient le texte écrit en ${label}, frenchOnPage le texte écrit en français. Si aucun mot français n’est écrit, frenchOnPage doit être vide sur TOUTES les lignes, et inversement. Une seule colonne lisible n’est pas une incertitude. Respecte les paires même si les colonnes sont inversées, les articles, les expressions et les accents. Si une partie est illisible ou si son association est douteuse, laisse-la vide et mets uncertain à true. Ignore les titres et les consignes. Si aucun mot de vocabulaire n’est identifiable dans ces langues, renvoie words vide.`,
-          images: [image.toString("base64")],
+          content:
+            `Transcris uniquement les mots présents dans ce document, sans traduire. Une entrée de vocabulaire par ligne. foreignOnPage contient le texte écrit en ${label}, frenchOnPage le texte écrit en français. Si aucun mot français n’est écrit, frenchOnPage doit être vide sur TOUTES les lignes, et inversement. Une seule colonne lisible n’est pas une incertitude. Respecte les paires même si les colonnes sont inversées, les articles, les expressions et les accents. Si une partie est illisible ou si son association est douteuse, laisse-la vide et mets uncertain à true. Ignore les titres et les consignes. Si aucun mot de vocabulaire n’est identifiable dans ces langues, renvoie words vide.` +
+            (typeof document === "string"
+              ? "\nDocument source :\n" + document
+              : ""),
+          ...(typeof document === "string"
+            ? {}
+            : { images: [document.toString("base64")] }),
         },
       ],
       {
@@ -107,7 +113,7 @@ export async function readVocabularyPhoto(
   );
   if (!Array.isArray(value.words) || value.words.length > 200)
     throw new Error(
-      "L’IA n’a pas renvoyé une liste exploitable. Photographiez une partie plus courte de la page.",
+      "L’IA n’a pas renvoyé une liste exploitable. Importez un extrait plus court.",
     );
   const words = value.words
     .map((item): VocabularyPhotoWord => {
@@ -124,7 +130,7 @@ export async function readVocabularyPhoto(
         typeof uncertain !== "boolean"
       )
         throw new Error(
-          "La lecture de la photo est incomplète. Réessayez avec une photo plus nette.",
+          "La lecture du document est incomplète. Vérifiez la source ou importez un extrait plus lisible.",
         );
       return {
         term: term.trim(),
@@ -135,7 +141,7 @@ export async function readVocabularyPhoto(
     .filter((word) => word.term || word.translation);
   if (!words.length)
     throw new Error(
-      "Aucun mot lisible pour cette langue. Cadrez la liste de plus près et reprenez la photo.",
+      "Aucun mot lisible pour cette langue. Vérifiez la langue et la lisibilité du document.",
     );
   // Keep the transcription intact. A text-only pass fills absent sides, never illegible ones.
   const gaps = words.flatMap((word, index) => {

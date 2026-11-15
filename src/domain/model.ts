@@ -308,6 +308,7 @@ export interface AiJob {
   message?: string;
   createdAt: string;
   result?: {
+    source?: CourseSource;
     course?: Partial<Course>;
     questions?: Question[];
     words?: EnglishWord[];

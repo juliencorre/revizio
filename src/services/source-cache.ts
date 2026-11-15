@@ -1,13 +1,21 @@
+import { documentKind } from "@/domain/document-kind";
 import { Directory, File, Paths } from "expo-file-system";
 import type { CourseSource } from "@/domain/model";
 import { absoluteApiUri, apiAuthHeaders } from "./api";
 const directory = () => new Directory(Paths.document, "revizo-courses");
 function target(source: CourseSource) {
-  return new File(
-    directory(),
-    (source.storageId || source.id).replace(/[^a-zA-Z0-9_-]/g, "_") +
-      (source.mimeType === "application/pdf" ? ".pdf" : ".jpg"),
-  );
+  const id = (source.storageId || source.id).replace(/[^a-zA-Z0-9_-]/g, "_");
+  const kind = documentKind(source);
+  // Keep existing offline photos under their historical cache name.
+  const ext =
+    kind === "image"
+      ? "jpg"
+      : kind === "pdf"
+        ? "pdf"
+        : source.mimeType === "text/plain"
+          ? "txt"
+          : source.name.match(/\.([a-z0-9]{1,10})$/i)?.[1] || "bin";
+  return new File(directory(), id + "." + ext);
 }
 export async function cacheSource(source: CourseSource): Promise<CourseSource> {
   const folder = directory();
@@ -33,4 +41,12 @@ export async function resolveSourceUri(source: CourseSource): Promise<string> {
 export async function clearSourceCache() {
   const folder = directory();
   if (folder.exists) await folder.delete();
+}
+
+export async function readSourceText(uri: string) {
+  if (uri.startsWith("file:") || uri.startsWith("content:"))
+    return new File(uri).text();
+  const response = await fetch(uri, { headers: apiAuthHeaders() });
+  if (!response.ok) throw new Error();
+  return response.text();
 }

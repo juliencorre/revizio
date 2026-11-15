@@ -9,7 +9,7 @@ import {
 } from "vitest";
 import { createTestHarness, type TestHarness } from "wrangler";
 import { resolve, join } from "node:path";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { PNG } from "pngjs";
 import { initialData } from "../../src/domain/fixtures";
@@ -18,37 +18,7 @@ import type { AiJob, CourseSource, LearningData } from "../../src/domain/model";
 import { cloudImages } from "../../cloud/images";
 import { CloudAi, CLOUD_MODEL } from "../../cloud/ai";
 
-function textPdf(pages: string[]): Buffer {
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    `<< /Type /Pages /Kids [${pages.map((_, index) => `${4 + index * 2} 0 R`).join(" ")}] /Count ${pages.length} >>`,
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-  ];
-  for (const [index, text] of pages.entries()) {
-    const content = `BT /F1 10 Tf 50 760 Td (${text}) Tj ET`;
-    objects.push(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + index * 2} 0 R >>`,
-      `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
-    );
-  }
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(Buffer.byteLength(pdf));
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = Buffer.byteLength(pdf);
-  pdf +=
-    `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n` +
-    offsets
-      .slice(1)
-      .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
-      .join("");
-  return Buffer.from(
-    pdf +
-      `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`,
-  );
-}
+import { textPdf } from "../fixtures/text-pdf";
 
 type SessionSnapshot = { token: string; profiles: { id: string }[] };
 const code = "installation-cloud-test";
@@ -228,25 +198,32 @@ describe("installation Cloudflare dans workerd", () => {
     ).toBe(403);
     const png = new PNG({ width: 60, height: 90 });
     png.data.fill(255);
-    const boundary = "revizo-cloud-boundary";
-    const multipart = Buffer.concat([
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="cours.png"\r\nContent-Type: image/png\r\n\r\n`,
-      ),
-      PNG.sync.write(png),
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ]);
-    const imported = await server.fetch(
-      origin + "/api/uploads?profileId=" + profileId,
-      {
+    const uploadDocument = async (
+      name: string,
+      mime: string,
+      bytes: Buffer,
+    ) => {
+      const form = new FormData();
+      form.append(
+        "file",
+        new Blob([Uint8Array.from(bytes)], { type: mime }),
+        name,
+      );
+      const body = new Response(form);
+      return server.fetch(origin + "/api/uploads?profileId=" + profileId, {
         method: "POST",
         headers: {
           origin,
           Authorization: "Bearer " + parent.token,
-          "Content-Type": "multipart/form-data; boundary=" + boundary,
+          "Content-Type": body.headers.get("Content-Type")!,
         },
-        body: multipart,
-      },
+        body: await body.arrayBuffer(),
+      });
+    };
+    const imported = await uploadDocument(
+      "cours.png",
+      "image/png",
+      PNG.sync.write(png),
     );
     expect(imported.status, await imported.clone().text()).toBe(200);
     const source = (await imported.json()) as CourseSource;
@@ -384,28 +361,27 @@ describe("installation Cloudflare dans workerd", () => {
           course.generationJobId === job.id,
       ),
     ).toBe(false);
+    const uploadedOffice = await uploadDocument(
+      "maison.docx",
+      "application/octet-stream",
+      await readFile("tests/fixtures/vocabulaire.docx"),
+    );
+    expect(uploadedOffice.status, await uploadedOffice.clone().text()).toBe(
+      200,
+    );
+    const office = (await uploadedOffice.json()) as CourseSource;
+    expect(office.mimeType).toBe("text/plain");
+    expect(
+      await (await request(office.uri!, "GET", undefined, parent.token)).text(),
+    ).toMatch(/la ventana\s+la fenêtre/);
     const pdfBytes = textPdf([
       "Un nombre relatif est positif, negatif ou nul. On conserve son signe dans les calculs du cours.",
       "Une temperature negative est inferieure a zero. La temperature positive est superieure a zero.",
     ]);
-    const pdfForm = Buffer.concat([
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="cours.pdf"\r\nContent-Type: application/pdf\r\n\r\n`,
-      ),
+    const pdfUpload = await uploadDocument(
+      "cours.pdf",
+      "application/pdf",
       pdfBytes,
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ]);
-    const pdfUpload = await server.fetch(
-      origin + "/api/uploads?profileId=" + profileId,
-      {
-        method: "POST",
-        headers: {
-          origin,
-          Authorization: "Bearer " + parent.token,
-          "Content-Type": "multipart/form-data; boundary=" + boundary,
-        },
-        body: pdfForm,
-      },
     );
     expect(pdfUpload.status).toBe(200);
     const pdfSource = (await pdfUpload.json()) as CourseSource;
