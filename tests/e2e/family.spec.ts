@@ -106,19 +106,26 @@ async function fillSetup(page: Page) {
   await page.getByTestId("auth-password").fill(parentPassword);
   await page.getByTestId("auth-password-confirm").fill(parentPassword);
   await page.getByTestId("auth-child-name").fill("Camille");
-  await page.getByTestId("auth-grade").fill("5e");
+  await page.getByTestId("auth-second-child-name").fill("Milo");
+  await page.getByTestId("auth-second-pin").fill("5729");
   await page.getByTestId("auth-pin").fill(childPin);
 }
 async function finishSetup(page: Page) {
   await page.getByTestId("auth-submit").click();
   await expect(page.getByTestId("parent-dashboard")).toBeVisible();
   const result = await profiles(page);
-  expect(result).toHaveLength(1);
+  expect(result).toHaveLength(2);
   return result[0].id;
 }
 async function setup(page: Page) {
   await fillSetup(page);
-  return finishSetup(page);
+  const id = await finishSetup(page);
+  // Exercise restoring a legacy one-child family in the document scenarios.
+  const second = (await profiles(page)).find((profile) => profile.id !== id)!;
+  expect((await page.request.delete("/api/profiles/" + second.id)).ok()).toBe(
+    true,
+  );
+  return id;
 }
 async function loginParent(page: Page) {
   await page.goto("/auth?target=parent");
@@ -131,7 +138,7 @@ async function loginChild(page: Page, profileId: string, pin = childPin) {
   await page.goto(
     `/auth?target=child&profileId=${encodeURIComponent(profileId)}`,
   );
-  await page.getByTestId(`auth-profile-${profileId}`).click();
+  await page.getByTestId("auth-child-name").fill("Camille");
   await page.getByTestId("auth-pin").fill(pin);
   await page.getByTestId("auth-submit").click();
   await expect(page.getByTestId("student-home")).toBeVisible();
@@ -277,13 +284,6 @@ test("créer la famille, gérer les profils et protéger l’espace parent derri
   expect((await envelope(page, firstId)).data.courses).toHaveLength(0);
 
   await page.goto("/parent/settings");
-  await page.getByTestId("settings-profile-name").fill("Milo");
-  await page.getByTestId("settings-profile-grade").fill("6e");
-  await page.getByTestId("settings-profile-pin").fill("5729");
-  await page.getByTestId("settings-profile-save").click();
-  await expect(page.getByTestId("settings-profiles-feedback")).toContainText(
-    "Le profil de Milo est enregistré",
-  );
   const added = (await profiles(page)).find(
     (profile) => profile.name === "Milo",
   )!;
@@ -305,7 +305,7 @@ test("créer la famille, gérer les profils et protéger l’espace parent derri
   try {
     const child = await context.newPage();
     await child.goto(`/auth?target=child&profileId=${added.id}`);
-    await child.getByTestId(`auth-profile-${added.id}`).click();
+    await child.getByTestId("auth-child-name").fill("Milo test");
     await child.getByTestId("auth-pin").fill("5729");
     await child.getByTestId("auth-submit").click();
     await expect(child.getByTestId("auth-error")).toContainText(

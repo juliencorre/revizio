@@ -6,6 +6,7 @@ import { parseLearningData } from "../src/domain/learning";
 import type { FamilyDatabase } from "./database";
 import { HttpError, isoNow, type StoredUpload } from "./types";
 import { removeUploadFiles } from "./uploads";
+import { FAMILY_LIMITS, normalizeChildName } from "../src/domain/family";
 const row = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)
@@ -69,7 +70,7 @@ export async function restoreBackup(
     !Array.isArray(backup.profiles) ||
     !Array.isArray(backup.uploads) ||
     backup.profiles.length < 1 ||
-    backup.profiles.length > 12 ||
+    backup.profiles.length > FAMILY_LIMITS.children ||
     backup.uploads.length > 1000
   )
     throw new HttpError(
@@ -102,6 +103,14 @@ export async function restoreBackup(
   });
   if (new Set(profiles.map((p) => p.id)).size !== profiles.length)
     throw new HttpError(400, "La sauvegarde contient des profils dupliqués.");
+  if (
+    new Set(profiles.map((p) => normalizeChildName(p.name))).size !==
+    profiles.length
+  )
+    throw new HttpError(
+      400,
+      "Chaque enfant doit avoir un prénom de connexion distinct.",
+    );
   let total = 0;
   const files: StoredUpload[] = [];
   const temporaryPaths: string[] = [];
@@ -220,17 +229,27 @@ export async function restoreBackup(
       for (const profile of profiles) {
         const current = previousProfiles.find((p) => p.id === profile.id);
         if (current)
-          database.updateProfile(profile.id, {
-            name: profile.name,
-            grade: profile.grade,
-          });
+          // All final names were validated together; temporary duplicates during a
+          // rename must not reject an otherwise valid atomic restore.
+          database.updateProfile(
+            profile.id,
+            {
+              name: profile.name,
+              grade: profile.grade,
+            },
+            false,
+          );
         else
-          database.addProfile(familyId, {
-            id: profile.id,
-            name: profile.name,
-            grade: profile.grade,
-            pinHash: "",
-          });
+          database.addProfile(
+            familyId,
+            {
+              id: profile.id,
+              name: profile.name,
+              grade: profile.grade,
+              pinHash: "",
+            },
+            false,
+          );
         database.db
           .prepare(
             "UPDATE learning SET data=?,revision=revision+1,updated_at=? WHERE profile_id=?",

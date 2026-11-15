@@ -224,7 +224,15 @@ describe("compte et sessions serveur", () => {
     expect((await app.inject("/api/health")).json().needsSetup).toBe(false);
     const bytes = await readFile(join(dir, "family.sqlite"));
     expect(bytes.includes(Buffer.from(password))).toBe(false);
-    expect((await app.inject("/api/profiles")).json().profiles[0]).toEqual({
+    expect((await app.inject("/api/profiles")).statusCode).toBe(401);
+    expect(
+      (
+        await app.inject({
+          url: "/api/profiles",
+          headers: bearer(session.token),
+        })
+      ).json().profiles[0],
+    ).toEqual({
       id: session.profiles[0].id,
       name: "Camille",
       grade: "5e",

@@ -8,7 +8,12 @@ async function main() {
   const root = await mkdtemp(join(tmpdir(), "revizio-playwright-"));
   let dataDir = join(root, "family");
   const make = () =>
-    createApp({ dataDir, staticDir: resolve("dist"), rateLimit: false });
+    createApp({
+      dataDir,
+      staticDir: resolve("dist"),
+      rateLimit: false,
+      allowDemo: true,
+    });
   let app = await make();
   await app.ready();
   let resetting: Promise<void> | null = null;

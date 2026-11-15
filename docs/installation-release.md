@@ -12,7 +12,7 @@ ollama pull ministral-3:8b
 npm run serve
 ```
 
-Il n’est pas nécessaire de reconstruire ce paquet. Ouvrir `http://127.0.0.1:4173` pour créer le compte parent et le premier profil enfant. **Essayer la démonstration** ouvre les exemples séparément.
+Il n’est pas nécessaire de reconstruire ce paquet. Ouvrir `http://127.0.0.1:4173` pour créer le compte parent et les deux profils enfants (CM1 et 5e). Le compte du conjoint s’ajoute dans **Famille**. Le web se connecte automatiquement à son API, sans adresse de serveur à saisir.
 
 Les données familiales sont créées dans `.revizio/`. Conserver ce répertoire lors d’une mise à jour et exporter régulièrement une sauvegarde depuis les réglages. Ne pas extraire une nouvelle version par-dessus ce répertoire de données.
 

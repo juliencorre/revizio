@@ -26,7 +26,11 @@ La connexion par code fonctionne même si le navigateur ne peut pas atteindre `l
 
 Le script de déploiement construit le web, publie le Worker `revizo` sur `cours.gofel.fr` et en `workers.dev`, puis configure son secret d’installation. L’adresse `workers.dev` utilise le sous-domaine du compte. Le nom du Worker se règle dans `wrangler.jsonc` avant le premier déploiement.
 
-Ouvrir cette adresse, choisir **Parent**, puis créer le compte parent et le premier enfant. Le formulaire demande aussi le code conservé dans le fichier local `.cloudflare/installation-code`. Ce code protège la première création de famille ; les connexions suivantes utilisent le mot de passe parent ou le code enfant. Sans secret configuré, la création est refusée, y compris entre la publication initiale et la configuration du secret.
+Ouvrir cette adresse avec l’invitation privée du propriétaire, puis choisir son compte parent et les codes des deux enfants (CM1 et 5e). Le compte du conjoint s’ajoute ensuite dans **Famille**, avec le mot de passe du parent connecté. Le foyer est limité côté serveur à deux parents et deux enfants. Les classes restent modifiables.
+
+Le web utilise automatiquement l’API du site ouvert, même si une ancienne adresse a été mémorisée. Aucun réglage de serveur ni démonstration n’est proposé. Les parents se connectent par e-mail et mot de passe ; les enfants par prénom et code personnel, sans liste de profils publique.
+
+L’invitation contient le code conservé dans le fichier local `.cloudflare/installation-code`, sous la forme `https://cours.gofel.fr/auth#invitation=CODE`. Le fragment est lu puis retiré de la barre d’adresse ; il n’est pas envoyé dans l’URL HTTP ni intégré au bundle public. L’option `&cm1=PRENOM` préremplit le premier enfant. Sans lien, le formulaire accepte la saisie de l’invitation familiale. Ce code protège uniquement la première création de famille ; les connexions suivantes utilisent le mot de passe parent ou le code enfant. Sans secret configuré, la création est refusée, y compris entre la publication initiale et la configuration du secret.
 
 Le fichier du code est privé, ignoré par Git, et réutilisé lors des déploiements suivants. Ne pas le publier. Aucun secret n’est intégré au bundle Expo ni aux variables `EXPO_PUBLIC_*`.
 
@@ -34,7 +38,7 @@ Dans Safari sur l’iPad, ouvrir l’adresse HTTPS puis **Partager → Sur l’�
 
 ## Données et préparations
 
-Une installation correspond à un espace familial avec plusieurs profils. Le Durable Object est identifié par `FAMILY_ID` dans `wrangler.jsonc` ; conserver cette valeur et le nom de la classe `FamilyServer` lors des mises à jour pour retrouver les mêmes données.
+Une installation correspond à un seul foyer privé de deux parents et deux enfants au maximum. Le Durable Object est identifié par `FAMILY_ID` dans `wrangler.jsonc` ; conserver cette valeur et le nom de la classe `FamilyServer` lors des mises à jour pour retrouver les mêmes données.
 
 Les comptes, sessions, révisions, cours, tentatives et préparations utilisent les mêmes règles que le serveur local. Les documents sont stockés par morceaux dans des tables SQLite privées, jamais dans les fichiers publics du site. Leur lecture passe par la session et le contrôle de publication : un enfant ne peut pas ouvrir un document de brouillon. Les API répondent avec `Cache-Control: no-store`.
 

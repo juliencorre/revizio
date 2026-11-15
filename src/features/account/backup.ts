@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { FAMILY_LIMITS } from "@/domain/family";
 import * as DocumentPicker from "expo-document-picker";
 import { File as NativeFile, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -25,6 +26,10 @@ export function backupSummary(
   )
     throw new Error(
       "Choisissez une sauvegarde Révizo compatible au format JSON.",
+    );
+  if (data.profiles.length > FAMILY_LIMITS.children)
+    throw new Error(
+      "Votre foyer est limité à deux profils enfants. Choisissez une sauvegarde contenant au maximum deux enfants.",
     );
   let courses = 0;
   for (const raw of data.profiles) {

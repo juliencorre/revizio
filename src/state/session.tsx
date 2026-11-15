@@ -33,15 +33,16 @@ interface SessionContextValue {
   offline: boolean;
   enterDemo(): Promise<void>;
   login(email: string, password: string): Promise<void>;
-  childLogin(profileId: string, pin: string): Promise<void>;
+  childLogin(
+    child: { profileId: string } | { childName: string },
+    pin: string,
+  ): Promise<void>;
   setup(input: {
     setupCode?: string;
     parentName: string;
     email: string;
     password: string;
-    childName: string;
-    grade: string;
-    pin: string;
+    children: { name: string; pin: string }[];
   }): Promise<void>;
   logout(): Promise<void>;
   selectProfile(id: string): void;
@@ -52,6 +53,7 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 const CACHE_KEY = "revizo.family-session";
 const MODE_KEY = "revizo.mode";
 const LOCK_KEY = "revizo.session-locked";
+const DEMO_ALLOWED_KEY = "revizo.demo-allowed";
 const DEMO_PROFILE = { id: "alex", name: "Alex", grade: "5e" };
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -102,6 +104,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         clearTimeout(timer);
       }
       setHealth(server);
+      await AsyncStorage.setItem(
+        DEMO_ALLOWED_KEY,
+        server.demoAvailable ? "1" : "0",
+      );
       setServerAvailable(true);
       setOffline(false);
       const savedMode = await AsyncStorage.getItem(MODE_KEY);
@@ -114,38 +120,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (savedMode !== "demo") {
           setUser(null);
           setMode("choose");
-          const available = await apiFetch<{ profiles: ChildProfile[] }>(
-            "/profiles",
-          );
-          setProfiles(available.profiles);
+          setProfiles([]);
           return;
         }
       }
-      if (savedMode === "demo") {
+      if (savedMode === "demo" && server.demoAvailable) {
         setMode("demo");
         setUser(null);
         setProfiles([DEMO_PROFILE]);
         setActiveProfileId("alex");
         return;
       }
-      const profileResponse = await apiFetch<{ profiles: ChildProfile[] }>(
-        "/profiles",
-      );
-      setProfiles(profileResponse.profiles);
       try {
         const response = await apiFetch<SessionResponse>("/session");
         setUser(response.user);
         setProfiles(response.profiles);
         setMode("family");
-        const previous = JSON.parse(
-          (await AsyncStorage.getItem(CACHE_KEY)) || "null",
-        );
+        let previous: { activeProfileId?: string } | null = null;
+        try {
+          previous = JSON.parse(
+            (await AsyncStorage.getItem(CACHE_KEY)) || "null",
+          );
+        } catch {}
         const selected =
           response.user.profileId ??
           (response.profiles.some(
             (item) => item.id === previous?.activeProfileId,
           )
-            ? previous.activeProfileId
+            ? (previous?.activeProfileId ?? response.profiles[0]?.id ?? "")
             : (response.profiles[0]?.id ?? ""));
         setActiveProfileId(selected);
         await AsyncStorage.multiSet([
@@ -164,14 +166,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (error instanceof ApiError && error.status === 401) {
           setUser(null);
           setMode("choose");
+          setProfiles([]);
+          setActiveProfileId("");
           await AsyncStorage.removeItem(CACHE_KEY);
+        } else if (error instanceof ApiError && error.status !== 0) {
+          setUser(null);
+          setMode("choose");
+          setProfiles([]);
         } else throw error;
       }
     } catch {
       setServerAvailable(false);
       setOffline(true);
       const savedMode = await AsyncStorage.getItem(MODE_KEY).catch(() => null);
-      if (savedMode === "demo") {
+      if (
+        savedMode === "demo" &&
+        (await AsyncStorage.getItem(DEMO_ALLOWED_KEY)) === "1"
+      ) {
         setMode("demo");
         setUser(null);
         setProfiles([DEMO_PROFILE]);
@@ -179,6 +190,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       } else if (await AsyncStorage.getItem(LOCK_KEY)) {
         setMode("choose");
         setUser(null);
+        setProfiles([]);
       } else {
         try {
           const cached = JSON.parse(
@@ -197,10 +209,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           } else {
             setMode("choose");
             setUser(null);
+            setProfiles([]);
           }
         } catch {
           setMode("choose");
           setUser(null);
+          setProfiles([]);
         }
       }
     } finally {
@@ -231,6 +245,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
   const enterDemo = useCallback(async () => {
+    if (!health?.demoAvailable) return;
     await AsyncStorage.setItem(LOCK_KEY, "1");
     await apiFetch("/logout", { method: "POST" }).catch(() => undefined);
     await rememberToken();
@@ -240,7 +255,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfiles([DEMO_PROFILE]);
     setActiveProfileId("alex");
-  }, []);
+  }, [health?.demoAvailable]);
   const login = useCallback(
     async (email: string, password: string) => {
       await accept(
@@ -253,11 +268,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [accept],
   );
   const childLogin = useCallback(
-    async (profileId: string, pin: string) => {
+    async (
+      child: { profileId: string } | { childName: string },
+      pin: string,
+    ) => {
       await accept(
         await apiFetch<SessionResponse>("/child-login", {
           method: "POST",
-          body: JSON.stringify({ profileId, pin }),
+          body: JSON.stringify({ ...child, pin }),
         }),
       );
     },
@@ -282,6 +300,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await rememberToken();
     await AsyncStorage.multiRemove([MODE_KEY, CACHE_KEY]);
     setUser(null);
+    setProfiles([]);
     setMode("choose");
     setActiveProfileId("");
     await refresh();

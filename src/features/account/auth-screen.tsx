@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -45,8 +46,10 @@ export function AuthScreen() {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [setupCode, setSetupCode] = useState("");
+  const [hasInvitation, setHasInvitation] = useState(false);
   const [childName, setChildName] = useState("");
-  const [grade, setGrade] = useState("5e");
+  const [secondChildName, setSecondChildName] = useState("");
+  const [secondPin, setSecondPin] = useState("");
   const [pin, setPin] = useState("");
   const [profileId, setProfileId] = useState(
     typeof params.profileId === "string" ? params.profileId : "",
@@ -56,6 +59,20 @@ export function AuthScreen() {
   const [error, setError] = useState("");
   const setup = !!session.health?.needsSetup && session.serverAvailable;
   const selected = session.profiles.find((profile) => profile.id === profileId);
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const invitation = new URLSearchParams(window.location.hash.slice(1));
+    const code = invitation.get("invitation");
+    if (!code || code.length > 256) return;
+    setSetupCode(code);
+    setHasInvitation(true);
+    setChildName(invitation.get("cm1")?.slice(0, 80) ?? "");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      window.location.pathname + window.location.search,
+    );
+  }, []);
   useEffect(() => {
     if (!session.profiles.some((profile) => profile.id === profileId))
       setProfileId(session.profiles[0]?.id ?? "");
@@ -71,15 +88,9 @@ export function AuthScreen() {
   async function submit() {
     if (busyRef.current) return;
     setError("");
-    if (!session.serverAvailable || session.offline) {
-      fail(
-        "Connectez-vous au serveur de la famille pour ouvrir cet espace. Vous pouvez vérifier son adresse ci-dessous.",
-      );
-      return;
-    }
     if (setup) {
-      if (!parentName.trim() || !childName.trim()) {
-        fail("Renseignez votre nom et le prénom de votre enfant.");
+      if (!parentName.trim() || !childName.trim() || !secondChildName.trim()) {
+        fail("Renseignez votre nom et les prénoms de vos deux enfants.");
         return;
       }
       if (!emailIsValid(email)) {
@@ -94,12 +105,8 @@ export function AuthScreen() {
         fail("Les deux mots de passe ne sont pas identiques.");
         return;
       }
-      if (!grade.trim()) {
-        fail("Indiquez la classe de votre enfant.");
-        return;
-      }
-      if (!pinIsValid(pin)) {
-        fail("Le code de votre enfant doit contenir de 4 à 8 chiffres.");
+      if (!pinIsValid(pin) || !pinIsValid(secondPin)) {
+        fail("Chaque code enfant doit contenir de 4 à 8 chiffres.");
         return;
       }
     } else if (target === "parent") {
@@ -108,8 +115,8 @@ export function AuthScreen() {
         return;
       }
     } else {
-      if (!selected) {
-        fail("Choisis ton profil avant de saisir ton code.");
+      if (!selected && !childName.trim()) {
+        fail("Saisis ton prénom avant ton code.");
         return;
       }
       if (needsPin(selected)) {
@@ -134,9 +141,10 @@ export function AuthScreen() {
           parentName: parentName.trim(),
           email: email.trim().toLowerCase(),
           password,
-          childName: childName.trim(),
-          grade: grade.trim(),
-          pin,
+          children: [
+            { name: childName.trim(), pin },
+            { name: secondChildName.trim(), pin: secondPin },
+          ],
         });
         await session.refresh();
         router.replace("/parent");
@@ -144,7 +152,10 @@ export function AuthScreen() {
         await session.login(email.trim().toLowerCase(), password);
         router.replace("/parent");
       } else {
-        await session.childLogin(profileId, pin);
+        await session.childLogin(
+          selected ? { profileId } : { childName: childName.trim() },
+          pin,
+        );
         router.replace("/student");
       }
     } catch (caught) {
@@ -208,10 +219,10 @@ export function AuthScreen() {
           }
           description={
             setup
-              ? "Votre compte prépare les cours. Chaque enfant dispose de son profil et de son code."
+              ? "Un espace privé pour deux parents et deux enfants, en CM1 et en 5e."
               : target === "parent"
                 ? "Retrouvez les cours, les exercices et les progrès de vos enfants."
-                : "Choisis ton profil et saisis le code préparé avec un parent."
+                : "Ton prénom et ton code suffisent pour retrouver tes révisions."
           }
         />
         {error && (
@@ -220,24 +231,33 @@ export function AuthScreen() {
           </View>
         )}
         {!session.serverAvailable && (
-          <Notice>
-            Le serveur n’est pas disponible pour le moment. Vérifiez la
-            connexion et son adresse ci-dessous, ou parcourez la démonstration.
-          </Notice>
+          <View style={{ gap: 12 }}>
+            <Notice>
+              La connexion est momentanément indisponible. Vérifiez votre accès
+              Internet, puis réessayez.
+            </Notice>
+            <Button
+              variant="ghost"
+              icon="refresh"
+              onPress={() => void session.refresh()}
+            >
+              Réessayer
+            </Button>
+          </View>
         )}
         <Card style={{ gap: 24 }} testID="auth-form">
           {setup ? (
             <>
-              {session.health?.setupProtected && (
+              {session.health?.setupProtected && !hasInvitation && (
                 <Field
-                  label="Code d’installation"
+                  label="Invitation familiale"
                   value={setupCode}
                   onChangeText={change(setSetupCode)}
                   autoCapitalize="none"
                   autoCorrect={false}
                   maxLength={256}
                   editable={!busy}
-                  placeholder="Le code fourni lors du déploiement"
+                  placeholder="Le code de votre invitation privée"
                   testID="auth-setup-code"
                 />
               )}
@@ -303,7 +323,7 @@ export function AuthScreen() {
               <View style={styles.divider} />
               <View style={s.row}>
                 <AppIcon name="book" />
-                <AppText variant="heading">Le premier profil enfant</AppText>
+                <AppText variant="heading">Votre enfant en CM1</AppText>
               </View>
               <View style={s.formGrid}>
                 <View style={s.field}>
@@ -320,10 +340,8 @@ export function AuthScreen() {
                 <View style={s.field}>
                   <Field
                     label="Classe"
-                    value={grade}
-                    onChangeText={change(setGrade)}
-                    maxLength={32}
-                    editable={!busy}
+                    value="CM1"
+                    editable={false}
                     testID="auth-grade"
                   />
                 </View>
@@ -339,12 +357,40 @@ export function AuthScreen() {
                   keyboardType="number-pad"
                   editable={!busy}
                   testID="auth-pin"
-                  onSubmitEditing={() => void submit()}
                 />
               </View>
+              <View style={styles.divider} />
+              <AppText variant="heading">Votre enfant en 5e</AppText>
+              <View style={s.formGrid}>
+                <View style={s.field}>
+                  <Field
+                    label="Prénom de votre enfant en 5e"
+                    value={secondChildName}
+                    onChangeText={change(setSecondChildName)}
+                    maxLength={80}
+                    autoCapitalize="words"
+                    editable={!busy}
+                    testID="auth-second-child-name"
+                  />
+                </View>
+                <View style={s.field}>
+                  <PasswordField
+                    label="Code de l’enfant en 5e"
+                    value={secondPin}
+                    onChangeText={change((value) =>
+                      setSecondPin(value.replace(/\D/g, "")),
+                    )}
+                    maxLength={8}
+                    keyboardType="number-pad"
+                    editable={!busy}
+                    testID="auth-second-pin"
+                    onSubmitEditing={() => void submit()}
+                  />
+                </View>
+              </View>
               <AppText variant="small" color={colors.muted}>
-                Choisissez ensemble un code de 4 à 8 chiffres. Vous pourrez
-                ajouter d’autres profils dans les réglages.
+                Choisissez un code de 4 à 8 chiffres avec chaque enfant. Vous
+                pourrez ajouter le compte de votre conjoint dans Famille.
               </AppText>
             </>
           ) : target === "parent" ? (
@@ -413,9 +459,16 @@ export function AuthScreen() {
                 ))}
               </View>
               {!session.profiles.length && (
-                <Notice>
-                  Un parent doit créer le premier profil enfant pour commencer.
-                </Notice>
+                <Field
+                  label="Ton prénom"
+                  value={childName}
+                  onChangeText={change(setChildName)}
+                  maxLength={80}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  editable={!busy}
+                  testID="auth-child-name"
+                />
               )}
               {selected && needsPin(selected) && (
                 <Notice>
@@ -443,9 +496,7 @@ export function AuthScreen() {
             onPress={() => void submit()}
             disabled={
               busy ||
-              (!setup &&
-                target === "child" &&
-                (!selected || needsPin(selected)))
+              (!setup && target === "child" && !!selected && needsPin(selected))
             }
             testID="auth-submit"
           >
@@ -470,43 +521,43 @@ export function AuthScreen() {
                   Je suis un parent
                 </Button>
               ) : (
-                session.profiles.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    icon="book"
-                    onPress={() => router.replace("/auth?target=child")}
-                    disabled={busy}
-                    testID="auth-switch-child"
-                  >
-                    Ouvrir un espace enfant
-                  </Button>
-                )
+                <Button
+                  variant="ghost"
+                  icon="book"
+                  onPress={() => router.replace("/auth?target=child")}
+                  disabled={busy}
+                  testID="auth-switch-child"
+                >
+                  Ouvrir un espace enfant
+                </Button>
               )}
             </View>
           )}
         </Card>
         <ServerConnectionCard initiallyExpanded={!session.serverAvailable} />
-        <View style={{ gap: 12, alignItems: "center" }}>
-          <AppText
-            variant="small"
-            color={colors.muted}
-            style={{ textAlign: "center" }}
-          >
-            Pour découvrir Révizo avec des cours d’exemple, vous pouvez aussi
-            ouvrir la démonstration.
-          </AppText>
-          <Button
-            variant="ghost"
-            icon="play"
-            onPress={() => {
-              void session.enterDemo().then(() => router.replace("/"));
-            }}
-            disabled={busy}
-            testID="auth-demo"
-          >
-            Essayer la démonstration
-          </Button>
-        </View>
+        {session.health?.demoAvailable && (
+          <View style={{ gap: 12, alignItems: "center" }}>
+            <AppText
+              variant="small"
+              color={colors.muted}
+              style={{ textAlign: "center" }}
+            >
+              Pour découvrir Révizo avec des cours d’exemple, vous pouvez aussi
+              ouvrir la démonstration.
+            </AppText>
+            <Button
+              variant="ghost"
+              icon="play"
+              onPress={() => {
+                void session.enterDemo().then(() => router.replace("/"));
+              }}
+              disabled={busy}
+              testID="auth-demo"
+            >
+              Essayer la démonstration
+            </Button>
+          </View>
+        )}
       </View>
     </ScrollView>
   );

@@ -6,6 +6,8 @@ Application familiale de révision, conçue pour l’iPad : les parents importen
 
 ## Ouvrir l’espace familial
 
+Sur [cours.gofel.fr](https://cours.gofel.fr), aucune configuration de serveur n’est demandée : la connexion utilise automatiquement le site ouvert. L’accès parent utilise une adresse e-mail et un mot de passe ; l’accès enfant, son prénom et son code. Les profils et les cours ne sont pas affichés aux visiteurs. La première création sur le site hébergé nécessite l’invitation privée du propriétaire. Voir le [guide Cloudflare](docs/cloudflare.md).
+
 Vous avez téléchargé le paquet serveur compilé d’une release ? Suivre [son guide d’installation](docs/installation-release.md). Les commandes ci-dessous partent du dépôt source.
 
 Installer Node.js 24, npm, Ollama et Poppler (`pdftotext`, `pdfinfo`, `pdftoppm` disponibles dans le PATH). Ollama doit fonctionner sur la machine qui exécute le serveur Révizo.
@@ -17,7 +19,7 @@ npm run build
 npm run serve
 ```
 
-Ouvrir `http://127.0.0.1:4173`, choisir **Parent**, puis créer le compte parent et le premier profil enfant avec son code. Le premier espace familial est vide. Les exemples d’Alex sont accessibles séparément avec **Essayer la démonstration**.
+Ouvrir `http://127.0.0.1:4173`, choisir **Parent**, puis créer le compte parent et les deux profils enfants, en CM1 et en 5e, chacun avec son code. Le premier espace familial est vide. Le compte du conjoint s’ajoute depuis **Famille**, avec confirmation du mot de passe du parent connecté. Le foyer est limité côté serveur à deux parents et deux enfants. La démonstration est désactivée sur les installations familiales.
 
 Le serveur conserve SQLite et les pièces jointes privées dans `.revizio/`. Il utilise par défaut Ollama à `http://127.0.0.1:11434` et le modèle `ministral-3:8b`. Ces réglages se modifient dans **Réglages**. Les premières lectures OCR téléchargent les données françaises de Tesseract ; elles sont ensuite mises en cache. Le détail des variables, limites et sauvegardes figure dans le [guide serveur](docs/backend.md).
 
@@ -74,7 +76,7 @@ Utiliser un client Expo compatible avec le SDK 58 ou un development build. Confi
 
 ## Périmètre actuel
 
-Photos/PDF durables, comptes parent/enfant, plusieurs profils, synchronisation par révisions, préparations Ollama, cinq formats d’exercices, contrôles blancs chronométrés, plans modifiables, listes de vocabulaire dans trois langues, cartes d’anglais et lecture audio sont implémentés. Les tentatives et séances de vocabulaire conservent les questions et corrections réellement affichées.
+Photos/PDF durables, comptes parent/enfant, deux parents et deux enfants, synchronisation par révisions, préparations Ollama, cinq formats d’exercices, contrôles blancs chronométrés, plans modifiables, listes de vocabulaire dans trois langues, cartes d’anglais et lecture audio sont implémentés. Les tentatives et séances de vocabulaire conservent les questions et corrections réellement affichées.
 
 Les photos manuscrites, formules et schémas nécessitent une relecture attentive ; une extraction incertaine est signalée. Après installation du cache en contexte sécurisé, l’interface et les contenus déjà conservés peuvent être repris hors connexion ; les générations et la synchronisation nécessitent le serveur. La caméra, les voix système et l’application native restent à vérifier sur iPad physique. Voir la [matrice fonctionnelle et les étapes restantes](docs/development-plan.md).
 

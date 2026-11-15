@@ -17,6 +17,8 @@ import {
   parentStyles,
 } from "@/features/parent/shared";
 import { colors, neumorphic } from "@/theme";
+import { FAMILY_LIMITS } from "@/domain/family";
+import { ParentAccountsCard } from "./parent-accounts";
 import { apiFetch, type SessionResponse } from "@/services/api";
 import { useSession } from "@/state/session";
 import { useLearning } from "@/state/learning-store";
@@ -84,6 +86,14 @@ export function ParentSettingsScreen() {
     (profile) => profile.id === editingId,
   );
   const editingNeedsPin = needsPin(editingProfile);
+  useEffect(() => {
+    if (!editingId)
+      setGrade(
+        session.profiles.some((profile) => profile.grade === "CM1")
+          ? "5e"
+          : "CM1",
+      );
+  }, [editingId, session.profiles]);
   const deletingProfile = session.profiles.find(
     (profile) => profile.id === deleteProfileId,
   );
@@ -148,7 +158,11 @@ export function ParentSettingsScreen() {
   function resetProfileForm() {
     setEditingId(null);
     setProfileName("");
-    setGrade("5e");
+    setGrade(
+      session.profiles.some((profile) => profile.grade === "CM1")
+        ? "5e"
+        : "CM1",
+    );
     setPin("");
   }
   async function saveProfile() {
@@ -439,6 +453,7 @@ export function ParentSettingsScreen() {
             réglages et les sauvegardes dès le retour de la connexion.
           </Notice>
         )}
+        <ParentAccountsCard online={online} />
         <View style={s.columns}>
           <Card style={s.column}>
             <View style={s.row}>
@@ -446,11 +461,13 @@ export function ParentSettingsScreen() {
               <AppText variant="heading" style={{ flex: 1 }}>
                 Les profils enfants
               </AppText>
-              <Badge>{session.profiles.length} / 12</Badge>
+              <Badge>
+                {session.profiles.length} / {FAMILY_LIMITS.children}
+              </Badge>
             </View>
             <AppText color={colors.muted}>
-              Choisissez le profil dont vous préparez les cours. Chaque enfant
-              dispose de son propre code.
+              Deux profils pour votre famille, en CM1 et en 5e. Chaque enfant
+              dispose de son propre code. Les classes restent modifiables.
             </AppText>
             {session.profiles.map((profile) => (
               <View
@@ -537,72 +554,85 @@ export function ParentSettingsScreen() {
             )}
             {response("profiles")}
           </Card>
-          <Card style={s.column}>
-            <AppText variant="heading">
-              {editingId ? "Modifier un profil" : "Ajouter un profil enfant"}
-            </AppText>
-            <Field
-              label="Prénom de l’enfant"
-              value={profileName}
-              onChangeText={setProfileName}
-              maxLength={80}
-              editable={!disabled && online}
-              testID="settings-profile-name"
-            />
-            <Field
-              label="Classe"
-              value={grade}
-              onChangeText={setGrade}
-              maxLength={32}
-              editable={!disabled && online}
-              testID="settings-profile-grade"
-            />
-            <PasswordField
-              label={
-                editingId && !editingNeedsPin
-                  ? "Nouveau code enfant (facultatif)"
-                  : "Code enfant"
-              }
-              value={pin}
-              onChangeText={(value) => setPin(value.replace(/\D/g, ""))}
-              maxLength={8}
-              keyboardType="number-pad"
-              editable={!disabled && online}
-              testID="settings-profile-pin"
-            />
-            <AppText variant="small" color={colors.muted}>
-              {editingId && !editingNeedsPin
-                ? "Laissez le code vide pour conserver le code actuel. Un nouveau code contient 4 à 8 chiffres."
-                : "Choisissez un code de 4 à 8 chiffres avec votre enfant."}
-            </AppText>
-            <View style={s.row}>
-              <Button
-                icon={editingId ? "check" : "plus"}
-                onPress={() => void run("profiles", saveProfile)}
-                disabled={
-                  disabled ||
-                  !online ||
-                  (!editingId && session.profiles.length >= 12)
+          {editingId || session.profiles.length < FAMILY_LIMITS.children ? (
+            <Card style={s.column}>
+              <AppText variant="heading">
+                {editingId ? "Modifier un profil" : "Ajouter un profil enfant"}
+              </AppText>
+              <Field
+                label="Prénom de l’enfant"
+                value={profileName}
+                onChangeText={setProfileName}
+                maxLength={80}
+                editable={!disabled && online}
+                testID="settings-profile-name"
+              />
+              <Field
+                label="Classe"
+                value={grade}
+                onChangeText={setGrade}
+                maxLength={32}
+                editable={!disabled && online}
+                testID="settings-profile-grade"
+              />
+              <PasswordField
+                label={
+                  editingId && !editingNeedsPin
+                    ? "Nouveau code enfant (facultatif)"
+                    : "Code enfant"
                 }
-                testID="settings-profile-save"
-              >
-                {busy === "profiles"
-                  ? "Enregistrement…"
-                  : editingId
-                    ? "Enregistrer le profil"
-                    : "Ajouter le profil"}
-              </Button>
-              {editingId && (
+                value={pin}
+                onChangeText={(value) => setPin(value.replace(/\D/g, ""))}
+                maxLength={8}
+                keyboardType="number-pad"
+                editable={!disabled && online}
+                testID="settings-profile-pin"
+              />
+              <AppText variant="small" color={colors.muted}>
+                {editingId && !editingNeedsPin
+                  ? "Laissez le code vide pour conserver le code actuel. Un nouveau code contient 4 à 8 chiffres."
+                  : "Choisissez un code de 4 à 8 chiffres avec votre enfant."}
+              </AppText>
+              <View style={s.row}>
                 <Button
-                  variant="ghost"
-                  onPress={resetProfileForm}
-                  disabled={disabled}
+                  icon={editingId ? "check" : "plus"}
+                  onPress={() => void run("profiles", saveProfile)}
+                  disabled={
+                    disabled ||
+                    !online ||
+                    (!editingId &&
+                      session.profiles.length >= FAMILY_LIMITS.children)
+                  }
+                  testID="settings-profile-save"
                 >
-                  Annuler la modification
+                  {busy === "profiles"
+                    ? "Enregistrement…"
+                    : editingId
+                      ? "Enregistrer le profil"
+                      : "Ajouter le profil"}
                 </Button>
-              )}
-            </View>
-          </Card>
+                {editingId && (
+                  <Button
+                    variant="ghost"
+                    onPress={resetProfileForm}
+                    disabled={disabled}
+                  >
+                    Annuler la modification
+                  </Button>
+                )}
+              </View>
+            </Card>
+          ) : (
+            <Card style={s.column}>
+              <AppText variant="heading">
+                Vos deux profils enfants sont prêts
+              </AppText>
+              <AppText color={colors.muted}>
+                Choisissez Modifier sur un profil pour changer son prénom, sa
+                classe ou son code.
+              </AppText>
+            </Card>
+          )}
         </View>
         {deletingProfile && (
           <Card

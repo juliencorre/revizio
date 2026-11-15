@@ -8,6 +8,11 @@ import type {
 } from "../src/domain/model";
 import { parseLearningData } from "../src/domain/learning";
 import { subjects } from "../src/domain/fixtures";
+import {
+  FAMILY_LIMITS,
+  INITIAL_CHILD_GRADES,
+  normalizeChildName,
+} from "../src/domain/family";
 import type { ServerRuntime } from "./runtime";
 import { childData, mergeChildData } from "./access";
 import { preserveVocabularyForLegacyClient } from "./vocabulary";
@@ -238,12 +243,15 @@ export async function configureServerRoutes(
     },
     version: process.env.REVIZIO_VERSION ?? "1.0.0",
     deployment: runtime.deployment ?? "local",
-    setupProtected: runtime.deployment === "cloudflare",
+    setupProtected: runtime.deployment === "cloudflare" || !!runtime.setupToken,
+    demoAvailable:
+      options.allowDemo === true && runtime.deployment !== "cloudflare",
+    familyLimits: FAMILY_LIMITS,
   }));
   app.post("/api/setup", async (request, reply) => {
     const body = objectBody(request.body);
     if (
-      runtime.deployment === "cloudflare" &&
+      (runtime.deployment === "cloudflare" || !!runtime.setupToken) &&
       (!runtime.setupToken ||
         typeof body.setupCode !== "string" ||
         body.setupCode.length > 256 ||
@@ -254,15 +262,52 @@ export async function configureServerRoutes(
     )
       throw new HttpError(
         403,
-        "Le code d’installation est absent ou incorrect. Utilisez le code fourni lors du déploiement.",
+        "Votre invitation familiale est absente ou incorrecte. Ouvrez votre lien privé pour créer votre espace.",
       );
+    let children:
+      { name: string; grade: string; pinHash: string }[] | undefined;
+    if (body.children !== undefined) {
+      if (
+        !Array.isArray(body.children) ||
+        body.children.length !== FAMILY_LIMITS.children
+      )
+        throw new HttpError(400, "Créez les deux profils enfants : CM1 et 5e.");
+      const entries = body.children.map((value, index) => {
+        const child = objectBody(value);
+        return {
+          name: requiredString(child.name, "Le prénom enfant", 80),
+          grade: INITIAL_CHILD_GRADES[index],
+          pin: validatePin(child.pin),
+        };
+      });
+      if (
+        normalizeChildName(entries[0].name) ===
+        normalizeChildName(entries[1].name)
+      )
+        throw new HttpError(
+          400,
+          "Chaque enfant doit avoir un prénom de connexion distinct.",
+        );
+      children = await Promise.all(
+        entries.map(async ({ pin, ...child }) => ({
+          ...child,
+          pinHash: await hashSecret(pin),
+        })),
+      );
+    }
     const input = {
       parentName: requiredString(body.parentName, "Votre nom", 80),
       email: validateEmail(body.email),
       passwordHash: await hashSecret(validatePassword(body.password)),
-      childName: requiredString(body.childName, "Le prénom enfant", 80),
-      grade: requiredString(body.grade ?? "5e", "La classe", 32),
-      pinHash: await hashSecret(validatePin(body.pin)),
+      childName:
+        children?.[0].name ??
+        requiredString(body.childName, "Le prénom enfant", 80),
+      grade:
+        children?.[0].grade ??
+        requiredString(body.grade ?? "CM1", "La classe", 32),
+      pinHash:
+        children?.[0].pinHash ?? (await hashSecret(validatePin(body.pin))),
+      children,
       settings: defaults,
     };
     return issue(database.setup(input), reply);
@@ -287,21 +332,33 @@ export async function configureServerRoutes(
       return issue(user, reply);
     },
   );
-  app.get("/api/profiles", async () => ({
-    profiles: database.profiles().map((profile) => ({
-      id: profile.id,
-      name: profile.name,
-      grade: profile.grade,
-    })),
-  }));
+  app.get("/api/profiles", async (request) => {
+    const { user } = auth(request);
+    return {
+      profiles: database.profiles(user.familyId).map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        grade: profile.grade,
+      })),
+    };
+  });
   app.post(
     "/api/child-login",
-    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
       const body = objectBody(request.body);
-      const profile = database.profile(
-        requiredString(body.profileId, "Le profil"),
-      );
+      const profile =
+        typeof body.childName === "string"
+          ? database
+              .profiles()
+              .find(
+                (profile) =>
+                  normalizeChildName(profile.name) ===
+                  normalizeChildName(
+                    requiredString(body.childName, "Le prénom", 80),
+                  ),
+              )
+          : database.profile(requiredString(body.profileId, "Le profil"));
       const pin = validatePin(body.pin);
       if (!profile || !(await verifySecret(pin, profile.pinHash)))
         throw new HttpError(401, "Le profil ou le code enfant est incorrect.");
@@ -333,13 +390,18 @@ export async function configureServerRoutes(
   app.post("/api/profiles", async (request) => {
     const { user } = auth(request, true);
     const body = objectBody(request.body);
-    if (database.profiles(user.familyId).length >= 12)
-      throw new HttpError(400, "Cet espace contient déjà 12 profils.");
     return {
       profile: publicProfile(
         database.addProfile(user.familyId, {
           name: requiredString(body.name, "Le prénom", 80),
-          grade: requiredString(body.grade ?? "5e", "La classe", 32),
+          grade: requiredString(
+            body.grade ??
+              (database.profiles(user.familyId).some((p) => p.grade === "CM1")
+                ? "5e"
+                : "CM1"),
+            "La classe",
+            32,
+          ),
           pinHash: await hashSecret(validatePin(body.pin)),
         }),
       ),
@@ -681,6 +743,32 @@ export async function configureServerRoutes(
         job: publicJob(queue.enqueue(user.familyId, profile.id, kind, payload)),
       };
     });
+  app.get("/api/parents", async (request) => {
+    const { user } = auth(request, true);
+    return { parents: database.parents(user.familyId) };
+  });
+  app.post("/api/parents", async (request) => {
+    const { user } = auth(request, true);
+    const body = objectBody(request.body);
+    const current = database.parentByEmail(user.email!);
+    if (
+      !current ||
+      typeof body.currentPassword !== "string" ||
+      body.currentPassword.length > 256 ||
+      !(await verifySecret(body.currentPassword, current.passwordHash))
+    )
+      throw new HttpError(401, "Confirmez votre mot de passe actuel.");
+    const input = {
+      name: requiredString(body.name, "Le nom du conjoint", 80),
+      email: validateEmail(body.email),
+      passwordHash: await hashSecret(validatePassword(body.password)),
+    };
+    return {
+      parent: database.transaction(() =>
+        database.addParent(user.familyId, input),
+      ),
+    };
+  });
   app.patch("/api/account", async (request) => {
     const session = auth(request, true);
     const { user } = session;
@@ -703,6 +791,9 @@ export async function configureServerRoutes(
         ? parent.passwordHash
         : await hashSecret(validatePassword(body.newPassword));
     database.transaction(() => {
+      const existing = database.parentByEmail(email);
+      if (existing && existing.id !== user.id)
+        throw new HttpError(409, "Cette adresse e-mail est déjà utilisée.");
       database.db
         .prepare("UPDATE parents SET name=?,email=?,password_hash=? WHERE id=?")
         .run(name, email, passwordHash, user.id);

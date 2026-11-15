@@ -129,13 +129,74 @@ describe("installation Cloudflare dans workerd", () => {
     expect(created.headers.get("set-cookie")).toMatch(/HttpOnly/);
     const parent = (await created.json()) as SessionSnapshot;
     const profileId = parent.profiles[0].id;
+    const health = await (await request("/api/health")).json();
+    expect(health).toMatchObject({
+      demoAvailable: false,
+      familyLimits: { parents: 2, children: 2 },
+    });
+    expect((await request("/api/profiles")).status).toBe(401);
+    expect((await request("/api/parents")).status).toBe(401);
+    const spouse = {
+      name: "Conjoint de test",
+      email: "conjoint-cloud@example.test",
+      password: "Conjoint-test-42!",
+      currentPassword: setup.password,
+    };
+    expect((await request("/api/parents", "POST", spouse)).status).toBe(401);
+    expect(
+      (await request("/api/parents", "POST", spouse, parent.token)).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          "/api/parents",
+          "POST",
+          { ...spouse, email: "tiers@example.test" },
+          parent.token,
+        )
+      ).status,
+    ).toBe(409);
+    const spouseLogin = await request("/api/login", "POST", {
+      email: spouse.email,
+      password: spouse.password,
+    });
+    expect(spouseLogin.status).toBe(200);
+    expect(((await spouseLogin.json()) as SessionSnapshot).profiles).toEqual(
+      parent.profiles,
+    );
+    expect(
+      (
+        await request(
+          "/api/profiles",
+          "POST",
+          { name: "Milo", grade: "CM1", pin: "579246" },
+          parent.token,
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(
+          "/api/profiles",
+          "POST",
+          { name: "Autre", grade: "CM2", pin: "123456" },
+          parent.token,
+        )
+      ).status,
+    ).toBe(409);
     expect(
       (await request("/api/setup", "POST", { ...setup, setupCode: code }))
         .status,
     ).toBe(409);
     const child = (await (
-      await request("/api/child-login", "POST", { profileId, pin: "4268" })
+      await request("/api/child-login", "POST", {
+        childName: "Camille",
+        pin: "4268",
+      })
     ).json()) as SessionSnapshot;
+    expect(
+      (await request("/api/parents", "POST", spouse, child.token)).status,
+    ).toBe(403);
     const png = new PNG({ width: 60, height: 90 });
     png.data.fill(255);
     const boundary = "revizo-cloud-boundary";

@@ -1,6 +1,6 @@
 # Serveur familial Révizo
 
-Le serveur Node.js 24 fournit une vraie session parent/enfant, des données SQLite par profil, le stockage privé des photos/PDF et des préparations IA persistantes. La démonstration locale reste indépendante. La création d’une famille démarre avec des cours et exercices vides.
+Le serveur Node.js 24 fournit une vraie session parent/enfant, des données SQLite par profil, le stockage privé des photos/PDF et des préparations IA persistantes. La démonstration est désactivée par défaut ; seul le serveur de tests l’active explicitement. La création d’une famille démarre avec des cours et exercices vides.
 
 ## Démarrer
 
@@ -29,7 +29,11 @@ Pour l’iPad, utiliser une adresse accessible sur le réseau familial et HTTPS 
 
 ## Données et autorisations
 
-Le compte parent utilise un mot de passe de 10 à 256 caractères. Chaque enfant possède un PIN de 4 à 8 chiffres. Les deux sont dérivés par scrypt et sel aléatoire. La base conserve uniquement le condensat des jetons de session. Le web reçoit un cookie HttpOnly SameSite Strict ; les applications natives peuvent envoyer le jeton dans `Authorization: Bearer …`. La déconnexion invalide la session côté serveur.
+Le foyer est limité à deux comptes parents et deux profils enfants. Le premier parent crée les deux enfants (CM1 et 5e) puis ajoute le conjoint depuis Famille. Les classes restent modifiables pour suivre la scolarité. Les installations existantes conservent leurs données ; aucune suppression automatique de profil n’est effectuée.
+
+Chaque compte parent utilise un mot de passe de 10 à 256 caractères. Chaque enfant possède un PIN de 4 à 8 chiffres. Les deux sont dérivés par scrypt et sel aléatoire. La base conserve uniquement le condensat des jetons de session. Le web reçoit un cookie HttpOnly SameSite Strict ; les applications natives peuvent envoyer le jeton dans `Authorization: Bearer …`. La déconnexion invalide la session côté serveur.
+
+`GET /api/profiles` exige une session. Un enfant peut se connecter avec `{childName,pin}` sur `POST /api/child-login` sans liste publique des prénoms ; `{profileId,pin}` reste accepté pour les appareils déjà connectés. Les prénoms de connexion doivent être distincts, sans tenir compte de la casse. `GET /api/parents` et `POST /api/parents` sont réservés aux parents ; la création du conjoint requiert `{name,email,password,currentPassword}` et ne change pas la session du parent connecté. Un troisième parent ou enfant est refusé côté serveur, y compris via une restauration.
 
 Le parent gère tous les profils et contenus de sa famille. Un enfant voit exclusivement les cours, séries et plans publiés de son profil. Il peut enregistrer ses tentatives, lectures et étapes accomplies. Le serveur recalcule la correction et vérifie les questions présentées ; les anciennes tentatives conservent leur instantané. Il refuse les modifications de contenus, de réglages et de périmètre anglais. Le dernier profil familial ne peut pas être supprimé.
 
@@ -59,7 +63,7 @@ Les exercices utilisent une sortie JSON structurée, puis une validation des for
 - `GET /api/profiles` public expose seulement identifiant, prénom et classe. Les mutations `/api/profiles` et `/api/profiles/:id` sont réservées au parent.
 - `PATCH /api/account` reçoit `{currentPassword,parentName?,email?,newPassword?}`.
 - `GET /api/backup` exporte `{format:'revizio-backup',version:1,exportedAt,profiles,uploads}`. Les documents normalisés et originaux sont intégrés en base64 ; plafond de 100 Mo décodés. L’adresse de connexion, les mots de passe, PIN, sessions et réglages serveur ne sont pas exportés.
-- `POST /api/backup/restore` reçoit `{backup}` (ou l’objet brut). Il **remplace** tous les profils, cours, résultats et documents de la famille connectée, après validation complète. Il conserve le compte parent, conserve le PIN d’un profil déjà présent avec le même identifiant et demande un nouveau PIN pour les profils récupérés. Les sessions enfant sont invalidées. Une sauvegarde privée de l’état précédent est écrite dans `backups/` avant remplacement.
+- `POST /api/backup/restore` reçoit `{backup}` (ou l’objet brut). Il **remplace** tous les profils, cours, résultats et documents de la famille connectée, après validation complète. Il conserve les comptes parents, conserve le PIN d’un profil déjà présent avec le même identifiant et demande un nouveau PIN pour les profils récupérés. Les sessions enfant sont invalidées. Une sauvegarde privée de l’état précédent est écrite dans `backups/` avant remplacement.
 - `DELETE /api/family` reçoit `{password}` et efface la famille, ses documents et les archives privées créées avant une restauration.
 
 Conserver régulièrement une copie du répertoire de données serveur, serveur arrêté, complète l’export portable. Les journaux de génération ne sont pas inclus dans l’export portable.

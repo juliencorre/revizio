@@ -16,6 +16,8 @@ export interface ServerOptions {
   logger?: boolean;
   rateLimit?: boolean;
   aiClient?: AiClient;
+  allowDemo?: boolean;
+  setupToken?: string;
 }
 export interface StoredProfile extends ChildProfile {
   familyId: string;

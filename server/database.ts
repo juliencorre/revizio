@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { FAMILY_LIMITS, normalizeChildName } from "../src/domain/family";
 import { nodeFiles } from "./files-node";
 import type { PrivateFiles, SqlDatabase } from "./runtime";
 import type { AiJob, LearningData, SessionUser } from "../src/domain/model";
@@ -80,6 +81,7 @@ export class FamilyDatabase {
     childName: string;
     grade: string;
     pinHash: string;
+    children?: { name: string; grade: string; pinHash: string }[];
     settings: AiSettings;
   }) {
     return this.transaction(() => {
@@ -99,21 +101,24 @@ export class FamilyDatabase {
           JSON.stringify(input.settings),
           isoNow(),
         );
-      this.db
-        .prepare("INSERT INTO parents VALUES (?,?,?,?,?)")
-        .run(
-          parentId,
-          familyId,
-          input.email,
-          input.parentName,
-          input.passwordHash,
-        );
-      this.addProfile(familyId, {
-        id: profileId,
-        name: input.childName,
-        grade: input.grade,
-        pinHash: input.pinHash,
+      this.addParent(familyId, {
+        id: parentId,
+        email: input.email,
+        name: input.parentName,
+        passwordHash: input.passwordHash,
       });
+      const children = input.children ?? [
+        {
+          name: input.childName,
+          grade: input.grade,
+          pinHash: input.pinHash,
+        },
+      ];
+      for (const [index, child] of children.entries())
+        this.addProfile(familyId, {
+          ...child,
+          ...(index === 0 ? { id: profileId } : {}),
+        });
       return {
         id: parentId,
         familyId,
@@ -140,6 +145,35 @@ export class FamilyDatabase {
         }
       : undefined;
   }
+  parents(familyId: string) {
+    return this.db
+      .prepare(
+        "SELECT id,name,email FROM parents WHERE family_id=? ORDER BY rowid",
+      )
+      .all(familyId)
+      .map((row) => ({
+        id: String(row.id),
+        name: String(row.name),
+        email: String(row.email),
+      }));
+  }
+  addParent(
+    familyId: string,
+    input: { id?: string; name: string; email: string; passwordHash: string },
+  ) {
+    if (this.parents(familyId).length >= FAMILY_LIMITS.parents)
+      throw new HttpError(
+        409,
+        "Votre foyer est limité à deux comptes parents.",
+      );
+    if (this.parentByEmail(input.email))
+      throw new HttpError(409, "Cette adresse e-mail est déjà utilisée.");
+    const id = input.id ?? randomUUID();
+    this.db
+      .prepare("INSERT INTO parents VALUES (?,?,?,?,?)")
+      .run(id, familyId, input.email, input.name, input.passwordHash);
+    return { id, name: input.name, email: input.email };
+  }
   profiles(familyId?: string): StoredProfile[] {
     const rows = familyId
       ? this.db
@@ -160,7 +194,14 @@ export class FamilyDatabase {
   addProfile(
     familyId: string,
     input: { id?: string; name: string; grade: string; pinHash: string },
+    validateName = true,
   ) {
+    if (this.profiles(familyId).length >= FAMILY_LIMITS.children)
+      throw new HttpError(
+        409,
+        "Votre foyer est limité à deux profils enfants.",
+      );
+    if (validateName) this.checkProfileName(familyId, input.name);
     const id = input.id ?? randomUUID();
     this.db
       .prepare("INSERT INTO profiles VALUES (?,?,?,?,?)")
@@ -173,7 +214,11 @@ export class FamilyDatabase {
   updateProfile(
     id: string,
     input: { name: string; grade: string; pinHash?: string },
+    validateName = true,
   ) {
+    const current = this.profile(id);
+    if (current && validateName)
+      this.checkProfileName(current.familyId, input.name, id);
     this.db
       .prepare(
         "UPDATE profiles SET name=?,grade=?,pin_hash=COALESCE(?,pin_hash) WHERE id=?",
@@ -182,6 +227,19 @@ export class FamilyDatabase {
     if (input.pinHash)
       this.db.prepare("DELETE FROM sessions WHERE profile_id=?").run(id);
     return this.profile(id)!;
+  }
+  private checkProfileName(familyId: string, name: string, exceptId?: string) {
+    if (
+      this.profiles(familyId).some(
+        (profile) =>
+          profile.id !== exceptId &&
+          normalizeChildName(profile.name) === normalizeChildName(name),
+      )
+    )
+      throw new HttpError(
+        409,
+        "Chaque enfant doit avoir un prénom de connexion distinct.",
+      );
   }
   deleteProfile(id: string) {
     this.db.prepare("DELETE FROM profiles WHERE id=?").run(id);

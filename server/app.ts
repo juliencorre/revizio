@@ -37,6 +37,7 @@ export async function createApp(options: ServerOptions = {}) {
       ai,
       queue,
       images: nodeImages,
+      setupToken: options.setupToken ?? process.env.SETUP_TOKEN,
       aiDefaults: {
         baseUrl: (
           options.ollamaUrl ??

@@ -18,6 +18,7 @@ export interface ServerHealth {
   needsSetup: boolean;
   setupProtected?: boolean;
   deployment?: "local" | "cloudflare";
+  demoAvailable?: boolean;
   version: string;
   ai: { available: boolean; model: string };
 }
@@ -36,14 +37,15 @@ export class ApiError extends Error {
   }
 }
 export function apiBase() {
+  if (Platform.OS === "web") return "/api";
   if (configuredBase) return configuredBase;
   if (process.env.EXPO_PUBLIC_API_URL)
     return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, "");
-  if (Platform.OS === "web") return "/api";
   const host = Constants.expoConfig?.hostUri?.split(":")[0];
   return `http://${host || "localhost"}:4173/api`;
 }
 export async function configureApiBase(url: string) {
+  if (Platform.OS === "web") return;
   const normalized = url.trim().replace(/\/$/, "");
   if (normalized && !/^https?:\/\//.test(normalized))
     throw new Error(
@@ -59,11 +61,15 @@ export async function configureApiBase(url: string) {
   else await AsyncStorage.removeItem(API_OVERRIDE);
 }
 export async function initializeApi() {
+  if (Platform.OS === "web") {
+    configuredBase = null;
+    await AsyncStorage.removeItem(API_OVERRIDE).catch(() => undefined);
+    return;
+  }
   configuredBase = await AsyncStorage.getItem(API_OVERRIDE).catch(() => null);
-  if (Platform.OS !== "web")
-    accessToken = await SecureStore.getItemAsync("revizo-session").catch(
-      () => null,
-    );
+  accessToken = await SecureStore.getItemAsync("revizo-session").catch(
+    () => null,
+  );
 }
 export async function rememberToken(token?: string) {
   if (Platform.OS === "web") return;

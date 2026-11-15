@@ -18,7 +18,7 @@ export default function ProfilesScreen() {
   const session = useSession();
   const profiles = session.profiles.length
     ? session.profiles
-    : [{ id: "new", name: "Élève", grade: "Mes cours" }];
+    : [{ id: "new", name: "Enfant", grade: "CM1 ou 5e" }];
   function openChild(id: string) {
     if (
       session.mode === "demo" ||
@@ -66,7 +66,7 @@ export default function ProfilesScreen() {
             textAlign: "center",
           }}
         >
-          Élève ou parent : chacun a son espace.
+          Notre espace familial privé.
         </AppText>
       </View>
       <View
@@ -83,9 +83,7 @@ export default function ProfilesScreen() {
             key={profile.id}
             title={profile.name}
             subtitle={
-              profile.id === "new"
-                ? "Apprendre et réviser"
-                : `Élève de ${profile.grade}`
+              profile.id === "new" ? "CM1 et 5e" : `Élève de ${profile.grade}`
             }
             description="Mes cours, mes fiches, mes exercices et mes progrès"
             icon="book"
@@ -176,35 +174,28 @@ export default function ProfilesScreen() {
               variant="secondary"
               onPress={() => router.push("/parent/settings")}
             >
-              Ajouter ou gérer les profils
+              Gérer notre famille
             </Button>
           )}
-          {session.serverAvailable ? (
-            <Badge tone={session.health?.ai.available ? "green" : "muted"}>
-              {session.health?.needsSetup
-                ? "Votre premier espace familial"
-                : session.health?.ai.available
-                  ? "Espace familial · IA disponible"
-                  : "Espace familial"}
-            </Badge>
-          ) : (
+          {!session.serverAvailable && session.ready && (
             <Card inset style={{ gap: 12 }}>
               <AppText color={colors.muted}>
-                Connectez votre serveur Révizo pour retrouver vos cours sur tous
-                vos appareils.
+                La connexion est momentanément indisponible.
               </AppText>
               <Button
                 variant="secondary"
-                icon="settings"
-                onPress={() => router.push("/auth")}
+                icon="refresh"
+                onPress={() => void session.refresh()}
               >
-                Configurer la connexion
+                Réessayer
               </Button>
             </Card>
           )}
-          <Button variant="ghost" onPress={() => void session.enterDemo()}>
-            Essayer la démonstration
-          </Button>
+          {session.health?.demoAvailable && (
+            <Button variant="ghost" onPress={() => void session.enterDemo()}>
+              Essayer la démonstration
+            </Button>
+          )}
         </View>
       )}
       <AppText

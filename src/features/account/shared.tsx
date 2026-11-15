@@ -134,6 +134,7 @@ export function ServerConnectionCard({
       setBusy(false);
     }
   }
+  if (Platform.OS === "web") return null;
   return (
     <Card inset style={{ gap: 16 }} testID={testPrefix + "-server"}>
       <View style={accountStyles.row}>
