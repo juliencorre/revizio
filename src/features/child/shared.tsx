@@ -181,20 +181,21 @@ export function CourseCard({
   const router = useRouter();
   return (
     <View testID={`course-card-${course.id}`} style={{ flex: 1 }}>
-      <Card style={{ gap: 16, flex: 1 }}>
+      <Card style={{ gap: 16, flex: 1, minHeight: 222 }}>
         <View style={styles.row}>
           <View
-            style={[styles.smallIcon, { backgroundColor: colors.primaryLight }]}
+            style={[styles.smallIcon, { backgroundColor: "#EAE0FF", width: 58, height: 58, borderRadius: 17 }]}
           >
-            <AppIcon name="file" />
+            <AppIcon name="file" size={26} />
           </View>
           <Badge tone="green">Fiche vérifiée</Badge>
         </View>
-        <AppText variant="heading">{course.title}</AppText>
+        <AppText variant="heading" style={{ fontSize: 22 }}>{course.title}</AppText>
         <AppText color={colors.muted}>{course.description}</AppText>
         <View style={{ flex: 1 }} />
         <View style={styles.wrap}>
           <Button
+            variant="secondary"
             icon="book"
             onPress={() => router.push(`/student/course/${course.id}`)}
           >
@@ -321,7 +322,8 @@ export const styles = StyleSheet.create({
   },
   stack: { gap: 18 },
   quietCard: {
-    boxShadow: neumorphic.small.boxShadow,
-    backgroundColor: colors.background,
+    backgroundColor: "#F8F9FE",
+    borderColor: colors.border,
+    boxShadow: "none",
   },
 });
