@@ -22,7 +22,7 @@ import { colors, fontFamily, neumorphic } from "@/theme";
 import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
-import { useSession } from "@/state/session";
+import { ParentChildSelector } from "./child-selector";
 import { SourceThumbnail, SourceViewer } from "@/components/source-viewer";
 export function ParentLayout({
   active,
@@ -53,7 +53,6 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
   const active = section === "review" ? "library" : (section ?? "dashboard");
   const router = useRouter();
   const data = useLearning();
-  const session = useSession();
   const compact = useWindowClass() === "compact";
   const tabStyle = compact
     ? { minWidth: 44, paddingHorizontal: 10 }
@@ -111,26 +110,14 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
               flexDirection: "row",
               flexWrap: "wrap",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 8,
             }}
           >
-            <AppText variant="label">Pour {data.childName}</AppText>
-            {data.profiles.length > 1 &&
-              data.profiles.map((profile) => (
-                <Button
-                  key={profile.id}
-                  selected={profile.id === data.activeProfileId}
-                  variant={
-                    profile.id === data.activeProfileId
-                      ? "primary"
-                      : "secondary"
-                  }
-                  accessibilityLabel={`Suivre ${profile.name}`}
-                  onPress={() => session.selectProfile(profile.id)}
-                >
-                  {profile.name}
-                </Button>
-              ))}
+            <AppText variant="small" color={colors.muted}>
+              {compact ? "Pour" : "Enfant accompagné"}
+            </AppText>
+            <ParentChildSelector />
           </View>
           {inLibrary && (
             <View
