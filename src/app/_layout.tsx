@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Slot } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -31,11 +31,7 @@ function AppNavigator() {
     );
   return (
     <View style={{ flex: 1 }}>
-      <View
-        style={{ flex: 1, opacity: isReady ? 1 : 0 }}
-        pointerEvents={isReady ? "auto" : "none"}
-        accessibilityElementsHidden={!isReady}
-      >
+      <View style={{ flex: 1 }}>
         {storageError && (
           <View
             accessibilityRole="alert"
@@ -67,33 +63,8 @@ function AppNavigator() {
             ) : null}
           </View>
         )}
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        />
+        <Slot />
       </View>
-      {!isReady && (
-        <View
-          testID="app-loading"
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 20,
-            backgroundColor: colors.background,
-          }}
-        >
-          <Brand />
-          <ActivityIndicator color={colors.primary} />
-          <AppText>On prépare ton espace…</AppText>
-        </View>
-      )}
     </View>
   );
 }
