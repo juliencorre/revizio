@@ -84,6 +84,8 @@ Configurer une fois ces secrets dans **Settings → Secrets and variables → Ac
 - `CLOUDFLARE_ACCOUNT_ID` : l’identifiant du compte qui héberge le Worker `revizo`.
 - `CLOUDFLARE_API_TOKEN` : un jeton API de déploiement Cloudflare, limité au compte et à la zone `gofel.fr`, avec les permissions du modèle **Edit Cloudflare Workers**.
 
+Le workflow accepte aussi `CLOUDFLATE_API_TOKEN` comme alias du jeton ; le nom `CLOUDFLARE_API_TOKEN` est prioritaire si les deux existent.
+
 La connexion OAuth locale de Wrangler reste réservée au poste de développement ; elle n’est pas copiée dans GitHub. Le jeton API reste dans les secrets chiffrés Actions et n’est jamais intégré au client.
 
 Après les tests, le job **Publier cours.gofel.fr** reconstruit le même commit avec le lockfile du dépôt et lance `wrangler deploy`. Il conserve les variables distantes, le secret d’installation déjà configuré et le Durable Object familial existant. Il ne relance pas le script d’installation initiale ni la création de famille. Une publication en cours n’est pas interrompue par un nouveau push.

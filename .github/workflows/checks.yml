@@ -57,7 +57,7 @@ jobs:
       - name: Vérifier les accès de publication
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLATE_API_TOKEN }}
         run: |
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::error::Configurer CLOUDFLARE_ACCOUNT_ID et CLOUDFLARE_API_TOKEN dans les secrets Actions du dépôt."
@@ -67,7 +67,7 @@ jobs:
       - name: Publier la version vérifiée
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLATE_API_TOKEN }}
           EXPO_PUBLIC_API_URL: ""
         # Existing Cloudflare secrets and the family Durable Object are preserved.
         run: npx wrangler deploy --config wrangler.jsonc --keep-vars --message "GitHub main ${GITHUB_SHA}"
