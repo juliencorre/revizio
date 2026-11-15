@@ -1,105 +1,83 @@
 import { Platform, type ViewStyle } from "react-native";
 
 export const colors = {
-  background: "#E4E9F2",
-  surface: "#E4E9F2",
-  surfaceRaised: "#E8EDF5",
-  surfaceInset: "#DEE4EE",
+  background: "#F3F5FF",
+  surface: "#FFFFFF",
+  surfaceRaised: "#FFFFFF",
+  surfaceInset: "#F1F2FC",
   highlight: "#FFFFFF",
-  shadow: "#BEC8D8",
-  ink: "#252D3D",
-  muted: "#57647B",
-  primary: "#514CCF",
-  primaryDark: "#3E39AD",
-  primaryLight: "#DFE1F7",
-  orange: "#A9460C",
-  orangeLight: "#F5E5DA",
-  green: "#246A45",
-  greenLight: "#DDECE4",
-  border: "#D2DAE7",
-  danger: "#A93246",
-  dangerLight: "#F3DEE3",
+  shadow: "#D7DDF0",
+  ink: "#161B45",
+  muted: "#626B8D",
+  primary: "#6045D9",
+  primaryDark: "#4730B7",
+  primaryLight: "#EDE8FF",
+  orange: "#B65C16",
+  orangeLight: "#FFF0D7",
+  green: "#22765C",
+  greenLight: "#E0F4EC",
+  border: "#E3E6F5",
+  danger: "#B73754",
+  dangerLight: "#FBE6EC",
 };
 
-export const radius = { sm: 14, md: 22, lg: 30, xl: 38 };
-
-/**
- * Material Design window size classes, adapted to the family devices:
- * compact phones, medium tablets in portrait, expanded tablets in
- * landscape and computers.
- */
+export const radius = { sm: 12, md: 18, lg: 24, xl: 30 };
 export type WindowClass = "compact" | "medium" | "expanded";
 export const breakpoints = { medium: 600, expanded: 1000 };
 export function windowClassFor(width: number): WindowClass {
-  return width < breakpoints.medium
-    ? "compact"
-    : width < breakpoints.expanded
-      ? "medium"
-      : "expanded";
+  return width < breakpoints.medium ? "compact" : width < breakpoints.expanded ? "medium" : "expanded";
 }
-/** Page margins, navigation sizes and readable content width. */
 export const layout = {
-  gutter: { compact: 16, medium: 24, expanded: 32 },
-  sectionGap: { compact: 20, medium: 24, expanded: 26 },
-  rail: 96,
-  drawer: 280,
+  gutter: { compact: 16, medium: 26, expanded: 34 },
+  sectionGap: { compact: 20, medium: 23, expanded: 25 },
+  rail: 88,
+  drawer: 224,
   topBar: 64,
   navigationBar: 76,
-  maxContent: 1280,
+  maxContent: 1320,
 } as const;
 export const fontFamily = Platform.select({
   ios: "Avenir Next",
   android: "sans-serif",
-  default: "'Avenir Next', 'Trebuchet MS', system-ui, sans-serif",
+  default: "'Avenir Next', Inter, system-ui, sans-serif",
 });
-
-/** The same two light sources are shared by native Fabric and the web. */
+/** Keep the previous public interface for every component; use calm flat surfaces. */
 export const neumorphic = {
   raised: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.42)",
-    boxShadow:
-      "9px 9px 20px rgba(174,186,205,0.65), -9px -9px 20px rgba(255,255,255,0.88)",
+    borderColor: "rgba(215,221,245,0.8)",
+    boxShadow: "0px 8px 26px rgba(32,42,108,0.08)",
   },
   small: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.34)",
-    boxShadow:
-      "4px 4px 9px rgba(174,186,205,0.68), -4px -4px 9px rgba(255,255,255,0.88)",
+    borderColor: colors.border,
+    boxShadow: "0px 3px 11px rgba(32,42,108,0.055)",
   },
   inset: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceInset,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    boxShadow:
-      "inset 4px 4px 9px rgba(169,181,201,0.64), inset -4px -4px 9px rgba(255,255,255,0.88)",
+    borderColor: colors.border,
+    boxShadow: "none",
   },
   focus: {
     borderColor: colors.primary,
-    boxShadow:
-      "4px 4px 9px rgba(174,186,205,0.65), -4px -4px 9px rgba(255,255,255,0.9), 0px 0px 0px 3px rgba(81,76,207,0.20)",
+    boxShadow: "0px 0px 0px 3px rgba(96,69,217,0.18)",
   },
   colored: {
-    boxShadow:
-      "5px 5px 11px rgba(154,166,190,0.76), -5px -5px 11px rgba(255,255,255,0.85)",
+    boxShadow: "0px 8px 17px rgba(85,62,196,0.17)",
   },
-  /** Softer relief for phones, where large shadows eat the margins. */
   raisedCompact: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.42)",
-    boxShadow:
-      "5px 5px 12px rgba(174,186,205,0.6), -5px -5px 12px rgba(255,255,255,0.85)",
+    borderColor: colors.border,
+    boxShadow: "0px 5px 16px rgba(32,42,108,0.065)",
   },
-  /** Hover state layer for pointer devices. */
   hover: {
-    boxShadow:
-      "6px 6px 14px rgba(174,186,205,0.72), -6px -6px 14px rgba(255,255,255,0.95)",
+    boxShadow: "0px 11px 26px rgba(32,42,108,0.12)",
   },
   coloredPressed: {
-    boxShadow:
-      "inset 3px 3px 7px rgba(24,27,73,0.35), inset -3px -3px 7px rgba(255,255,255,0.19)",
+    boxShadow: "0px 2px 6px rgba(42,28,123,0.15)",
   },
 } satisfies Record<string, ViewStyle>;
