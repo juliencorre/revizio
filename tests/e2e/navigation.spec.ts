@@ -36,9 +36,16 @@ test("accéder au tableau de bord parent", async ({ page }) => {
   await page.getByTestId("profile-parent").click();
   await expect(page).toHaveURL(/\/parent$/);
   await expect(
-    page
-      .getByRole("button", { name: /Ajouter un cours|Importer un cours/ })
-      .first(),
+    page.getByRole("heading", { name: "Choisir une matière", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Mathématiques", exact: true })
+    .click();
+  await expect(page.getByTestId("parent-subject-banner")).toContainText(
+    "Mathématiques",
+  );
+  await expect(
+    page.getByRole("button", { name: "Cours", exact: true }),
   ).toBeVisible();
   await expect
     .poll(() =>
