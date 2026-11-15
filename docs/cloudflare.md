@@ -2,6 +2,14 @@
 
 L’application web complète utilise Workers pour l’interface et l’API, un Durable Object SQLite pour l’espace familial et ses documents privés, et Workers AI pour les préparations. L’ordinateur familial peut être éteint. Aucun serveur Node.js, Ollama, R2 ou domaine payant n’est nécessaire pour cette installation.
 
+## Adresse de l’application
+
+Révizo est accessible sur **https://cours.gofel.fr**. Le domaine personnalisé est déclaré dans `wrangler.jsonc` avec `custom_domain: true`. Cloudflare gère son enregistrement DNS et son certificat HTTPS ; l’interface et l’API `/api` partagent cette adresse. L’adresse `https://revizo.jcorre.workers.dev` reste également disponible.
+
+Le domaine `gofel.fr` doit être actif dans le compte Cloudflare utilisé pour déployer. Pour une autre installation, remplacer `cours.gofel.fr` dans `routes` par son propre domaine actif, ou retirer `routes` pour utiliser uniquement l’adresse gratuite `workers.dev`. Voir la [documentation des domaines personnalisés Workers](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
+
+Le changement d’adresse conserve les données de l’installation Cloudflare, mais demande une nouvelle connexion sur le nouveau domaine. Pour l’iPad, créer le raccourci d’écran d’accueil depuis `cours.gofel.fr`. Les données d’un ancien serveur local se transfèrent avec une sauvegarde, comme décrit ci-dessous.
+
 ## Installer
 
 Avec Node.js 24 et un compte Cloudflare sur l’offre **Workers Free** :
@@ -16,7 +24,7 @@ npm run deploy:cloud
 
 La connexion par code fonctionne même si le navigateur ne peut pas atteindre `localhost:8976`. Ouvrir l’adresse indiquée par Wrangler, saisir le code temporaire et autoriser la connexion.
 
-Le script de déploiement construit le web, publie le Worker `revizo`, puis configure son secret d’installation. Wrangler affiche l’adresse HTTPS en `workers.dev` ; elle utilise le sous-domaine du compte. Le nom du Worker se règle dans `wrangler.jsonc` avant le premier déploiement.
+Le script de déploiement construit le web, publie le Worker `revizo` sur `cours.gofel.fr` et en `workers.dev`, puis configure son secret d’installation. L’adresse `workers.dev` utilise le sous-domaine du compte. Le nom du Worker se règle dans `wrangler.jsonc` avant le premier déploiement.
 
 Ouvrir cette adresse, choisir **Parent**, puis créer le compte parent et le premier enfant. Le formulaire demande aussi le code conservé dans le fichier local `.cloudflare/installation-code`. Ce code protège la première création de famille ; les connexions suivantes utilisent le mot de passe parent ou le code enfant. Sans secret configuré, la création est refusée, y compris entre la publication initiale et la configuration du secret.
 
@@ -52,7 +60,7 @@ Le nouvel espace cloud est vide. Pour récupérer les cours d’une installation
 
 ## Rester sur l’offre gratuite
 
-Conserver le forfait **Workers Free** dans **Calcul → Offres Workers**. Le déploiement n’active aucun abonnement payant, aucun R2 et aucun domaine personnalisé.
+Conserver le forfait **Workers Free** dans **Calcul → Offres Workers**. Le déploiement n’active aucun abonnement payant ni R2. Le rattachement de `cours.gofel.fr` utilise le domaine déjà détenu ; son renouvellement reste indépendant de l’hébergement Workers gratuit.
 
 Au 15 novembre 2026, les principales enveloppes gratuites Cloudflare sont :
 

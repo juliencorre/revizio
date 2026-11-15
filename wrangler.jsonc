@@ -5,6 +5,12 @@
   "compatibility_date": "2026-11-15",
   "workers_dev": true,
   "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "cours.gofel.fr",
+      "custom_domain": true,
+    },
+  ],
   "build": {
     "command": "npm run export:web",
   },

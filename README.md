@@ -31,7 +31,7 @@ Ouvrir alors l’adresse réseau de cette machine dans Safari. Pour une installa
 
 ## Héberger gratuitement sur Cloudflare
 
-Le [guide Cloudflare](docs/cloudflare.md) installe l’application complète sur Workers : données et documents privés dans un Durable Object SQLite, préparations avec Workers AI, adresse HTTPS gratuite en `workers.dev`. L’ordinateur familial peut être éteint. Le déploiement utilise l’offre Workers Free et ses quotas ; aucun abonnement payant ni stockage R2 n’est nécessaire.
+L’application est accessible sur **[cours.gofel.fr](https://cours.gofel.fr)**. Le [guide Cloudflare](docs/cloudflare.md) installe l’application complète sur Workers : données et documents privés dans un Durable Object SQLite, préparations avec Workers AI. L’ordinateur familial peut être éteint. Le déploiement utilise l’offre Workers Free et ses quotas ; aucun abonnement payant ni stockage R2 n’est nécessaire.
 
 ```sh
 npm ci
