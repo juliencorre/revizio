@@ -21,7 +21,7 @@ import { colors, fontFamily, neumorphic } from "@/theme";
 import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
-import { useSession } from "@/state/session";
+import { ParentChildSelector } from "./child-selector";
 import { SourceThumbnail, SourceViewer } from "@/components/source-viewer";
 export function ParentLayout({
   active,
@@ -58,7 +58,6 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
   const active = usePathname().split("/")[2] || "dashboard";
   const router = useRouter();
   const data = useLearning();
-  const session = useSession();
   const navigation: NavigationItem[] = [
     {
       label: "Accueil",
@@ -113,36 +112,24 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
               flexDirection: "row",
               flexWrap: "wrap",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 8,
             }}
           >
-            <AppText variant="label">Pour {data.childName}</AppText>
-            {data.profiles.length > 1 &&
-              data.profiles.map((profile) => (
-                <Button
-                  key={profile.id}
-                  selected={profile.id === data.activeProfileId}
-                  variant={
-                    profile.id === data.activeProfileId
-                      ? "primary"
-                      : "secondary"
-                  }
-                  accessibilityLabel={`Suivre ${profile.name}`}
-                  onPress={() => session.selectProfile(profile.id)}
-                >
-                  {profile.name}
-                </Button>
-              ))}
-            {subject && (
+            {subject ? (
               <Button
-                style={{ marginLeft: "auto" }}
                 variant="ghost"
                 icon="arrow-left"
                 onPress={() => router.navigate("/parent/subjects")}
               >
                 Toutes les matières
               </Button>
+            ) : (
+              <AppText variant="small" color={colors.muted}>
+                Enfant accompagné
+              </AppText>
             )}
+            <ParentChildSelector />
           </View>
           {subject && (
             <Card
