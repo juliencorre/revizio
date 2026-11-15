@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, type ScrollViewInstance } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -14,6 +14,7 @@ import { useLearning } from "@/state/learning-store";
 import type { VocabularyList } from "@/domain/model";
 import {
   isVocabularyList,
+  legacyEnglishListId,
   languageLabel,
   normalizeVocabularyList,
   parseVocabularyLines,
@@ -76,6 +77,30 @@ function VocabularyEditor() {
   const [bulk, setBulk] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  useEffect(() => {
+    if (!draft.ready || id !== legacyEnglishListId) return;
+    const revision = data.english.wordsRevision ?? 0;
+    if ((list.englishWordsRevision ?? 0) === revision) return;
+    setList((current) => ({
+      ...current,
+      words: data.english.words.map((word) => ({
+        id: word.id,
+        term: word.en,
+        translation: word.fr,
+      })),
+      englishWordsRevision: revision,
+    }));
+    setMessage(
+      "Les mots du répertoire anglais ont été actualisés dans cette liste.",
+    );
+  }, [
+    draft.ready,
+    id,
+    list.englishWordsRevision,
+    data.english.wordsRevision,
+    data.english.words,
+    setList,
+  ]);
   const progress = vocabularyProgress(saved ?? list, data.vocabularySessions);
   function change(next: VocabularyList) {
     setList(next);

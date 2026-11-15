@@ -85,6 +85,9 @@ export function validateExtendedData(
     const english = data.english;
     if (
       !obj(english) ||
+      (english.wordsRevision !== undefined &&
+        (!Number.isSafeInteger(english.wordsRevision) ||
+          Number(english.wordsRevision) < 0)) ||
       !Array.isArray(english.words) ||
       !Array.isArray(english.verbs) ||
       !ids(english.tenses) ||

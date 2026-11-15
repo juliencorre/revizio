@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { Platform, Pressable, View, useWindowDimensions } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -63,6 +63,7 @@ function mergeExtracted(
   incoming: EnglishSettings,
 ): EnglishSettings {
   return {
+    ...current,
     words: [
       ...new Map(
         [...current.words, ...incoming.words].map((word) => [
@@ -113,6 +114,29 @@ export function ParentEnglishScreen() {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => {
+    if (
+      !draft.ready ||
+      (settings.wordsRevision ?? 0) === (data.english.wordsRevision ?? 0)
+    )
+      return;
+    setSettings((current) => ({
+      ...current,
+      words: data.english.words,
+      wordsRevision: data.english.wordsRevision ?? 0,
+    }));
+    setPreview(false);
+    setConfirmed(false);
+    setMessage(
+      "Le vocabulaire publié a été mis à jour. Votre brouillon de verbes et de temps est conservé.",
+    );
+  }, [
+    draft.ready,
+    settings.wordsRevision,
+    data.english.wordsRevision,
+    data.english.words,
+    setSettings,
+  ]);
   const showToolInput = toolInput ?? settings.toolWords.join(", ");
   const effective: EnglishSettings = {
     ...settings,

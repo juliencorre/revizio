@@ -10,6 +10,7 @@ import { parseLearningData } from "../src/domain/learning";
 import { subjects } from "../src/domain/fixtures";
 import type { ServerRuntime } from "./runtime";
 import { childData, mergeChildData } from "./access";
+import { preserveVocabularyForLegacyClient } from "./vocabulary";
 import {
   hashSecret,
   newToken,
@@ -420,6 +421,12 @@ export async function configureServerRoutes(
           data: user.role === "child" ? childData(current.data) : current.data,
         },
       );
+    data = preserveVocabularyForLegacyClient(
+      current.data,
+      data,
+      body.data as Record<string, unknown>,
+      user.role === "child",
+    );
     if (user.role === "child")
       data = mergeChildData(current.data, data, profile.id);
     else

@@ -709,9 +709,18 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       assertParent();
       const error = englishValidation(input);
       if (error) throw new Error(error);
-      const english = normalizeEnglish(input);
-      const material = buildEnglishMaterial(english);
       const current = dataRef.current;
+      const normalized = normalizeEnglish(input);
+      const english = {
+        ...normalized,
+        wordsRevision:
+          (current.english?.wordsRevision ?? 0) +
+          (JSON.stringify(normalized.words) ===
+          JSON.stringify(current.english?.words ?? [])
+            ? 0
+            : 1),
+      };
+      const material = buildEnglishMaterial(english);
       commit({
         ...current,
         english,
@@ -719,7 +728,13 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           ...vocabularyListsFor(current).filter(
             (list) => list.id !== legacyEnglishListId,
           ),
-          ...legacyEnglishVocabulary(english),
+          ...legacyEnglishVocabulary(english).map((list) => ({
+            ...list,
+            title:
+              vocabularyListsFor(current).find(
+                (previous) => previous.id === list.id,
+              )?.title ?? list.title,
+          })),
         ],
         courses: material
           ? [
@@ -771,19 +786,35 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         throw new Error(
           "La langue d’une liste existante ne peut pas être changée.",
         );
+      if (list.id === legacyEnglishListId && list.status === "published") {
+        updateEnglish({
+          ...(current.english ?? clone(emptyEnglishSettings)),
+          words: list.words.map((word) => ({
+            id: word.id,
+            en: word.term,
+            fr: word.translation,
+          })),
+        });
+        list.englishWordsRevision = dataRef.current.english?.wordsRevision ?? 0;
+      }
       commit({
-        ...current,
+        ...dataRef.current,
         vocabularyLists: [
           ...lists.filter((item) => item.id !== list.id),
           clone(list),
         ],
       });
     },
-    [assertParent, commit],
+    [assertParent, commit, updateEnglish],
   );
   const deleteVocabularyList = useCallback(
     (id: string) => {
       assertParent();
+      if (id === legacyEnglishListId)
+        updateEnglish({
+          ...(dataRef.current.english ?? clone(emptyEnglishSettings)),
+          words: [],
+        });
       commit({
         ...dataRef.current,
         vocabularyLists: vocabularyListsFor(dataRef.current).filter(
@@ -791,7 +822,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         ),
       });
     },
-    [assertParent, commit],
+    [assertParent, commit, updateEnglish],
   );
   const startVocabularySession = useCallback(
     (

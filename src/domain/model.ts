@@ -221,6 +221,8 @@ export interface EnglishVerb {
   meaning: string;
 }
 export interface EnglishSettings {
+  /** Lets editor drafts detect a newer published word bank without discarding verbs. */
+  wordsRevision?: number;
   words: EnglishWord[];
   verbs: EnglishVerb[];
   tenses: string[];
@@ -241,6 +243,8 @@ export interface VocabularyList {
   title: string;
   status: PublicationStatus;
   words: VocabularyWord[];
+  /** Used only by the migrated English repertoire to reconcile its two editors. */
+  englishWordsRevision?: number;
 }
 export interface VocabularyQuestion {
   id: string;

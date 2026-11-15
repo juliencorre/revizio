@@ -232,6 +232,9 @@ test.describe("sur téléphone", () => {
   }, info) => {
     await page.addInitScript(() => localStorage.setItem("revizo.mode", "demo"));
     await page.goto("/parent/vocabulary?language=spanish");
+    await expect(
+      page.getByRole("button", { name: "Vocabulaire", exact: true }),
+    ).toBeInViewport();
     await page.getByTestId("add-vocabulary-list").click();
     await page.getByTestId("vocabulary-title").fill("Vocabulaire du quotidien");
     await page.getByTestId("publish-vocabulary-list").click();
@@ -271,4 +274,90 @@ test.describe("sur téléphone", () => {
     await expect(page.getByTestId("vocabulary-next")).toBeInViewport();
     await capture(page, info, "mobile-enfant-correction");
   });
+});
+
+test("modifier et supprimer le vocabulaire migré actualise les anciennes cartes sans perdre les verbes", async ({
+  page,
+}) => {
+  const { initialData } = await import("../../src/domain/fixtures");
+  const seed: LearningData = JSON.parse(JSON.stringify(initialData));
+  delete seed.vocabularyLists;
+  seed.english = {
+    words: [{ id: "legacy-castle", en: "castle", fr: "château" }],
+    verbs: [
+      {
+        id: "go",
+        base: "go",
+        past: "went",
+        participle: "gone",
+        meaning: "aller",
+      },
+    ],
+    tenses: ["past-simple"],
+    toolWords: ["the"],
+  };
+  await page.addInitScript(
+    ({ seed, key }) => {
+      localStorage.setItem("revizo.mode", "demo");
+      if (!localStorage.getItem(key))
+        localStorage.setItem(key, JSON.stringify(seed));
+    },
+    { seed, key: storageKey },
+  );
+  await page.goto("/parent/english");
+  await expect(
+    page.getByRole("textbox", { name: "Traduction du mot 1", exact: true }),
+  ).toHaveValue("château");
+  const editor = "/parent/vocabulary/english-repertoire-vocabulary";
+  await page.goto(editor);
+  await page.getByTestId("vocabulary-translation-0").fill("forteresse");
+  await page.getByTestId("publish-vocabulary-list").click();
+  await expect
+    .poll(async () => (await saved(page)).english?.words[0].fr)
+    .toBe("forteresse");
+  expect(
+    (await saved(page)).courses.find(
+      (course) => course.id === "english-repertoire-course",
+    )?.sections[0].content,
+  ).toContain("forteresse");
+  await page.goto("/parent/english");
+  await expect(
+    page.getByRole("textbox", { name: "Traduction du mot 1", exact: true }),
+  ).toHaveValue("forteresse");
+  await page.goto("/student/english");
+  await expect(page.getByTestId("english-flashcard")).toContainText("castle");
+  await page.getByTestId("english-flashcard").click();
+  await expect(page.getByTestId("english-flashcard")).toContainText(
+    "forteresse",
+  );
+  await page.goto(editor);
+  await page
+    .getByRole("button", { name: "Supprimer cette liste", exact: true })
+    .click();
+  await page
+    .getByRole("button", {
+      name: "Confirmer la suppression de la liste",
+      exact: true,
+    })
+    .click();
+  await expect
+    .poll(async () => (await saved(page)).english?.words.length)
+    .toBe(0);
+  expect((await saved(page)).english?.verbs[0].base).toBe("go");
+  expect((await saved(page)).english?.tenses).toEqual(["past-simple"]);
+  expect((await saved(page)).english?.toolWords).toEqual(["the"]);
+  expect(
+    (await saved(page)).vocabularyLists?.some(
+      (list) => list.id === "english-repertoire-vocabulary",
+    ),
+  ).toBe(false);
+  await page.goto("/parent/english");
+  await expect(
+    page.getByRole("textbox", { name: "Traduction du mot 1", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("/student/english");
+  await expect(page.getByTestId("english-flashcard")).toContainText("go");
+  await expect(page.getByTestId("english-flashcard")).not.toContainText(
+    "castle",
+  );
 });

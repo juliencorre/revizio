@@ -59,6 +59,12 @@ const unique = (values: string[]) =>
   new Set(values.map(normalize)).size === values.length;
 export function englishValidation(settings: EnglishSettings): string | null {
   if (
+    settings.wordsRevision !== undefined &&
+    (!Number.isSafeInteger(settings.wordsRevision) ||
+      settings.wordsRevision < 0)
+  )
+    return "La version du répertoire anglais est invalide.";
+  if (
     !Array.isArray(settings.words) ||
     !Array.isArray(settings.verbs) ||
     !Array.isArray(settings.tenses) ||
@@ -108,6 +114,9 @@ export function englishValidation(settings: EnglishSettings): string | null {
 
 export function normalizeEnglish(settings: EnglishSettings): EnglishSettings {
   return {
+    ...(settings.wordsRevision !== undefined
+      ? { wordsRevision: settings.wordsRevision }
+      : {}),
     words: settings.words.map((word) => ({
       ...word,
       en: word.en.trim(),

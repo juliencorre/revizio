@@ -241,3 +241,43 @@ describe("vocabulaire familial protégé par le serveur", () => {
     ).toEqual(source.data.vocabularySessions[0].questions);
   });
 });
+
+describe("compatibilité avec une interface encore en cache", () => {
+  it.each(["parent", "child"] as const)(
+    "une écriture %s sans les nouveaux champs conserve les listes et les séances",
+    async (role) => {
+      const first = await envelope(childToken);
+      first.data.vocabularySessions = [
+        complete(practice(first.data, "preserved-session")),
+      ];
+      expect((await save(childToken, first)).statusCode).toBe(200);
+      const token = role === "parent" ? parentToken : childToken;
+      const old = await envelope(token);
+      delete old.data.vocabularyLists;
+      delete old.data.vocabularySessions;
+      expect((await save(token, old)).statusCode).toBe(200);
+      const after = await envelope(parentToken);
+      expect(after.data.vocabularyLists).toHaveLength(2);
+      expect(after.data.vocabularySessions![0].id).toBe("preserved-session");
+    },
+  );
+  it("une ancienne publication anglaise préserve les listes des autres langues", async () => {
+    const old = await envelope(parentToken);
+    delete old.data.vocabularyLists;
+    delete old.data.vocabularySessions;
+    old.data.english = {
+      words: [{ id: "castle", en: "castle", fr: "château" }],
+      verbs: [],
+      tenses: [],
+      toolWords: [],
+    };
+    expect((await save(parentToken, old)).statusCode).toBe(200);
+    const after = await envelope(parentToken);
+    expect(after.data.vocabularyLists).toHaveLength(3);
+    expect(
+      after.data.vocabularyLists!.find((list) => list.language === "english")
+        ?.words[0].term,
+    ).toBe("castle");
+    expect(after.data.english?.wordsRevision).toBe(1);
+  });
+});

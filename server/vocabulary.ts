@@ -2,12 +2,57 @@ import type { LearningData, VocabularySession } from "../src/domain/model";
 import { clone } from "../src/domain/learning";
 import {
   evaluateVocabularyAnswer,
+  legacyEnglishListId,
+  legacyEnglishVocabulary,
   vocabularyListsFor,
   vocabularyQuestions,
 } from "../src/domain/vocabulary";
 import { HttpError } from "./types";
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
+/** Cached clients that predate this module must not erase its lists or history. */
+export function preserveVocabularyForLegacyClient(
+  current: LearningData,
+  incoming: LearningData,
+  raw: Record<string, unknown>,
+  child: boolean,
+): LearningData {
+  const next = { ...incoming };
+  if (raw.vocabularyLists === undefined) {
+    const lists = vocabularyListsFor(current);
+    if (child)
+      next.vocabularyLists = clone(
+        lists.filter((list) => list.status === "published"),
+      );
+    else {
+      if (!incoming.english) next.english = current.english;
+      const wordsChanged = !same(
+        next.english?.words ?? [],
+        current.english?.words ?? [],
+      );
+      if (next.english)
+        next.english = {
+          ...next.english,
+          wordsRevision:
+            (current.english?.wordsRevision ?? 0) + (wordsChanged ? 1 : 0),
+        };
+      next.vocabularyLists = wordsChanged
+        ? [
+            ...lists.filter((list) => list.id !== legacyEnglishListId),
+            ...legacyEnglishVocabulary(next.english).map((list) => ({
+              ...list,
+              title:
+                lists.find((previous) => previous.id === list.id)?.title ??
+                list.title,
+            })),
+          ]
+        : clone(lists);
+    }
+  }
+  if (raw.vocabularySessions === undefined)
+    next.vocabularySessions = clone(current.vocabularySessions ?? []);
+  return next;
+}
 /** The parent owns lists; the server owns snapshots and grades, even for offline submissions. */
 export function mergeVocabularySessions(
   current: LearningData,

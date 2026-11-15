@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -17,6 +16,7 @@ import {
   AppText,
   Button,
   Card,
+  useWindowClass,
   type NavigationItem,
 } from "@/components/ui";
 import { colors, fontFamily, neumorphic } from "@/theme";
@@ -46,6 +46,10 @@ export function ParentLayout({
   const router = useRouter();
   const data = useLearning();
   const session = useSession();
+  const compact = useWindowClass() === "compact";
+  const tabStyle = compact
+    ? { minWidth: 44, paddingHorizontal: 10 }
+    : undefined;
   const inLibrary = [
     "library",
     "import",
@@ -114,42 +118,49 @@ export function ParentLayout({
           ))}
       </View>
       {inLibrary && (
-        <ScrollView
+        <View
           accessibilityLabel="Rubriques des cours et exercices"
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={{ flexDirection: "row", gap: 8 }}
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
         >
           <Button
             variant={active === "library" ? "secondary" : "ghost"}
-            icon="book"
+            selected={active === "library"}
+            accessibilityLabel="Bibliothèque"
+            style={tabStyle}
+            icon={compact ? undefined : "book"}
             onPress={() => router.push("/parent/library")}
           >
-            Bibliothèque
-          </Button>
-          <Button
-            variant={active === "preparations" ? "secondary" : "ghost"}
-            icon="refresh"
-            onPress={() => router.push("/parent/preparations")}
-          >
-            Préparations IA
+            {compact ? "Cours" : "Bibliothèque"}
           </Button>
           <Button
             variant={active === "vocabulary" ? "secondary" : "ghost"}
-            icon="languages"
+            selected={active === "vocabulary"}
+            style={tabStyle}
+            icon={compact ? undefined : "languages"}
             onPress={() => router.push("/parent/vocabulary")}
           >
             Vocabulaire
           </Button>
           <Button
+            variant={active === "preparations" ? "secondary" : "ghost"}
+            selected={active === "preparations"}
+            accessibilityLabel="Préparations IA"
+            style={tabStyle}
+            icon={compact ? undefined : "refresh"}
+            onPress={() => router.push("/parent/preparations")}
+          >
+            {compact ? "IA" : "Préparations IA"}
+          </Button>
+          <Button
             variant={active === "english" ? "secondary" : "ghost"}
-            icon="languages"
+            selected={active === "english"}
+            style={tabStyle}
+            icon={compact ? undefined : "languages"}
             onPress={() => router.push("/parent/english")}
           >
             Anglais
           </Button>
-        </ScrollView>
+        </View>
       )}
       {children}
     </AppShell>

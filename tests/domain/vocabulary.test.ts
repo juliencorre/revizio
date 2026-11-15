@@ -306,3 +306,32 @@ describe("persistance et synchronisation du vocabulaire", () => {
     expect(() => parseLearningData(JSON.stringify(merged.data))).not.toThrow();
   });
 });
+
+it("conserve intégralement un ancien répertoire anglais de plus de 200 mots", () => {
+  const old = clone(initialData);
+  delete old.vocabularyLists;
+  old.english = {
+    words: Array.from({ length: 250 }, (_, index) => ({
+      id: `legacy-${index}`,
+      en: `word ${index}`,
+      fr: `mot ${index}`,
+    })),
+    verbs: [],
+    tenses: [],
+    toolWords: [],
+  };
+  const migrated = parseLearningData(JSON.stringify(old));
+  expect(migrated.vocabularyLists![0].words).toHaveLength(250);
+  expect(migrated.vocabularyLists![0].status).toBe("published");
+  expect(() => parseLearningData(JSON.stringify(migrated))).not.toThrow();
+  migrated.vocabularySessions = [
+    createVocabularySession(migrated.vocabularyLists![0], [], {
+      id: "large-repertoire",
+      mode: "both",
+      scope: "all",
+      startedAt: "2026-11-15T10:00:00Z",
+    })!,
+  ];
+  expect(migrated.vocabularySessions[0].questions).toHaveLength(500);
+  expect(() => parseLearningData(JSON.stringify(migrated))).not.toThrow();
+});

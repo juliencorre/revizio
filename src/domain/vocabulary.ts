@@ -54,6 +54,7 @@ export function legacyEnglishVocabulary(
 ): VocabularyList[] {
   if (!english?.words.length) return [];
   const list: VocabularyList = {
+    englishWordsRevision: english.wordsRevision ?? 0,
     id: legacyEnglishListId,
     language: "english",
     title: "Mon répertoire d’anglais",
@@ -86,11 +87,15 @@ export function isVocabularyList(value: unknown): value is VocabularyList {
     object(value) &&
     id(value.id) &&
     vocabularyLanguages.some((item) => item.id === value.language) &&
+    (value.id !== legacyEnglishListId || value.language === "english") &&
     text(value.title) &&
+    (value.englishWordsRevision === undefined ||
+      (Number.isSafeInteger(value.englishWordsRevision) &&
+        Number(value.englishWordsRevision) >= 0)) &&
     value.title.length <= 160 &&
     ["draft", "published"].includes(String(value.status)) &&
     Array.isArray(value.words) &&
-    value.words.length <= 200 &&
+    (value.words.length <= 200 || value.id === legacyEnglishListId) &&
     value.words.every(
       (word) =>
         object(word) &&
@@ -355,7 +360,7 @@ export function isVocabularySession(
         Date.parse(value.completedAt) < Date.parse(value.startedAt))) ||
     !Array.isArray(value.questions) ||
     !value.questions.length ||
-    value.questions.length > 400 ||
+    (value.questions.length > 400 && value.listId !== legacyEnglishListId) ||
     !Array.isArray(value.answers)
   )
     return false;
