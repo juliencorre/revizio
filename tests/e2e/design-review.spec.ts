@@ -14,6 +14,14 @@ const screens = [
   { name: "exercices", path: "/student/exercises", ready: "main" },
   { name: "progression", path: "/student/progress", ready: "main" },
   { name: "tableau-parent", path: "/parent", ready: "parent-dashboard" },
+  { name: "anglais-eleve", path: "/student/english", ready: "main" },
+  { name: "controles-eleve", path: "/student/plans", ready: "main" },
+  { name: "ajout-cours-parent", path: "/parent/import", ready: "main" },
+  { name: "preparer-exercices-parent", path: "/parent/exercises", ready: "main" },
+  { name: "controles-parent", path: "/parent/controls", ready: "main" },
+  { name: "anglais-parent", path: "/parent/english", ready: "main" },
+  { name: "preparations-parent", path: "/parent/preparations", ready: "main" },
+  { name: "reglages-parent", path: "/parent/settings", ready: "main" },
 ] as const;
 
 test("captures du parcours élève et parent sur ordinateur", async ({ page }, testInfo) => {
