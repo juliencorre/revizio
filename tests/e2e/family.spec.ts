@@ -127,6 +127,48 @@ async function setup(page: Page) {
   );
   return id;
 }
+
+test.describe("réglages Anthropic", () => {
+  test.use({ serviceWorkers: "block" });
+  test("afficher la configuration Anthropic et sa facturation dans les réglages parent", async ({
+    page,
+  }, info) => {
+    await setup(page);
+    const configuration = {
+      provider: "anthropic",
+      baseUrl: "https://api.anthropic.com",
+      model: "claude-sonnet-5-5",
+      available: true,
+    };
+    await page.route("**/api/settings", (route) =>
+      route.fulfill({ json: configuration }),
+    );
+    await page.goto("/parent/settings");
+    await expect(
+      page.getByText("Claude disponible", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/sont transmis à Anthropic/)).toContainText(
+      "facturée sur votre compte API",
+    );
+    await expect(page.getByTestId("settings-ai-url")).not.toBeEditable();
+    await expect(page.getByTestId("settings-ai-model")).not.toBeEditable();
+    const button = page.getByTestId("settings-ai-save");
+    await button.scrollIntoViewIfNeeded();
+    const box = await button.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    await button.click();
+    await expect(page.getByTestId("settings-ai-feedback")).toContainText(
+      "Le modèle Claude est accessible",
+    );
+    await capture(page, info, "settings-anthropic");
+    configuration.available = false;
+    await page.reload();
+    await page.getByTestId("settings-ai-save").click();
+    await expect(page.getByTestId("settings-ai-feedback")).toContainText(
+      "Vérifiez la clé Anthropic",
+    );
+  });
+});
 async function loginParent(page: Page) {
   await page.goto("/auth?target=parent");
   await page.getByTestId("auth-email").fill(parentEmail);

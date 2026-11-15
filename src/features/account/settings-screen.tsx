@@ -41,7 +41,7 @@ type AiSettings = {
   baseUrl: string;
   model: string;
   available: boolean;
-  provider?: "local" | "cloudflare";
+  provider?: "local" | "cloudflare" | "anthropic";
 };
 type Feedback = {
   section: string;
@@ -82,6 +82,8 @@ export function ParentSettingsScreen() {
     session.mode === "family" && session.user?.role === "parent";
   const online = familyParent && session.serverAvailable && !session.offline;
   const disabled = !!busy;
+  const managedAi =
+    ai?.provider === "cloudflare" || ai?.provider === "anthropic";
   const editingProfile = session.profiles.find(
     (profile) => profile.id === editingId,
   );
@@ -271,10 +273,14 @@ export function ParentSettingsScreen() {
     setFeedback({
       section: "ai",
       message: result.available
-        ? result.provider === "cloudflare"
-          ? "La liaison Cloudflare est configurée. Les préparations utilisent le quota gratuit quotidien."
-          : "Le modèle répond. Les prochaines générations utiliseront ces réglages."
-        : "Réglages enregistrés. Le modèle ne répond pas encore : vérifiez le service et son installation.",
+        ? result.provider === "anthropic"
+          ? "Le modèle Claude est accessible avec la clé du serveur. Les préparations utilisent l’API Anthropic."
+          : result.provider === "cloudflare"
+            ? "La liaison Cloudflare est configurée. Les préparations utilisent le quota gratuit quotidien."
+            : "Le modèle répond. Les prochaines générations utiliseront ces réglages."
+        : result.provider === "anthropic"
+          ? "Le modèle Claude ne répond pas. Vérifiez la clé Anthropic, les autorisations et le modèle dans la configuration du serveur."
+          : "Réglages enregistrés. Le modèle ne répond pas encore : vérifiez le service et son installation.",
       warning: !result.available,
     });
   }
@@ -769,16 +775,20 @@ export function ParentSettingsScreen() {
               {aiLoading
                 ? "Vérification…"
                 : ai?.available
-                  ? ai?.provider === "cloudflare"
-                    ? "IA configurée"
-                    : "Modèle disponible"
+                  ? ai?.provider === "anthropic"
+                    ? "Claude disponible"
+                    : ai?.provider === "cloudflare"
+                      ? "IA configurée"
+                      : "Modèle disponible"
                   : "Modèle à vérifier"}
             </Badge>
           </View>
           <AppText color={colors.muted}>
-            {ai?.provider === "cloudflare"
-              ? "Les documents utilisés pour préparer les fiches sont traités par l’IA hébergée chez Cloudflare. Le quota gratuit est renouvelé chaque jour. Votre relecture reste nécessaire avant publication."
-              : "Les prochaines générations utiliseront ce service et ce modèle. Votre relecture reste nécessaire avant de publier une fiche ou une série."}
+            {ai?.provider === "anthropic"
+              ? "Les textes et images utilisés pour préparer les fiches, les exercices et l’anglais sont transmis à Anthropic. L’utilisation est facturée sur votre compte API. La clé et le modèle se configurent sur le serveur. Votre relecture reste nécessaire avant publication."
+              : ai?.provider === "cloudflare"
+                ? "Les documents utilisés pour préparer les fiches sont traités par l’IA hébergée chez Cloudflare. Le quota gratuit est renouvelé chaque jour. Votre relecture reste nécessaire avant publication."
+                : "Les prochaines générations utiliseront ce service et ce modèle. Votre relecture reste nécessaire avant de publier une fiche ou une série."}
           </AppText>
           <View style={s.formGrid}>
             <View style={s.field}>
@@ -791,12 +801,7 @@ export function ParentSettingsScreen() {
                 keyboardType="url"
                 placeholder="http://127.0.0.1:11434"
                 maxLength={500}
-                editable={
-                  !disabled &&
-                  !aiLoading &&
-                  online &&
-                  ai?.provider !== "cloudflare"
-                }
+                editable={!disabled && !aiLoading && online && !managedAi}
                 testID="settings-ai-url"
               />
             </View>
@@ -809,12 +814,7 @@ export function ParentSettingsScreen() {
                 autoCorrect={false}
                 placeholder="ministral-3:8b"
                 maxLength={120}
-                editable={
-                  !disabled &&
-                  !aiLoading &&
-                  online &&
-                  ai?.provider !== "cloudflare"
-                }
+                editable={!disabled && !aiLoading && online && !managedAi}
                 testID="settings-ai-model"
               />
             </View>
@@ -828,7 +828,7 @@ export function ParentSettingsScreen() {
           >
             {busy === "ai"
               ? "Vérification du modèle…"
-              : ai?.provider === "cloudflare"
+              : managedAi
                 ? "Vérifier la configuration IA"
                 : "Enregistrer et tester le modèle"}
           </Button>

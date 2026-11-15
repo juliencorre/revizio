@@ -14,7 +14,13 @@ import {
   generateExercises,
   type ExtractedPage,
 } from "./ai-core";
-import { HttpError, isoNow, type AiClient, type StoredJob } from "./types";
+import {
+  HttpError,
+  isoNow,
+  type AiClient,
+  type AiSettings,
+  type StoredJob,
+} from "./types";
 
 export class JobQueue {
   private running = false;
@@ -26,6 +32,7 @@ export class JobQueue {
     private options: {
       extractUpload: typeof import("./ai").extractUpload;
       alarmDriven?: boolean;
+      settings?: AiSettings;
     },
   ) {
     for (const job of database.jobs())
@@ -140,7 +147,8 @@ export class JobQueue {
       stage: "lecture",
       message: "Lecture des documents et préparation du contenu.",
     });
-    const settings = this.database.settings(job.familyId);
+    const settings =
+      this.options.settings ?? this.database.settings(job.familyId);
     const payload = job.payload;
     const data = this.database.data(job.profileId).data;
     const old =

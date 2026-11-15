@@ -70,7 +70,11 @@ beforeAll(async () => {
         bindings: [{ name: "FAMILIES", class_name: "FamilyServer" }],
       },
       migrations: [{ tag: "v1", new_sqlite_classes: ["FamilyServer"] }],
-      vars: { FAMILY_ID: "cloud-test" },
+      vars: {
+        FAMILY_ID: "cloud-test",
+        AI_PROVIDER: "anthropic",
+        ANTHROPIC_MODEL: "claude-cloud-test",
+      },
     }),
   );
   server = createTestHarness({
@@ -128,6 +132,31 @@ describe("installation Cloudflare dans workerd", () => {
     expect(created.headers.get("set-cookie")).toMatch(/Secure/);
     expect(created.headers.get("set-cookie")).toMatch(/HttpOnly/);
     const parent = (await created.json()) as SessionSnapshot;
+    const configured = await request(
+      "/api/settings",
+      "GET",
+      undefined,
+      parent.token,
+    );
+    expect(await configured.json()).toMatchObject({
+      provider: "anthropic",
+      model: "claude-cloud-test",
+      baseUrl: "https://api.anthropic.com",
+    });
+    const settingsPatch = await request(
+      "/api/settings",
+      "PATCH",
+      {
+        baseUrl: "https://untrusted.example",
+        model: "client-model",
+      },
+      parent.token,
+    );
+    expect(await settingsPatch.json()).toMatchObject({
+      provider: "anthropic",
+      model: "claude-cloud-test",
+      baseUrl: "https://api.anthropic.com",
+    });
     const profileId = parent.profiles[0].id;
     const health = await (await request("/api/health")).json();
     expect(health).toMatchObject({

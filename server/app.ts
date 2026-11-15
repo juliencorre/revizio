@@ -3,6 +3,7 @@ import { resolve, join } from "node:path";
 import staticPlugin from "@fastify/static";
 import { FamilyDatabase } from "./database";
 import { OllamaClient, extractUpload } from "./ai";
+import { AnthropicClient, anthropicDefaults } from "./anthropic";
 import { JobQueue } from "./jobs";
 import { nodeImages } from "./images-node";
 import { configureServerRoutes } from "./app-core";
@@ -16,8 +17,38 @@ export async function createApp(options: ServerOptions = {}) {
   const database = new FamilyDatabase(
     resolve(options.dataDir ?? process.env.REVIZIO_DATA_DIR ?? ".revizio"),
   );
-  const ai = options.aiClient ?? new OllamaClient();
-  const queue = new JobQueue(database, ai, { extractUpload });
+  const apiKey = options.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY;
+  const provider =
+    options.aiProvider ??
+    process.env.AI_PROVIDER ??
+    (apiKey?.trim() ? "anthropic" : "ollama");
+  if (provider !== "anthropic" && provider !== "ollama") {
+    database.close();
+    throw new Error(
+      "AI_PROVIDER doit être anthropic ou ollama sur le serveur Node.js.",
+    );
+  }
+  const defaults =
+    provider === "anthropic"
+      ? anthropicDefaults(options.anthropicModel ?? process.env.ANTHROPIC_MODEL)
+      : {
+          baseUrl: (
+            options.ollamaUrl ??
+            process.env.OLLAMA_BASE_URL ??
+            "http://127.0.0.1:11434"
+          ).replace(/\/$/, ""),
+          model:
+            options.ollamaModel ?? process.env.OLLAMA_MODEL ?? "ministral-3:8b",
+        };
+  const ai =
+    options.aiClient ??
+    (provider === "anthropic"
+      ? new AnthropicClient(apiKey)
+      : new OllamaClient());
+  const queue = new JobQueue(database, ai, {
+    extractUpload,
+    settings: provider === "anthropic" ? defaults : undefined,
+  });
   const app = Fastify({
     logger: options.logger ?? false,
     bodyLimit: 8 * 1024 * 1024,
@@ -38,15 +69,8 @@ export async function createApp(options: ServerOptions = {}) {
       queue,
       images: nodeImages,
       setupToken: options.setupToken ?? process.env.SETUP_TOKEN,
-      aiDefaults: {
-        baseUrl: (
-          options.ollamaUrl ??
-          process.env.OLLAMA_BASE_URL ??
-          "http://127.0.0.1:11434"
-        ).replace(/\/$/, ""),
-        model:
-          options.ollamaModel ?? process.env.OLLAMA_MODEL ?? "ministral-3:8b",
-      },
+      aiDefaults: defaults,
+      aiProvider: provider,
     },
     options,
   );

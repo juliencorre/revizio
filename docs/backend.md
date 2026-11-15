@@ -6,24 +6,30 @@ Le serveur Node.js 24 fournit une vraie session parent/enfant, des données SQLi
 
 ```sh
 npm install
-ollama pull ministral-3:8b
+cp .env.example .env
+# Renseigner ANTHROPIC_API_KEY dans .env.
 npm run export:web
 npm run server
 ```
 
-Installer Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) pour les PDF. L’OCR imprimé utilise Tesseract.js et télécharge les données françaises au premier document ; elles sont ensuite conservées dans `.revizio/.cache/ocr`. Une connexion réseau est nécessaire pour ce premier téléchargement. Le traitement des documents et l’inférence Ollama restent locaux. Les photos manuscrites ou les OCR peu confiants utilisent la vision du modèle, avec une incertitude visible. Une lecture trop courte est refusée avec une demande de nouvelle photo ou de texte saisi.
+Installer Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) pour les PDF. Avec Anthropic, les images sont transcrites directement par Claude et les textes utiles à la préparation sont transmis à son API ; voir le [guide Anthropic](anthropic.md). Avec `AI_PROVIDER=ollama`, installer le modèle via `ollama pull ministral-3:8b` : l’OCR imprimé utilise Tesseract.js et télécharge les données françaises au premier document, puis les conserve dans `.revizio/.cache/ocr`. L’inférence Ollama reste locale ; les photos manuscrites ou les OCR peu confiants utilisent sa vision. Une lecture trop courte est refusée avec une demande de nouvelle photo ou de texte saisi.
 
 Par défaut : `http://127.0.0.1:4173`, fichiers dans `.revizio/`. Variables possibles :
 
-| Variable | Effet |
-|---|---|
-| `HOST` | Adresse d’écoute, `127.0.0.1` par défaut ; `0.0.0.0` expose au réseau local |
-| `PORT` | Port, `4173` par défaut |
-| `REVIZIO_DATA_DIR` | Répertoire privé SQLite, documents, cache et sauvegardes de restauration |
-| `OLLAMA_BASE_URL` | Serveur Ollama initial, `http://127.0.0.1:11434` |
-| `OLLAMA_MODEL` | Modèle initial, `ministral-3:8b` |
-| `ALLOWED_ORIGINS` | Origines web de développement autorisées, séparées par des virgules |
-| `SECURE_COOKIES` | `true` derrière une terminaison HTTPS |
+| Variable            | Effet                                                                                                     |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `HOST`              | Adresse d’écoute, `127.0.0.1` par défaut ; `0.0.0.0` expose au réseau local                               |
+| `PORT`              | Port, `4173` par défaut                                                                                   |
+| `REVIZIO_DATA_DIR`  | Répertoire privé SQLite, documents, cache et sauvegardes de restauration                                  |
+| `AI_PROVIDER`       | `anthropic` ou `ollama` ; sans valeur explicite, Anthropic si une clé non vide est présente, sinon Ollama |
+| `ANTHROPIC_API_KEY` | Clé privée du serveur, jamais retournée au client ni sauvegardée avec la famille                          |
+| `ANTHROPIC_MODEL`   | Modèle Claude, `claude-sonnet-5-5` par défaut ; nécessite les sorties structurées et la vision            |
+| `OLLAMA_BASE_URL`   | Serveur Ollama initial, `http://127.0.0.1:11434`                                                          |
+| `OLLAMA_MODEL`      | Modèle initial, `ministral-3:8b`                                                                          |
+| `ALLOWED_ORIGINS`   | Origines web de développement autorisées, séparées par des virgules                                       |
+| `SECURE_COOKIES`    | `true` derrière une terminaison HTTPS                                                                     |
+
+Les réglages Anthropic sont fixés par le serveur, y compris pour les familles déjà créées avec Ollama. Le bouton de vérification dans **Famille** consulte l’accès au modèle sans lancer de génération. Pour Ollama, les réglages par famille restent modifiables dans cet écran.
 
 Pour l’iPad, utiliser une adresse accessible sur le réseau familial et HTTPS pour un déploiement durable. Le serveur ne configure pas de tunnel public et ne contient aucune clé IA dans le client. Le bundle de production se construit avec `npm run build:server`, puis démarre avec `npm run serve`.
 

@@ -10,18 +10,19 @@ Sur [cours.gofel.fr](https://cours.gofel.fr), aucune configuration de serveur n�
 
 Vous avez téléchargé le paquet serveur compilé d’une release ? Suivre [son guide d’installation](docs/installation-release.md). Les commandes ci-dessous partent du dépôt source.
 
-Installer Node.js 24, npm, Ollama et Poppler (`pdftotext`, `pdfinfo`, `pdftoppm` disponibles dans le PATH). Ollama doit fonctionner sur la machine qui exécute le serveur Révizo.
+Installer Node.js 24, npm et Poppler (`pdftotext`, `pdfinfo`, `pdftoppm` disponibles dans le PATH). Pour Anthropic, copier `.env.example` vers `.env` et y renseigner `ANTHROPIC_API_KEY` ; voir le [guide Anthropic](docs/anthropic.md). Pour l’IA locale, installer Ollama sur la machine serveur et sélectionner `AI_PROVIDER=ollama`.
 
 ```sh
 npm ci
-ollama pull ministral-3:8b
+cp .env.example .env
+# Renseigner ANTHROPIC_API_KEY dans .env avant de démarrer.
 npm run build
 npm run serve
 ```
 
 Ouvrir `http://127.0.0.1:4173`, choisir **Parent**, puis créer le compte parent et les deux profils enfants, en CM1 et en 5e, chacun avec son code. Le premier espace familial est vide. Le compte du conjoint s’ajoute depuis **Famille**, avec confirmation du mot de passe du parent connecté. Le foyer est limité côté serveur à deux parents et deux enfants. La démonstration est désactivée sur les installations familiales.
 
-Le serveur conserve SQLite et les pièces jointes privées dans `.revizio/`. Il utilise par défaut Ollama à `http://127.0.0.1:11434` et le modèle `ministral-3:8b`. Ces réglages se modifient dans **Réglages**. Les premières lectures OCR téléchargent les données françaises de Tesseract ; elles sont ensuite mises en cache. Le détail des variables, limites et sauvegardes figure dans le [guide serveur](docs/backend.md).
+Le serveur conserve SQLite et les pièces jointes privées dans `.revizio/`. Avec la configuration d’exemple, les préparations utilisent l’API Anthropic et le modèle `claude-sonnet-5-5`. La clé et le modèle se configurent exclusivement sur le serveur. Le mode Ollama conserve son modèle `ministral-3:8b`, ses réglages dans **Famille** et son OCR Tesseract local. Le détail des variables, limites et sauvegardes figure dans le [guide serveur](docs/backend.md).
 
 Pour accéder au serveur depuis l’iPad du même réseau :
 
@@ -31,17 +32,18 @@ HOST=0.0.0.0 PORT=4173 npm run serve
 
 Ouvrir alors l’adresse réseau de cette machine dans Safari. Pour une installation durable, servir l’application et `/api` sous la même origine HTTPS ; définir `SECURE_COOKIES=true` derrière cette terminaison HTTPS. Safari permet ensuite **Partager → Sur l’écran d’accueil**. Le cache de l’interface s’installe après une première ouverture en ligne ; une adresse LAN en HTTP ne suffit pas sur iPad. Voir [installation iPad et hors connexion](docs/ipad-offline.md).
 
-## Héberger gratuitement sur Cloudflare
+## Héberger sur Cloudflare
 
-L’application est accessible sur **[cours.gofel.fr](https://cours.gofel.fr)**. Le [guide Cloudflare](docs/cloudflare.md) installe l’application complète sur Workers : données et documents privés dans un Durable Object SQLite, préparations avec Workers AI. L’ordinateur familial peut être éteint. Le déploiement utilise l’offre Workers Free et ses quotas ; aucun abonnement payant ni stockage R2 n’est nécessaire.
+L’application est accessible sur **[cours.gofel.fr](https://cours.gofel.fr)**. Le [guide Cloudflare](docs/cloudflare.md) installe l’application complète sur Workers : données et documents privés dans un Durable Object SQLite, préparations avec Anthropic. L’ordinateur familial peut être éteint. L’hébergement utilise l’offre Workers Free et ses quotas ; les appels Anthropic sont facturés séparément sur votre compte API.
 
 ```sh
 npm ci
 npx wrangler login --device
+npx wrangler secret put ANTHROPIC_API_KEY
 npm run deploy:cloud
 ```
 
-Le premier compte se crée avec un code d’installation privé conservé dans `.cloudflare/installation-code`. Les documents utilisés pour l’IA sont alors traités chez Cloudflare. Les instructions de serveur local ci-dessus restent disponibles pour conserver Ollama sur l’ordinateur familial.
+Le premier compte se crée avec un code d’installation privé conservé dans `.cloudflare/installation-code`. Les documents utilisés pour l’IA sont transmis à Anthropic ; la clé reste un secret du Worker. Le [guide Anthropic](docs/anthropic.md) décrit aussi l’alternative Workers AI et la configuration locale avec Ollama.
 
 ## Premier parcours
 
