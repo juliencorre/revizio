@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Platform, StyleSheet, View, type TextInputProps } from "react-native";
 import { AppIcon, AppText, Button, Card } from "@/components/ui";
 import { Field, Notice } from "@/features/parent/shared";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import {
   apiBase,
   apiFetch,
@@ -98,6 +98,7 @@ export function ServerConnectionCard({
   initiallyExpanded?: boolean;
   testPrefix?: string;
 }) {
+  const { colors } = useTheme();
   const session = useSession();
   const [expanded, setExpanded] = useState(
     initiallyExpanded || !session.serverAvailable || Platform.OS !== "web",

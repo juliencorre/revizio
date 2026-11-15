@@ -5,7 +5,7 @@ import { Field, Notice } from "@/features/parent/shared";
 import { FAMILY_LIMITS } from "@/domain/family";
 import { apiFetch } from "@/services/api";
 import { useSession } from "@/state/session";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import {
   PasswordField,
   accountStyles as s,
@@ -16,6 +16,7 @@ import {
 type Parent = { id: string; name: string; email: string };
 
 export function ParentAccountsCard({ online }: { online: boolean }) {
+  const { colors } = useTheme();
   const { user } = useSession();
   const [parents, setParents] = useState<Parent[] | null>(null);
   const [name, setName] = useState("");

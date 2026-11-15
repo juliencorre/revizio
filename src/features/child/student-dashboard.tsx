@@ -12,7 +12,7 @@ import {
   useWindowClass,
   useContentWidth,
 } from "@/components/ui";
-import { colors, radius, spacing } from "@/theme";
+import { useTheme, radius, spacing } from "@/theme";
 import { useChildData, ChildShell, Loading } from "./shared";
 import { SubjectGrid } from "./subjects-screen";
 import { nextStudySession } from "@/domain/study-overview";
@@ -20,6 +20,7 @@ import type { Href } from "expo-router";
 
 /** Decorative landscape only on home. Study and exercise pages stay neutral. */
 function MountainHeader({ name, grade }: { name: string; grade: string }) {
+  const { colors } = useTheme();
   const compact = useWindowClass() === "compact";
   return (
     <View
@@ -61,8 +62,8 @@ function MountainHeader({ name, grade }: { name: string; grade: string }) {
             <Defs>
               <LinearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
                 <Stop offset="0" stopColor={colors.welcome} />
-                <Stop offset="0.68" stopColor="#F8E5EB" />
-                <Stop offset="1" stopColor="#C7D9FA" />
+                <Stop offset="0.68" stopColor={colors.skyMid} />
+                <Stop offset="1" stopColor={colors.skyEnd} />
               </LinearGradient>
               <LinearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
                 <Stop offset="0" stopColor={colors.welcome} />
@@ -77,20 +78,20 @@ function MountainHeader({ name, grade }: { name: string; grade: string }) {
             <Rect width="1100" height="200" fill="url(#sky)" />
             <Path
               d="M0 145 L85 100 L125 119 L230 60 L280 92 L360 132 L455 63 L530 108 L600 147 L710 91 L750 120 L900 37 L1040 125 L1100 100 L1100 200 L0 200 Z"
-              fill="#A5B8E3"
+              fill={colors.ridgeFar}
             />
             <Path
               d="M0 165 L125 120 L185 139 L270 98 L390 158 L540 126 L665 159 L794 91 L905 143 L995 100 L1100 156 L1100 200 L0 200 Z"
-              fill="#7898D2"
+              fill={colors.ridgeNear}
             />
             <Path
               d="M215 72 L230 60 L248 75 L238 72 L231 82 L224 72 Z M883 53 L900 37 L923 59 L908 55 L900 66 L892 57 Z M449 71 L455 63 L465 76 L455 71 Z"
-              fill="#FFFFFF"
+              fill={colors.snow}
               opacity="0.95"
             />
             <Path
               d="M0 175 Q200 155 400 184 T800 171 T1100 182 L1100 200 L0 200 Z"
-              fill="#4D71AF"
+              fill={colors.foothills}
               opacity="0.45"
             />
             <Rect width="1100" height="200" fill="url(#veil)" />
@@ -126,6 +127,7 @@ function MountainHeader({ name, grade }: { name: string; grade: string }) {
 }
 
 export function StudentDashboard() {
+  const { colors } = useTheme();
   const router = useRouter();
   const data = useChildData();
   const compact = useWindowClass() === "compact";

@@ -11,7 +11,7 @@ import {
   PageHeading,
   ProgressBar,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import type { PlanStep } from "@/domain/model";
 import {
@@ -30,6 +30,7 @@ function formattedDate(value: string) {
   });
 }
 export function StudentPlansScreen() {
+  const { colors } = useTheme();
   const data = useLearning();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();

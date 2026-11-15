@@ -3,9 +3,9 @@ import { View } from "react-native";
 import { AppText, Badge, Button, Card } from "@/components/ui";
 import { LearningDiagram } from "@/components/learning-diagram";
 import type { LearningDiagram as Diagram } from "@/domain/model";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { useLocalDraft } from "@/features/planning/use-local-draft";
-import { Field, Notice, localId, parentStyles as s } from "./shared";
+import { Field, Notice, localId, useParentStyles } from "./shared";
 
 interface DiagramForm {
   base: string;
@@ -159,6 +159,8 @@ function EditableDiagram({
   onChange,
   onPendingChange,
 }: DiagramEditorProps) {
+  const { colors } = useTheme();
+  const s = useParentStyles();
   const [form, setForm, local] = useLocalDraft(
     storageKey,
     fromDiagram(value),

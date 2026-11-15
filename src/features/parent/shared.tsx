@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Image,
   Pressable,
-  StyleSheet,
   TextInput,
   View,
   type TextInputProps,
@@ -17,7 +16,7 @@ import {
   Card,
   type NavigationItem,
 } from "@/components/ui";
-import { colors, fontFamily, neumorphic } from "@/theme";
+import { createThemedStyles, useTheme, fontFamily } from "@/theme";
 import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
@@ -58,6 +57,7 @@ export function ParentLayout({
 }
 
 export function ParentWorkspace({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
   const active = usePathname().split("/")[2] || "dashboard";
   const router = useRouter();
   const returnTab: SubjectTab =
@@ -205,6 +205,8 @@ export function Field({
   onBlur,
   ...props
 }: TextInputProps & { label: string; optional?: boolean }) {
+  const { colors, neumorphic } = useTheme();
+  const styles = useStyles();
   const [focused, setFocused] = useState(false);
   return (
     <View style={{ gap: 8 }}>
@@ -244,6 +246,8 @@ export function Notice({
   error?: boolean;
   success?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const color = error ? colors.danger : success ? colors.green : colors.orange;
   return (
     <View
@@ -289,6 +293,7 @@ export function LoadingParent({
   );
 }
 export function ParentNotFound() {
+  const { colors } = useTheme();
   const router = useRouter();
   return (
     <ParentLayout active="dashboard">
@@ -316,6 +321,8 @@ export function SourcePreview({
   index: number;
   controls?: ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const image =
@@ -377,7 +384,7 @@ export function localId(prefix: string) {
     Math.random().toString(36).slice(2, 8)
   );
 }
-export const parentStyles = StyleSheet.create({
+export const useParentStyles = createThemedStyles(({ colors, neumorphic }) => ({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 20 },
   column: { flex: 1, minWidth: 280, minHeight: "auto", gap: 20 },
   row: {
@@ -412,10 +419,11 @@ export const parentStyles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.primaryLight,
   },
-});
-const styles = StyleSheet.create({
+}));
+const useStyles = createThemedStyles(({ colors, neumorphic }) => ({
   input: {
     ...neumorphic.inset,
+    borderColor: colors.controlBorder,
     minHeight: 54,
     fontFamily,
     borderRadius: 18,
@@ -442,4 +450,4 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     gap: 8,
   },
-});
+}));

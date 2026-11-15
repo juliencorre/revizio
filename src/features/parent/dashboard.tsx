@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   AppIcon,
@@ -10,7 +10,7 @@ import {
   useWindowClass,
 } from "@/components/ui";
 import { plural } from "@/domain/format";
-import { colors, spacing } from "@/theme";
+import { createThemedStyles, useTheme, spacing } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import { dateOnly, stepIsLate } from "@/domain/planning";
 import { learningOverview, preparationStatus } from "@/domain/study-overview";
@@ -19,6 +19,8 @@ import { usePreparationJobs } from "./preparations";
 import { ParentSubjectGrid } from "./subjects";
 
 export function ParentDashboard() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const data = useLearning();
   const compact = useWindowClass() === "compact";
@@ -267,7 +269,7 @@ export function ParentDashboard() {
     </ParentLayout>
   );
 }
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors }) => ({
   draftRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -278,4 +280,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
   },
   draftTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 240, gap: spacing.xs },
-});
+}));

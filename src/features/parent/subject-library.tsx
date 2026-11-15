@@ -1,11 +1,5 @@
 import { useRef, type ComponentRef } from "react";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-  type ViewProps,
-} from "react-native";
+import { Platform, Pressable, View, type ViewProps } from "react-native";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { AppIcon, AppText, Button, useFocusVisible } from "@/components/ui";
 import { englishTenses } from "@/domain/english";
@@ -14,7 +8,7 @@ import type { IconName, Subject } from "@/domain/model";
 import { preparationStatus } from "@/domain/study-overview";
 import { vocabularyLanguages, vocabularyProgress } from "@/domain/vocabulary";
 import { useLearning } from "@/state/learning-store";
-import { colors, spacing } from "@/theme";
+import { createThemedStyles, useTheme, spacing } from "@/theme";
 import { localId } from "./shared";
 import type { SubjectTab } from "./subject-navigation";
 
@@ -41,6 +35,8 @@ function TabStrip({
   tab: SubjectTab;
   select: (tab: SubjectTab) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const refs = useRef<
     Partial<Record<SubjectTab, ComponentRef<typeof View> | null>>
   >({});
@@ -114,6 +110,8 @@ interface Entry {
   accessibilityLabel?: string;
 }
 function EntryRow({ entry }: { entry: Entry }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const { focusVisible, onFocus, onBlur } = useFocusVisible();
   const { href, title, detail, icon, status } = entry;
@@ -179,6 +177,8 @@ function courseHeading(subject: Subject) {
 }
 
 export function SubjectLibrary({ subject }: { subject: Subject }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const data = useLearning();
   const router = useRouter();
   const { tab: requested } = useLocalSearchParams<{ tab?: string }>();
@@ -355,7 +355,7 @@ export function SubjectLibrary({ subject }: { subject: Subject }) {
     </View>
   );
 }
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors }) => ({
   tabs: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -409,4 +409,4 @@ const styles = StyleSheet.create({
     outlineWidth: 2,
     outlineColor: colors.primary,
   },
-});
+}));

@@ -14,7 +14,7 @@ import {
 import { useLearning } from "@/state/learning-store";
 import { preparationStatus } from "@/domain/study-overview";
 import { plural } from "@/domain/format";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { preparationHref } from "./subject-navigation";
 import { Field, LoadingParent, ParentLayout } from "./shared";
 
@@ -30,6 +30,7 @@ const matchesStatus = (status: string, filter: Filter) =>
   status === statuses.find((item) => item.id === filter)?.label;
 
 export function ParentLibraryScreen() {
+  const { colors, subjectAccent } = useTheme();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const data = useLearning();
   const router = useRouter();
@@ -280,7 +281,7 @@ export function ParentLibraryScreen() {
                   >
                     <AppIcon
                       name={subject?.icon ?? "book"}
-                      color={subject?.color}
+                      color={subjectAccent(subject?.color)}
                     />
                     <AppText variant="small" color={colors.muted}>
                       {subject?.title} ·{" "}

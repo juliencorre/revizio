@@ -17,15 +17,17 @@ import {
   vocabularyProgress,
 } from "@/domain/vocabulary";
 import { ChildShell, Loading } from "@/features/child/shared";
-import { colors, spacing } from "@/theme";
+import { useTheme, spacing } from "@/theme";
 import {
   MasteryRule,
   VocabularySummary,
   WordProgressList,
-  vocabularyStyles,
+  useVocabularyStyles,
 } from "./shared";
 
 export function StudentVocabularyList() {
+  const { colors } = useTheme();
+  const vocabularyStyles = useVocabularyStyles();
   const data = useLearning();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();

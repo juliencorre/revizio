@@ -12,7 +12,7 @@ import {
   EmptyState,
   PageHeading,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import type {
   AiJob,
   ExerciseSeries,
@@ -28,7 +28,7 @@ import {
   Notice,
   ParentLayout,
   localId,
-  parentStyles as s,
+  useParentStyles,
 } from "./shared";
 
 const formats: { id: QuestionType; label: string }[] = [
@@ -244,6 +244,8 @@ function ExercisesEditor({
   courseId?: string;
   requestedId: string;
 }) {
+  const { colors, subjectAccent } = useTheme();
+  const s = useParentStyles();
   const data = useLearning();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -795,12 +797,14 @@ function ExercisesEditor({
                       >
                         <AppIcon
                           name={selected ? "check" : (subject?.icon ?? "book")}
-                          color={selected ? colors.primary : subject?.color}
+                          color={
+                            selected
+                              ? colors.primary
+                              : subjectAccent(subject?.color)
+                          }
                         />
                         <View style={{ flex: 1, gap: 3 }}>
-                          <AppText variant="small" color={subject?.color}>
-                            {subject?.title}
-                          </AppText>
+                          <AppText variant="small">{subject?.title}</AppText>
                           <AppText variant="label">{course.title}</AppText>
                         </View>
                       </Pressable>

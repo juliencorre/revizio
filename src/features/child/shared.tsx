@@ -17,7 +17,7 @@ import {
   useContentWidth,
   type NavigationItem,
 } from "@/components/ui";
-import { colors, neumorphic } from "@/theme";
+import { useTheme } from "@/theme";
 import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import { useLearning } from "@/state/learning-store";
 import { plural } from "@/domain/format";
@@ -132,6 +132,7 @@ export function StudentWorkspace({ children }: { children: ReactNode }) {
 }
 
 export function Loading() {
+  const { colors } = useTheme();
   return (
     <Card style={{ alignItems: "center", gap: 14, paddingVertical: 48 }}>
       <ActivityIndicator color={colors.primary} size="large" />
@@ -185,6 +186,7 @@ export function CourseCard({
   course: Course;
   series: ExerciseSeries[];
 }) {
+  const { colors } = useTheme();
   const router = useRouter();
   return (
     <View testID={`course-card-${course.id}`} style={{ flex: 1 }}>
@@ -194,7 +196,7 @@ export function CourseCard({
             style={[
               styles.smallIcon,
               {
-                backgroundColor: "#EAE0FF",
+                backgroundColor: colors.primaryLight,
                 width: 58,
                 height: 58,
                 borderRadius: 17,
@@ -235,6 +237,7 @@ export function SeriesCard({
   attempts: Attempt[];
   subjects: Subject[];
 }) {
+  const { colors } = useTheme();
   const router = useRouter();
   const last = latestAttempt(attempts, series.id);
   const subject = subjectFor(subjects, series.subjectId);
@@ -245,7 +248,7 @@ export function SeriesCard({
         <View style={{ flex: 1 }}>
           <AppText
             variant="small"
-            color={subject?.color ?? colors.primary}
+            color={colors.ink}
             style={{ fontWeight: "700" }}
           >
             {subject?.title ?? "Mes exercices"}
@@ -338,9 +341,4 @@ export const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   stack: { gap: 18 },
-  quietCard: {
-    backgroundColor: "#F8F9FE",
-    borderColor: colors.border,
-    boxShadow: "none",
-  },
 });

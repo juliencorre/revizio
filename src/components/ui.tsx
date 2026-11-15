@@ -74,11 +74,11 @@ import {
 } from "lucide-react-native";
 import { usePathname, useRouter, type Href } from "expo-router";
 import {
-  colors,
+  createThemedStyles,
+  useTheme,
   radius,
   fontFamily,
   layout,
-  neumorphic,
   windowClassFor,
   type WindowClass,
 } from "@/theme";
@@ -224,14 +224,15 @@ function isHovered(state: PressableStateCallbackType) {
 export function AppIcon({
   name,
   size = 22,
-  color = colors.primary,
+  color,
 }: {
   name: IconName;
   size?: number;
   color?: string;
 }) {
+  const { colors } = useTheme();
   const Icon = icons[name] ?? GraduationCap;
-  return <Icon size={size} color={color} strokeWidth={1.8} />;
+  return <Icon size={size} color={color ?? colors.primary} strokeWidth={1.8} />;
 }
 export function AppText({
   children,
@@ -247,6 +248,7 @@ export function AppText({
   numberOfLines?: number;
   testID?: string;
 }) {
+  const styles = useStyles();
   const windowClass = useWindowClass();
   return (
     <Text
@@ -294,11 +296,18 @@ export function Button({
   selected?: boolean;
   expanded?: boolean;
 }) {
+  const { colors, neumorphic } = useTheme();
+  const styles = useStyles();
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const compact = useWindowClass() === "compact";
+  const buttonStyles = useButtonStyles();
   const filled = variant === "primary" || variant === "orange";
+  const filledHover = {
+    backgroundColor:
+      variant === "orange" ? colors.orangeHover : colors.primaryDark,
+  };
   const foreground = filled
-    ? "#FFFFFF"
+    ? colors.onPrimary
     : variant === "danger"
       ? colors.danger
       : colors.primary;
@@ -321,12 +330,12 @@ export function Button({
           styles.button,
           compact && styles.buttonCompact,
           buttonStyles[variant],
-          hovered && (filled ? filledHover[variant] : styles.raisedHover),
+          hovered && (filled ? filledHover : styles.raisedHover),
           focused && !disabled && styles.focusRing,
           pressed &&
             !disabled &&
             (filled
-              ? [neumorphic.coloredPressed, filledHover[variant]]
+              ? [neumorphic.coloredPressed, filledHover]
               : { backgroundColor: colors.surfaceInset }),
           disabled && { opacity: 0.48, boxShadow: neumorphic.inset.boxShadow },
           style,
@@ -349,7 +358,7 @@ export function IconButton({
   icon,
   label,
   onPress,
-  color = colors.primary,
+  color,
   testID,
   dark = false,
   expanded,
@@ -362,6 +371,8 @@ export function IconButton({
   dark?: boolean;
   expanded?: boolean;
 }) {
+  const { colors, neumorphic } = useTheme();
+  const styles = useStyles();
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   return (
     <Pressable
@@ -382,7 +393,10 @@ export function IconButton({
         state.pressed && (dark ? styles.drawerItemHover : neumorphic.inset),
       ]}
     >
-      <AppIcon name={icon} color={dark ? colors.onPrimary : color} />
+      <AppIcon
+        name={icon}
+        color={dark ? colors.navigationInk : (color ?? colors.primary)}
+      />
     </Pressable>
   );
 }
@@ -397,6 +411,8 @@ export function Card({
   testID?: string;
   inset?: boolean;
 }) {
+  const { neumorphic } = useTheme();
+  const styles = useStyles();
   const windowClass = useWindowClass();
   return (
     <View
@@ -427,6 +443,8 @@ export function ActionCard({
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { focusVisible, onFocus, onBlur } = useFocusVisible();
   return (
     <Pressable
@@ -455,6 +473,8 @@ export function Badge({
   children: ReactNode;
   tone?: "primary" | "green" | "orange" | "muted";
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const tones = {
     primary: [colors.primaryLight, colors.primary],
     green: [colors.greenLight, colors.green],
@@ -484,6 +504,8 @@ export function EmptyState({
   description: string;
   children?: ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const compact = useWindowClass() === "compact";
   return (
     <Card style={{ alignItems: "center", padding: compact ? 24 : 36, gap: 14 }}>
@@ -505,11 +527,13 @@ export function EmptyState({
 }
 export function ProgressBar({
   value,
-  color = colors.primary,
+  color,
 }: {
   value: number;
   color?: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   return (
     <View
       accessibilityRole="progressbar"
@@ -521,7 +545,7 @@ export function ProgressBar({
           width: `${Math.min(100, Math.max(0, value))}%`,
           height: "100%",
           borderRadius: 8,
-          backgroundColor: color,
+          backgroundColor: color ?? colors.primary,
         }}
       />
     </View>
@@ -538,6 +562,8 @@ export function PageHeading({
   description?: string;
   action?: ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const compact = useWindowClass() === "compact";
   return (
     <View style={[styles.heading, compact && { gap: 16 }]}>
@@ -605,10 +631,12 @@ function DrawerItem({
   dark?: boolean;
   parentRail?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const tint = item.active
     ? parentRail
-      ? colors.onPrimary
+      ? colors.navigationInk
       : colors.primaryDark
     : dark
       ? colors.navigationMuted
@@ -623,10 +651,10 @@ function DrawerItem({
       onBlur={onBlur}
       style={(state) => [
         styles.drawerItem,
-        isHovered(state) &&
+        (isHovered(state) || state.pressed) &&
           !item.active &&
           (dark ? styles.drawerItemHover : styles.raisedHover),
-        (state.pressed || item.active) &&
+        item.active &&
           (dark ? styles.drawerItemActive : styles.indicatorActive),
         parentRail && { borderRadius: 8, paddingHorizontal: 10, gap: 10 },
         parentRail &&
@@ -671,10 +699,12 @@ function StackedNavItem({
   expanded?: boolean;
   dark?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const tint = dark
     ? active
-      ? colors.onPrimary
+      ? colors.navigationInk
       : colors.navigationMuted
     : active
       ? colors.primaryDark
@@ -697,10 +727,10 @@ function StackedNavItem({
           <View
             style={[
               styles.indicator,
-              isHovered(state) &&
+              (isHovered(state) || state.pressed) &&
                 !active &&
                 (dark ? styles.drawerItemHover : styles.indicatorHover),
-              (active || state.pressed) &&
+              active &&
                 (dark ? styles.indicatorActiveDark : styles.indicatorActive),
               focused && (dark ? styles.focusRingDark : styles.focusRing),
             ]}
@@ -739,6 +769,7 @@ function NavigationSheet({
   onNavigate: (item: NavigationItem) => void;
   onSwitchProfile: () => void;
 }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <Modal
@@ -793,6 +824,7 @@ function NavigationBar({
   onNavigate: (item: NavigationItem) => void;
   onSwitchProfile: () => void;
 }) {
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const overflowing = items.length > MAX_BAR_ITEMS;
   const primary = overflowing ? items.slice(0, MAX_BAR_ITEMS - 1) : items;
@@ -861,6 +893,8 @@ function NavigationRail({
   grade: string;
   width: number;
 }) {
+  const { colors, subjectAccent } = useTheme();
+  const styles = useStyles();
   return (
     <View
       role="navigation"
@@ -877,7 +911,7 @@ function NavigationRail({
             onPress={onToggle}
           />
           {expanded && (
-            <AppText variant="heading" color={colors.onPrimary}>
+            <AppText variant="heading" color={colors.navigationInk}>
               Révizo
             </AppText>
           )}
@@ -931,13 +965,15 @@ function NavigationRail({
         </View>
         {/* Context follows the destinations so it cannot shift their position. */}
         {expanded && subject && (
-          <View style={[styles.subject, { backgroundColor: subject.color }]}>
-            <AppIcon name={subject.icon} color={colors.onPrimary} size={28} />
-            <AppText variant="label" color={colors.onPrimary}>
-              {subject.title}
-            </AppText>
+          <View style={styles.subject}>
+            <AppIcon
+              name={subject.icon}
+              color={subjectAccent(subject.color)}
+              size={28}
+            />
+            <AppText variant="label">{subject.title}</AppText>
             {role === "child" && (
-              <AppText variant="small" color={colors.onPrimary}>
+              <AppText variant="small" color={colors.muted}>
                 {grade} · À ton rythme
               </AppText>
             )}
@@ -967,6 +1003,7 @@ function NavigationRail({
 
 /** Route loading is confined to the page, leaving navigation usable. */
 export function PageLoading() {
+  const { colors } = useTheme();
   return (
     <View
       role="status"
@@ -1007,6 +1044,8 @@ export function AppShell({
   contentLoading?: boolean;
   pageKey: string;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { width } = useWindowDimensions();
   const windowClass = windowClassFor(width);
   const session = useSession();
@@ -1073,7 +1112,7 @@ export function AppShell({
             <Brand compact />
             {role === "parent" && (
               <View style={{ alignSelf: "center" }}>
-                <Badge tone="orange">Parent</Badge>
+                <Badge tone="muted">Parent</Badge>
               </View>
             )}
             <View style={{ flex: 1 }} />
@@ -1182,6 +1221,7 @@ function BrandMark({
   size?: number;
   dark?: boolean;
 }) {
+  const { colors } = useTheme();
   return (
     <View
       style={{
@@ -1195,7 +1235,7 @@ function BrandMark({
     >
       <AppIcon
         name="book"
-        color={dark ? "#FFFFFF" : colors.primary}
+        color={dark ? colors.navigationInk : colors.primary}
         size={Math.round(size * 0.62)}
       />
     </View>
@@ -1208,12 +1248,13 @@ export function Brand({
   compact?: boolean;
   dark?: boolean;
 }) {
+  const { colors } = useTheme();
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
       <BrandMark dark={dark} size={compact ? 36 : 42} />
       <AppText
         variant={compact ? "heading" : "title"}
-        color={dark ? "#FFFFFF" : colors.ink}
+        color={dark ? colors.navigationInk : colors.ink}
         style={compact ? { fontSize: 22, lineHeight: 28 } : undefined}
       >
         Révizo
@@ -1257,7 +1298,7 @@ const mediumText: Partial<Record<keyof typeof textStyles, TextStyle>> = {
   title: { fontSize: 32, lineHeight: 40 },
   heading: { fontSize: 22, lineHeight: 30 },
 };
-const buttonStyles = StyleSheet.create({
+const useButtonStyles = createThemedStyles(({ colors, neumorphic }) => ({
   primary: {
     ...neumorphic.colored,
     backgroundColor: colors.primary,
@@ -1271,12 +1312,9 @@ const buttonStyles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
   },
   danger: { ...neumorphic.small, backgroundColor: colors.dangerLight },
-});
-const filledHover: Partial<Record<keyof typeof buttonStyles, ViewStyle>> = {
-  primary: { backgroundColor: colors.primaryDark },
-  orange: { backgroundColor: "#8E3A09" },
-};
-const styles = StyleSheet.create({
+}));
+
+const useStyles = createThemedStyles(({ colors, neumorphic }) => ({
   text: { color: colors.ink, fontFamily, flexShrink: 1 },
   button: {
     alignSelf: "flex-start",
@@ -1313,7 +1351,7 @@ const styles = StyleSheet.create({
     outlineOffset: 2,
   },
   focusRingDark: {
-    outlineColor: colors.onPrimary,
+    outlineColor: colors.navigationInk,
     outlineStyle: "solid",
     outlineWidth: 3,
     outlineOffset: 2,
@@ -1364,8 +1402,9 @@ const styles = StyleSheet.create({
   },
   shell: { flex: 1, flexDirection: "row", backgroundColor: colors.background },
   subject: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
+    borderColor: colors.border,
     borderRadius: 26,
     padding: 22,
     gap: 12,
@@ -1386,6 +1425,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navigationHover,
   },
   drawerItemActive: {
+    borderColor: colors.navigationMuted,
     backgroundColor: colors.primaryLight,
   },
   stackedItem: {
@@ -1405,13 +1445,14 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   indicatorHover: {
-    backgroundColor: "rgba(96,69,217,0.10)",
+    backgroundColor: colors.primaryLight,
   },
   indicatorActive: {
     backgroundColor: colors.primaryLight,
-    borderColor: "rgba(96,69,217,0.10)",
+    borderColor: colors.primary,
   },
   indicatorActiveDark: {
+    borderColor: colors.navigationMuted,
     backgroundColor: colors.primaryLight,
   },
   navLabel: {
@@ -1492,6 +1533,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     ...neumorphic.raised,
+    backgroundColor: colors.surfaceRaised,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     borderTopLeftRadius: 28,
@@ -1508,7 +1550,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#AEB8CA",
+    backgroundColor: colors.controlBorder,
     marginBottom: 4,
   },
   sheetHeader: {
@@ -1527,4 +1569,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 20,
   },
-});
+}));

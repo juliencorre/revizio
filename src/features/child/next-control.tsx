@@ -1,10 +1,11 @@
 import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { AppText, Badge, Button, Card } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { dateOnly } from "@/domain/planning";
 import { formatDate, useChildData } from "./shared";
 export function NextControl({ subjectId }: { subjectId?: string }) {
+  const { colors } = useTheme();
   const data = useChildData();
   const router = useRouter();
   const next = data.plans
@@ -18,7 +19,7 @@ export function NextControl({ subjectId }: { subjectId?: string }) {
   if (!next) return null;
   const remaining = next.steps.filter((step) => !step.completedAt).length;
   return (
-    <Card style={{ gap: 16, backgroundColor: colors.primaryLight }}>
+    <Card style={{ gap: 16 }}>
       <View
         style={{
           flexDirection: "row",

@@ -5,11 +5,12 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { LearningProvider, useLearning } from "@/state/learning-store";
 import { AppText, Brand, Button, ResponsiveProvider } from "@/components/ui";
 import { SessionProvider } from "@/state/session";
-import { colors } from "@/theme";
+import { useTheme, ThemeContext, useSystemTheme } from "@/theme";
 import { useRef } from "react";
 import { PwaProvider } from "@/features/pwa/pwa-provider";
 export { ErrorBoundary } from "expo-router";
 function AppNavigator() {
+  const { colors } = useTheme();
   const { isReady, storageError, syncStatus, syncNow, resolveSyncConflict } =
     useLearning();
   const navigationStarted = useRef(false);
@@ -69,20 +70,25 @@ function AppNavigator() {
   );
 }
 export default function RootLayout() {
+  const theme = useSystemTheme();
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <ResponsiveProvider>
-          <PwaProvider>
-            <SessionProvider>
-              <LearningProvider>
-                <StatusBar style="dark" />
-                <AppNavigator />
-              </LearningProvider>
-            </SessionProvider>
-          </PwaProvider>
-        </ResponsiveProvider>
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <ThemeContext.Provider value={theme}>
+      <SafeAreaProvider>
+        <SafeAreaView
+          style={{ flex: 1, backgroundColor: theme.colors.background }}
+        >
+          <ResponsiveProvider>
+            <PwaProvider>
+              <SessionProvider>
+                <LearningProvider>
+                  <StatusBar style={theme.dark ? "light" : "dark"} />
+                  <AppNavigator />
+                </LearningProvider>
+              </SessionProvider>
+            </PwaProvider>
+          </ResponsiveProvider>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </ThemeContext.Provider>
   );
 }

@@ -14,9 +14,9 @@ import {
   Field,
   Notice,
   ParentLayout,
-  parentStyles,
+  useParentStyles,
 } from "@/features/parent/shared";
-import { colors, neumorphic } from "@/theme";
+import { useTheme } from "@/theme";
 import { FAMILY_LIMITS } from "@/domain/family";
 import { ParentAccountsCard } from "./parent-accounts";
 import { InstallAppCard } from "@/features/pwa/install-app-card";
@@ -52,6 +52,8 @@ type Feedback = {
 } | null;
 
 export function ParentSettingsScreen() {
+  const { colors, neumorphic } = useTheme();
+  const parentStyles = useParentStyles();
   const session = useSession();
   const learning = useLearning();
   const router = useRouter();

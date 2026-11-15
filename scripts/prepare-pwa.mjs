@@ -1,3 +1,4 @@
+import palettes from "../src/theme/palettes.json" with { type: "json" };
 import { createHash } from "node:crypto";
 import {
   copyFile,
@@ -21,7 +22,15 @@ for (const file of [
   await copyFile(join(root, "public", file), join(output, file));
 const indexPath = join(output, "index.html");
 let html = await readFile(indexPath, "utf8");
+// Replace Expo's single theme colour with media-specific browser chrome.
+html = html.replace(
+  /<meta name="theme-color" content="[^"]*"\s*\/?>(?:\n)?/gi,
+  "",
+);
 const tags = [
+  `<meta name="theme-color" media="(prefers-color-scheme: light)" content="${palettes.light.primary}" />`,
+  `<meta name="theme-color" media="(prefers-color-scheme: dark)" content="${palettes.dark.background}" />`,
+  `<style id="revizo-appearance">:root{color-scheme:light dark;background:${palettes.light.background}}@media(prefers-color-scheme:dark){:root{background:${palettes.dark.background}}}</style>`,
   '<link rel="manifest" href="/manifest.webmanifest" />',
   '<link rel="apple-touch-icon" sizes="180x180" href="/pwa/apple-touch-icon.png" />',
   '<meta name="apple-mobile-web-app-capable" content="yes" />',

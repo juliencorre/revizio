@@ -11,7 +11,7 @@ import {
   PageHeading,
   ProgressBar,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import type { ExerciseSeries, PlanStep, RevisionPlan } from "@/domain/model";
 import { expectedAnswerLabel } from "@/domain/answers";
@@ -29,7 +29,7 @@ import {
   Field,
   Notice,
   localId,
-  parentStyles as common,
+  useParentStyles,
 } from "@/features/parent/shared";
 import { StudyWorkspace } from "./shared";
 import { useLocalDraft } from "./use-local-draft";
@@ -80,6 +80,8 @@ const dateLabel = (date: string) =>
   });
 
 export function ParentControlsScreen() {
+  const { colors } = useTheme();
+  const common = useParentStyles();
   const data = useLearning();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();

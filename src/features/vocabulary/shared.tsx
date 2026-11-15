@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { AppText, Badge, Button, ProgressBar } from "@/components/ui";
-import { colors, spacing } from "@/theme";
+import { createThemedStyles, useTheme, spacing } from "@/theme";
 import type { VocabularyLanguage } from "@/domain/model";
 import {
   directionLabel,
@@ -18,6 +18,7 @@ export function LanguagePicker({
   language: VocabularyLanguage;
   onChange: (language: VocabularyLanguage) => void;
 }) {
+  const vocabularyStyles = useVocabularyStyles();
   return (
     <View style={vocabularyStyles.row}>
       {vocabularyLanguages.map((item) => (
@@ -40,6 +41,7 @@ export function VocabularySummary({
 }: {
   progress: VocabularyWordProgress[];
 }) {
+  const { colors } = useTheme();
   const known = progress.filter((item) => item.status === "known").length;
   const review = progress.filter((item) => item.status === "review").length;
   return (
@@ -57,6 +59,7 @@ export function VocabularySummary({
   );
 }
 export function MasteryRule() {
+  const { colors } = useTheme();
   return (
     <AppText variant="small" color={colors.muted}>
       Un mot est connu après {vocabularyKnownStreak} réussites de suite dans
@@ -72,6 +75,8 @@ export function WordProgressList({
   language: VocabularyLanguage;
   progress: VocabularyWordProgress[];
 }) {
+  const { colors } = useTheme();
+  const vocabularyStyles = useVocabularyStyles();
   const [filter, setFilter] = useState<"all" | "review" | "known">("all");
   const visible = progress.filter(
     (item) =>
@@ -160,7 +165,7 @@ export function WordProgressList({
     </View>
   );
 }
-export const vocabularyStyles = StyleSheet.create({
+export const useVocabularyStyles = createThemedStyles(({ colors }) => ({
   section: { gap: spacing.xl },
   row: {
     flexDirection: "row",
@@ -174,4 +179,4 @@ export const vocabularyStyles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.md,
   },
-});
+}));

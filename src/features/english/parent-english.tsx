@@ -12,7 +12,7 @@ import {
   Card,
   PageHeading,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import type { CourseSource, EnglishSettings } from "@/domain/model";
 import {
@@ -26,7 +26,7 @@ import {
   Field,
   Notice,
   localId,
-  parentStyles as common,
+  useParentStyles,
 } from "@/features/parent/shared";
 import { StudyWorkspace } from "@/features/planning/shared";
 import { useLocalDraft } from "@/features/planning/use-local-draft";
@@ -109,6 +109,8 @@ export function ParentEnglishScreen() {
   );
 }
 function EnglishEditor({ conjugation }: { conjugation: boolean }) {
+  const { colors } = useTheme();
+  const common = useParentStyles();
   const router = useRouter();
   const data = useLearning();
   const { width } = useWindowDimensions();

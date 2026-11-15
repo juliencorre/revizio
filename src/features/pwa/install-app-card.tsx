@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { AppIcon, AppText, Badge, Button, Card } from "@/components/ui";
-import { colors, radius, spacing } from "@/theme";
+import { useTheme, radius, spacing } from "@/theme";
 import { usePwa } from "./pwa-provider";
 
 export function InstallAppCard({ compact = false }: { compact?: boolean }) {
+  const { colors } = useTheme();
   const pwa = usePwa();
   const [showGuide, setShowGuide] = useState(false);
   if (!pwa.available || (compact && pwa.installed && !pwa.updateAvailable))

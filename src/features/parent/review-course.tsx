@@ -9,7 +9,7 @@ import {
   Card,
   PageHeading,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import type {
   AiJob,
   CourseSource,
@@ -27,7 +27,7 @@ import {
   ParentNotFound,
   SourcePreview,
   localId,
-  parentStyles as s,
+  useParentStyles,
 } from "./shared";
 const definitions: {
   kind: RevisionSection["kind"];
@@ -73,6 +73,8 @@ function editableSections(sections: RevisionSection[]): RevisionSection[] {
   ];
 }
 export function ReviewCourseScreen() {
+  const { colors } = useTheme();
+  const s = useParentStyles();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();

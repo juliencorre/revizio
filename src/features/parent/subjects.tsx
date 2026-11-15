@@ -13,7 +13,7 @@ import { plural } from "@/domain/format";
 import type { IconName } from "@/domain/model";
 import { SubjectLibrary } from "./subject-library";
 import { useLearning } from "@/state/learning-store";
-import { colors, radius, spacing } from "@/theme";
+import { useTheme, radius, spacing } from "@/theme";
 import { preparationHref, subjectHref } from "./subject-navigation";
 import { LoadingParent, ParentLayout } from "./shared";
 
@@ -51,6 +51,7 @@ function MenuCard({
   width: number;
   href: Href;
 }) {
+  const { colors } = useTheme();
   const router = useRouter();
   return (
     <ActionCard
@@ -90,6 +91,7 @@ export function ParentSubjectGrid({
   preview?: boolean;
   next?: "import" | "exercises";
 }) {
+  const { subjectAccent } = useTheme();
   const data = useLearning();
   const width = useContentWidth();
   const columns = width >= 730 ? 3 : width >= 320 ? 2 : 1;
@@ -125,6 +127,7 @@ export function ParentSubjectGrid({
           <MenuCard
             key={subject.id}
             {...subject}
+            color={subjectAccent(subject.color)}
             width={Math.floor((width - (columns - 1) * spacing.lg) / columns)}
             detail={detail || "Ajouter un premier cours"}
             href={

@@ -1,6 +1,6 @@
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 import { ActionCard, AppIcon, AppText } from "@/components/ui";
-import { colors, radius, spacing } from "@/theme";
+import { createThemedStyles, useTheme, radius, spacing } from "@/theme";
 import type { IconName } from "@/domain/model";
 
 export function NeumorphicProfileCard({
@@ -19,15 +19,17 @@ export function NeumorphicProfileCard({
   subtitle: string;
   description: string;
   icon: IconName;
-  tone?: "primary" | "orange";
+  tone?: "primary" | "neutral";
   onPress: () => void;
   testID?: string;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
 }) {
-  const accent = tone === "orange" ? colors.orange : colors.primary;
-  const tint = tone === "orange" ? colors.orangeLight : colors.primaryLight;
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const accent = tone === "neutral" ? colors.muted : colors.primary;
+  const tint = tone === "neutral" ? colors.surfaceInset : colors.primaryLight;
   return (
     <ActionCard
       accessibilityLabel={
@@ -55,19 +57,19 @@ export function NeumorphicProfileCard({
         </AppText>
       </View>
       {compact ? (
-        <AppIcon name="arrow-right" color={accent} />
+        <AppIcon name="arrow-right" color={colors.primary} />
       ) : (
         <View style={styles.enter}>
-          <AppText variant="label" color={accent}>
+          <AppText variant="label" color={colors.primary}>
             Entrer dans mon espace
           </AppText>
-          <AppIcon name="arrow-right" color={accent} />
+          <AppIcon name="arrow-right" color={colors.primary} />
         </View>
       )}
     </ActionCard>
   );
 }
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors }) => ({
   card: {
     minHeight: 316,
     borderRadius: radius.lg,
@@ -103,4 +105,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     minHeight: 44,
   },
-});
+}));

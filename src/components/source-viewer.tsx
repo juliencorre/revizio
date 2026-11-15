@@ -11,7 +11,7 @@ import { PdfDocument } from "./pdf-document";
 import type { CourseSource } from "@/domain/model";
 import { resolveSourceUri, cacheSource } from "@/services/source-cache";
 import { apiAuthHeaders } from "@/services/api";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 export function useSourceUri(source?: CourseSource | null) {
   const [uri, setUri] = useState("");
   const [error, setError] = useState("");
@@ -46,6 +46,7 @@ export function SourceThumbnail({
   source: CourseSource;
   height?: number;
 }) {
+  const { colors } = useTheme();
   const { uri } = useSourceUri(source);
   return uri ? (
     <Image
@@ -75,6 +76,7 @@ export function SourceViewer({
   source: CourseSource | null;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
   const { uri, error } = useSourceUri(source);
   const [zoom, setZoom] = useState(false);
   const image =

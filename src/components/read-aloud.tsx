@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import * as Speech from "expo-speech";
 import { AppText, Button } from "./ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { speechSupported } from "@/services/speech-supported";
 export function ReadAloud({
   text,
@@ -11,6 +11,7 @@ export function ReadAloud({
   text: string;
   language?: string;
 }) {
+  const { colors } = useTheme();
   const [speaking, setSpeaking] = useState(false);
   const [error, setError] = useState("");
   const generation = useRef(0);

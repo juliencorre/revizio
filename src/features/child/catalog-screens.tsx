@@ -11,7 +11,7 @@ import {
   PageHeading,
   useWindowClass,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { SourceViewer } from "@/components/source-viewer";
 import { ReadAloud } from "@/components/read-aloud";
 import { LearningDiagram } from "@/components/learning-diagram";
@@ -128,28 +128,37 @@ export function StudentSubjectScreen() {
     </ChildShell>
   );
 }
-const sectionConfig: Record<
-  RevisionSection["kind"],
-  {
-    icon: "sparkles" | "book" | "pencil" | "lightbulb";
-    color: string;
-    background: string;
-  }
-> = {
-  essential: {
-    icon: "sparkles",
-    color: colors.primary,
-    background: colors.primaryLight,
-  },
-  vocabulary: { icon: "book", color: colors.primary, background: "#F4F5FA" },
-  method: { icon: "pencil", color: colors.primary, background: "#F4F5FA" },
-  warning: {
-    icon: "lightbulb",
-    color: colors.orange,
-    background: colors.orangeLight,
-  },
-};
 export function StudentCourseScreen() {
+  const { colors } = useTheme();
+  const sectionConfig: Record<
+    RevisionSection["kind"],
+    {
+      icon: "sparkles" | "book" | "pencil" | "lightbulb";
+      color: string;
+      background: string;
+    }
+  > = {
+    essential: {
+      icon: "sparkles",
+      color: colors.primary,
+      background: colors.primaryLight,
+    },
+    vocabulary: {
+      icon: "book",
+      color: colors.primary,
+      background: colors.surfaceInset,
+    },
+    method: {
+      icon: "pencil",
+      color: colors.primary,
+      background: colors.surfaceInset,
+    },
+    warning: {
+      icon: "lightbulb",
+      color: colors.orange,
+      background: colors.orangeLight,
+    },
+  };
   const { id } = useLocalSearchParams<{ id: string }>();
   const data = useChildData();
   const router = useRouter();
@@ -252,7 +261,7 @@ export function StudentCourseScreen() {
                             : colors.surface,
                         borderColor:
                           section.kind === "warning"
-                            ? "#F0D8C6"
+                            ? colors.orangeBorder
                             : colors.border,
                       }}
                     >
@@ -460,6 +469,7 @@ export function StudentCourseScreen() {
   );
 }
 export function StudentExercisesScreen() {
+  const { colors } = useTheme();
   const { subjectId } = useLocalSearchParams<{ subjectId?: string }>();
   const data = useChildData();
   const router = useRouter();

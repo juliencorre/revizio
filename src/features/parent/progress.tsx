@@ -14,10 +14,11 @@ import { expectedAnswerLabel } from "@/domain/answers";
 import { dateOnly, stepIsLate } from "@/domain/planning";
 import { useLearning } from "@/state/learning-store";
 import { plural } from "@/domain/format";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { LoadingParent, ParentLayout } from "./shared";
 
 export function ParentProgressScreen() {
+  const { colors, subjectAccent } = useTheme();
   const data = useLearning();
   const router = useRouter();
   if (!data.isReady) return <LoadingParent active="progress" />;
@@ -126,7 +127,7 @@ export function ParentProgressScreen() {
                   >
                     <AppIcon
                       name={subject?.icon ?? "book"}
-                      color={subject?.color}
+                      color={subjectAccent(subject?.color)}
                     />
                     <AppText variant="heading">{item.concept}</AppText>
                     <Badge tone="orange">

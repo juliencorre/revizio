@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Redirect, usePathname } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { useSession } from "@/state/session";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 export function AccessGuard({
   role,
   children,
@@ -10,6 +10,7 @@ export function AccessGuard({
   role: "parent" | "child";
   children: ReactNode;
 }) {
+  const { colors } = useTheme();
   const session = useSession();
   const path = usePathname();
   if (!session.ready)

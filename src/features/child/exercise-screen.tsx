@@ -17,7 +17,7 @@ import {
   ProgressBar,
   useWindowClass,
 } from "@/components/ui";
-import { colors, fontFamily, neumorphic } from "@/theme";
+import { useTheme, fontFamily } from "@/theme";
 import { expectedAnswerLabel } from "@/domain/answers";
 import type { Answer, Attempt, Question } from "@/domain/model";
 import {
@@ -30,6 +30,7 @@ import {
   useContentWidth,
 } from "./shared";
 export function StudentExerciseScreen() {
+  const { colors, neumorphic } = useTheme();
   const {
     id,
     mode,
@@ -446,6 +447,7 @@ export function StudentExerciseScreen() {
                 style={[
                   neumorphic.inset,
                   {
+                    borderColor: colors.controlBorder,
                     minHeight: question.type === "problem" ? 130 : 60,
                     padding: 20,
                     borderRadius: 18,
@@ -472,11 +474,12 @@ export function StudentExerciseScreen() {
                       ? colors.danger
                       : selected
                         ? colors.primary
-                        : colors.border;
+                        : colors.controlBorder;
                   return (
                     <Pressable
                       key={choice.id}
                       accessibilityRole="radio"
+                      aria-checked={selected}
                       accessibilityLabel={`${String.fromCharCode(65 + index)}. ${choice.label}`}
                       accessibilityState={{
                         checked: selected,
@@ -515,7 +518,7 @@ export function StudentExerciseScreen() {
                           width: 38,
                           height: 38,
                           borderRadius: 19,
-                          borderWidth: 1.5,
+                          borderWidth: selected && !correct && !wrong ? 4 : 1.5,
                           borderColor: border,
                           backgroundColor: colors.surface,
                           alignItems: "center",
@@ -604,7 +607,7 @@ export function StudentExerciseScreen() {
                         ? colors.primaryLight
                         : saved.isCorrect
                           ? colors.greenLight
-                          : colors.orangeLight
+                          : colors.dangerLight
                       : colors.border,
                     alignItems: "center",
                     justifyContent: "center",
@@ -619,7 +622,7 @@ export function StudentExerciseScreen() {
                           ? colors.primary
                           : saved.isCorrect
                             ? colors.green
-                            : colors.orange
+                            : colors.danger
                       }
                     />
                   )}
@@ -639,6 +642,7 @@ function AnswerFeedback({
   question: Question;
   answer: Answer;
 }) {
+  const { colors } = useTheme();
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -648,17 +652,17 @@ function AnswerFeedback({
         gap: 9,
         backgroundColor: answer.isCorrect
           ? colors.greenLight
-          : colors.orangeLight,
+          : colors.dangerLight,
       }}
     >
       <View style={styles.row}>
         <AppIcon
           name={answer.isCorrect ? "check" : "lightbulb"}
-          color={answer.isCorrect ? colors.green : colors.orange}
+          color={answer.isCorrect ? colors.green : colors.danger}
         />
         <AppText
           variant="heading"
-          color={answer.isCorrect ? colors.green : colors.orange}
+          color={answer.isCorrect ? colors.green : colors.danger}
         >
           {answer.isCorrect ? "Bien joué !" : "On regarde ensemble."}
         </AppText>
@@ -692,6 +696,7 @@ function ExerciseSummary({
   onReviewAll: () => void;
   onExit: () => void;
 }) {
+  const { colors } = useTheme();
   const correct = attempt.answers.filter((a) => a.isCorrect).length;
   const hints = attempt.answers.filter((a) => a.usedHint).length;
   const mistakes = attempt.answers.filter((a) => !a.isCorrect);

@@ -12,7 +12,7 @@ import {
   Card,
   PageHeading,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import { cacheSource } from "@/services/source-cache";
@@ -24,7 +24,7 @@ import {
   ParentLayout,
   SourcePreview,
   localId,
-  parentStyles as s,
+  useParentStyles,
 } from "./shared";
 
 type ImportDraft = {
@@ -88,6 +88,8 @@ function ImportEditor({
   courseId?: string;
   scope?: string;
 }) {
+  const { colors, subjectAccent } = useTheme();
+  const s = useParentStyles();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const data = useLearning();
@@ -393,7 +395,7 @@ function ImportEditor({
                     >
                       <AppIcon
                         name={subject.icon}
-                        color={subject.color}
+                        color={subjectAccent(subject.color)}
                         size={20}
                       />
                       <AppText

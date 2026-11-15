@@ -12,7 +12,7 @@ import {
   ProgressBar,
   useWindowClass,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import {
   ChildShell,
   Loading,
@@ -23,6 +23,7 @@ import {
   useContentWidth,
 } from "./shared";
 export function StudentProgressScreen() {
+  const { colors, subjectAccent } = useTheme();
   const data = useChildData();
   const width = useContentWidth();
   const router = useRouter();
@@ -204,11 +205,12 @@ export function StudentProgressScreen() {
                           <AppText style={{ fontWeight: "700" }}>
                             {subject.title}
                           </AppText>
-                          <AppText variant="label" color={subject.color}>
-                            {percent} %
-                          </AppText>
+                          <AppText variant="label">{percent} %</AppText>
                         </View>
-                        <ProgressBar value={percent} color={subject.color} />
+                        <ProgressBar
+                          value={percent}
+                          color={subjectAccent(subject.color)}
+                        />
                         <AppText variant="small" color={colors.muted}>
                           {right} bonnes réponses sur {sa.length}
                         </AppText>

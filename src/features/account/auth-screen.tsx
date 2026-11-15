@@ -4,7 +4,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   View,
   useWindowDimensions,
 } from "react-native";
@@ -19,7 +18,7 @@ import {
   PageHeading,
 } from "@/components/ui";
 import { Field, Notice } from "@/features/parent/shared";
-import { colors, neumorphic } from "@/theme";
+import { createThemedStyles, useTheme } from "@/theme";
 import { useSession } from "@/state/session";
 import {
   PasswordField,
@@ -32,6 +31,8 @@ import {
 } from "./shared";
 
 export function AuthScreen() {
+  const { colors, neumorphic } = useTheme();
+  const styles = useStyles();
   const params = useLocalSearchParams<{
     target?: string;
     profileId?: string;
@@ -562,7 +563,7 @@ export function AuthScreen() {
     </ScrollView>
   );
 }
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, neumorphic }) => ({
   page: { flex: 1, backgroundColor: colors.background },
   content: {
     flexGrow: 1,
@@ -596,4 +597,4 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 24 },
-});
+}));

@@ -10,12 +10,12 @@ import {
   EmptyState,
   PageHeading,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import type { AiJob } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import { apiFetch } from "@/services/api";
 import { preparationHref } from "./subject-navigation";
-import { Notice, ParentLayout, parentStyles as common } from "./shared";
+import { Notice, ParentLayout, useParentStyles } from "./shared";
 
 export type PreparationJob = AiJob & {
   profileId?: string;
@@ -126,6 +126,7 @@ export function usePreparationJobs(
 }
 
 function JobSteps({ job }: { job: PreparationJob }) {
+  const { colors } = useTheme();
   const index =
     job.status === "succeeded"
       ? 2
@@ -194,6 +195,8 @@ function JobSteps({ job }: { job: PreparationJob }) {
 }
 
 export function ParentPreparationsScreen() {
+  const { colors } = useTheme();
+  const common = useParentStyles();
   const data = useLearning();
   const router = useRouter();
   const state = usePreparationJobs(

@@ -9,10 +9,11 @@ import {
   PageHeading,
   useContentWidth,
 } from "@/components/ui";
-import { colors, radius, spacing } from "@/theme";
+import { useTheme, radius, spacing } from "@/theme";
 import { ChildShell, Loading, latestAttempt, useChildData } from "./shared";
 
 export function SubjectGrid() {
+  const { colors, subjectAccent } = useTheme();
   const data = useChildData();
   const router = useRouter();
   const width = useContentWidth();
@@ -32,6 +33,7 @@ export function SubjectGrid() {
         const lists = data.vocabularyLists.filter(
           (list) => list.language === subject.id && list.status === "published",
         ).length;
+        const accent = subjectAccent(subject.color);
         return (
           <ActionCard
             key={subject.id}
@@ -44,10 +46,8 @@ export function SubjectGrid() {
             ]}
           >
             <View style={styles.top}>
-              <View
-                style={[styles.icon, { backgroundColor: subject.color + "14" }]}
-              >
-                <AppIcon name={subject.icon} color={subject.color} size={25} />
+              <View style={[styles.icon, { backgroundColor: accent + "14" }]}>
+                <AppIcon name={subject.icon} color={accent} size={25} />
               </View>
               <AppIcon name="chevron-right" size={18} color={colors.muted} />
             </View>
@@ -73,6 +73,7 @@ export function SubjectGrid() {
 }
 
 export function StudentSubjectsScreen() {
+  const { colors } = useTheme();
   const data = useChildData();
   return (
     <ChildShell active="courses">

@@ -1,8 +1,9 @@
 import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { Brand, Button, EmptyState } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 export default function NotFoundScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
   return (
     <View

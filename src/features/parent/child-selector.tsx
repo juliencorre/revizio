@@ -12,16 +12,17 @@ import {
 import { AppIcon, AppText, useFocusVisible } from "@/components/ui";
 import { useSession } from "@/state/session";
 import type { ChildProfile } from "@/domain/model";
-import { colors, radius, spacing } from "@/theme";
+import { createThemedStyles, useTheme, radius, spacing } from "@/theme";
 
 type Anchor = { x: number; y: number; width: number; height: number };
 type MenuKey = Parameters<NonNullable<ViewProps["onKeyDown"]>>[0];
-const avatarColors = [
-  { background: colors.primary, ink: colors.onPrimary },
-  { background: colors.welcomeInk, ink: colors.onPrimary },
-];
-
 function ChildAvatar({ name, index }: { name: string; index: number }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const avatarColors = [
+    { background: colors.primary, ink: colors.onPrimary },
+    { background: colors.welcomeInk, ink: colors.onPrimary },
+  ];
   const palette = avatarColors[Math.max(0, index) % avatarColors.length];
   return (
     <View
@@ -53,6 +54,8 @@ function ChildOption({
   onPress: () => void;
   optionRef: (node: ComponentRef<typeof View> | null) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const focus = useFocusVisible();
   return (
     <Pressable
@@ -97,6 +100,8 @@ function ChildOption({
 
 /** A compact, anchored choice of the child whose workspace the parent sees. */
 export function ParentChildSelector() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const session = useSession();
   const pathname = usePathname();
   const { width, height } = useWindowDimensions();
@@ -262,7 +267,7 @@ export function ParentChildSelector() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors }) => ({
   trigger: {
     minHeight: 48,
     maxWidth: "100%",
@@ -285,7 +290,7 @@ const styles = StyleSheet.create({
   overlay: { flex: 1 },
   menu: {
     position: "absolute",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -308,4 +313,4 @@ const styles = StyleSheet.create({
     outlineWidth: 2,
     outlineOffset: -2,
   },
-});
+}));

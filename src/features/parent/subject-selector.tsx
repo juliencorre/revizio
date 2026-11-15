@@ -12,10 +12,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppIcon, AppText, IconButton, useFocusVisible } from "@/components/ui";
 import { useLearning } from "@/state/learning-store";
 import type { Subject } from "@/domain/model";
-import { colors, radius, spacing } from "@/theme";
+import { createThemedStyles, useTheme, radius, spacing } from "@/theme";
 import { subjectHref } from "./subject-navigation";
 
 export function SubjectSelector({ subject }: { subject: Subject }) {
+  const { colors, subjectAccent } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const { subjects } = useLearning();
   const { width, height } = useWindowDimensions();
@@ -77,7 +79,11 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
           pressed && styles.pressed,
         ]}
       >
-        <AppIcon name={subject.icon} size={26} color={subject.color} />
+        <AppIcon
+          name={subject.icon}
+          size={26}
+          color={subjectAccent(subject.color)}
+        />
         <AppText variant="title" style={styles.title}>
           {subject.title}
         </AppText>
@@ -159,7 +165,11 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <AppIcon name={item.icon} color={item.color} size={19} />
+                  <AppIcon
+                    name={item.icon}
+                    color={subjectAccent(item.color)}
+                    size={19}
+                  />
                   <AppText style={{ flex: 1 }}>{item.title}</AppText>
                   {item.id === subject.id && <AppIcon name="check" size={18} />}
                 </Pressable>
@@ -171,7 +181,7 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
     </>
   );
 }
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors }) => ({
   trigger: {
     minHeight: 48,
     flexDirection: "row",
@@ -196,7 +206,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderWidth: 1,
     padding: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
     boxShadow: "0px 8px 28px rgba(22,27,69,0.14)",
   },
   menuTitle: {
@@ -215,4 +225,4 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     borderRadius: 6,
   },
-});
+}));

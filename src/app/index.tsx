@@ -1,17 +1,14 @@
 import { useRouter } from "expo-router";
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { ScrollView, View, useWindowDimensions } from "react-native";
 import { AppIcon, AppText, Badge, Brand, Card, Button } from "@/components/ui";
 import { useSession } from "@/state/session";
 import { NeumorphicProfileCard } from "@/components/NeumorphicProfileCard";
-import { colors, spacing } from "@/theme";
+import { createThemedStyles, useTheme, spacing } from "@/theme";
 import { InstallAppCard } from "@/features/pwa/install-app-card";
 
 export default function ProfilesScreen() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const landscape = width >= 600;
@@ -104,7 +101,7 @@ export default function ProfilesScreen() {
           subtitle="Suivi et accompagnement"
           description="Ajouter les cours et préparer les prochaines révisions ensemble"
           icon="users"
-          tone="orange"
+          tone="neutral"
           testID="profile-parent"
           accessibilityLabel="Entrer dans l’espace parent"
           compact={compact}
@@ -210,7 +207,7 @@ export default function ProfilesScreen() {
     </ScrollView>
   );
 }
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors }) => ({
   page: { flex: 1, backgroundColor: colors.background },
   content: {
     flexGrow: 1,
@@ -230,4 +227,4 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     flexWrap: "wrap",
   },
-});
+}));

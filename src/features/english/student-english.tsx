@@ -12,13 +12,14 @@ import {
   PageHeading,
   ProgressBar,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { useTheme } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import { englishFlashcards, englishTenses } from "@/domain/english";
 import { StudyWorkspace } from "@/features/planning/shared";
 import { speechSupported } from "@/services/speech-supported";
 
 export function StudentEnglishScreen() {
+  const { colors } = useTheme();
   const data = useLearning();
   const router = useRouter();
   const [filter, setFilter] = useState<"all" | "words" | "verbs">("all");

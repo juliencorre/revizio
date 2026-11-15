@@ -15,10 +15,16 @@ import {
   vocabularyProgress,
 } from "@/domain/vocabulary";
 import { ChildShell, Loading } from "@/features/child/shared";
-import { colors, spacing } from "@/theme";
-import { LanguagePicker, VocabularySummary, vocabularyStyles } from "./shared";
+import { useTheme, spacing } from "@/theme";
+import {
+  LanguagePicker,
+  VocabularySummary,
+  useVocabularyStyles,
+} from "./shared";
 
 export function VocabularyCollection() {
+  const { colors } = useTheme();
+  const vocabularyStyles = useVocabularyStyles();
   const data = useLearning();
   const router = useRouter();
   const params = useLocalSearchParams<{ language?: string }>();

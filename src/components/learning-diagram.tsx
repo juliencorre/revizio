@@ -3,8 +3,9 @@ import { View } from "react-native";
 import Svg, { Line, Circle, Text as SvgText } from "react-native-svg";
 import type { LearningDiagram as Diagram } from "@/domain/model";
 import { AppText } from "./ui";
-import { colors, neumorphic } from "@/theme";
+import { useTheme } from "@/theme";
 export function LearningDiagram({ diagram }: { diagram: Diagram }) {
+  const { colors, neumorphic } = useTheme();
   if (diagram.type === "fraction") {
     const d = diagram.denominator ?? 0,
       n = diagram.numerator ?? 0;

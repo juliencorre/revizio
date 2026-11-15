@@ -30,7 +30,7 @@ import {
   MasteryRule,
   VocabularySummary,
   WordProgressList,
-  vocabularyStyles,
+  useVocabularyStyles,
 } from "./shared";
 
 export function ParentVocabularyEditor() {
@@ -47,6 +47,7 @@ export function ParentVocabularyEditor() {
   );
 }
 function VocabularyEditor() {
+  const vocabularyStyles = useVocabularyStyles();
   const scrollRef = useRef<ScrollViewInstance>(null);
   const data = useLearning();
   const router = useRouter();

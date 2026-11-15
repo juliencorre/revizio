@@ -20,8 +20,8 @@ import {
 } from "@/domain/vocabulary";
 import { ChildShell, Loading } from "@/features/child/shared";
 import { Field } from "@/features/parent/shared";
-import { colors, spacing } from "@/theme";
-import { VocabularySummary, vocabularyStyles } from "./shared";
+import { useTheme, spacing } from "@/theme";
+import { VocabularySummary, useVocabularyStyles } from "./shared";
 
 export function VocabularyPractice() {
   const data = useLearning();
@@ -48,6 +48,8 @@ export function VocabularyPractice() {
   );
 }
 function PracticeSession({ initial }: { initial: VocabularySession }) {
+  const { colors } = useTheme();
+  const vocabularyStyles = useVocabularyStyles();
   const data = useLearning();
   const router = useRouter();
   const scrollRef = useRef<ScrollViewInstance>(null);
