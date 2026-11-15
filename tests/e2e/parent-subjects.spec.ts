@@ -99,3 +99,39 @@ test("publier le premier cours d’une matière vide et préparer ses exercices"
   );
   await expect(banner).toContainText("EPS");
 });
+
+test("reprendre un ancien import uniquement dans sa matière et garder le contexte du suivi IA", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "revizo.import.alex.new",
+      JSON.stringify({
+        title: "Un cours déjà commencé",
+        subjectId: "english",
+        sourceText: "My lesson",
+        sources: [],
+        existingId: "",
+      }),
+    ),
+  );
+  await page.goto("/parent/import?subjectId=maths");
+  await expect(page.getByTestId("course-title")).toHaveValue("");
+  await page.goto("/parent/import?subjectId=english");
+  await expect(page.getByTestId("course-title")).toHaveValue(
+    "Un cours déjà commencé",
+  );
+  await page.goto("/parent/preparations?subjectId=english");
+  await expect(page.getByTestId("parent-subject-banner")).toContainText(
+    "Anglais",
+  );
+  await page
+    .getByRole("button", { name: "Préparer un exercice à la main" })
+    .click();
+  await expect(
+    page.getByTestId("ai-exercise-course-english-past-simple"),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("ai-exercise-course-maths-relative-numbers"),
+  ).toHaveCount(0);
+});
