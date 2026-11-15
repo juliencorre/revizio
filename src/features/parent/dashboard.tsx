@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   AppIcon,
@@ -10,7 +10,7 @@ import {
   useWindowClass,
 } from "@/components/ui";
 import { plural } from "@/domain/format";
-import { colors } from "@/theme";
+import { colors, spacing } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import { dateOnly, stepIsLate } from "@/domain/planning";
 import { learningOverview, preparationStatus } from "@/domain/study-overview";
@@ -42,42 +42,35 @@ export function ParentDashboard() {
   const failedJobs = jobs.jobs.filter((job) => job.status === "failed");
   return (
     <ParentLayout active="dashboard">
-      <View testID="parent-dashboard" style={{ gap: compact ? 18 : 24 }}>
+      <View testID="parent-dashboard" style={{ gap: spacing.xl }}>
+        <PageHeading
+          title={`Accompagner ${data.childName}`}
+          description={`Voici où en est ${data.childName}, et ce que vous pouvez préparer.`}
+          action={
+            <Button icon="plus" onPress={() => router.push("/parent/import")}>
+              Ajouter un cours
+            </Button>
+          }
+        />
         <View
-          style={{
-            backgroundColor: colors.primaryLight,
-            borderRadius: 24,
-            padding: compact ? 18 : 28,
-          }}
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}
         >
-          <PageHeading
-            eyebrow="Ensemble, à son rythme"
-            title="Bonjour !"
-            description={`Voici où en est ${data.childName}, et ce que vous pouvez préparer.`}
-            action={
-              <Button icon="plus" onPress={() => router.push("/parent/import")}>
-                Ajouter un cours
-              </Button>
-            }
-          />
-        </View>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           <Button
             icon="book"
-            variant="secondary"
+            variant="ghost"
             onPress={() => router.push("/parent/library")}
           >
             Retrouver les cours et exercices
           </Button>
           <Button
             icon="chart"
-            variant="secondary"
+            variant="ghost"
             onPress={() => router.push("/parent/progress")}
           >
             Voir le suivi de {data.childName}
           </Button>
         </View>
-        <Card style={{ gap: 16 }}>
+        <Card style={{ gap: spacing.lg }}>
           <View
             style={{
               flexDirection: "row",
@@ -87,8 +80,8 @@ export function ParentDashboard() {
             }}
           >
             <AppIcon name="pencil" />
-            <AppText variant="heading">
-              Vos contenus à préparer et vérifier
+            <AppText variant="heading" style={{ flex: 1 }}>
+              Contenus à vérifier
             </AppText>
             <Badge tone="orange">{drafts.length + draftSeries.length}</Badge>
           </View>
@@ -97,11 +90,13 @@ export function ParentDashboard() {
             leurs corrections avant de les publier.
           </AppText>
           {drafts.slice(0, 3).map((course) => (
-            <View key={course.id} style={{ gap: 6 }}>
-              <AppText variant="label">{course.title}</AppText>
-              <AppText variant="small" color={colors.muted}>
-                Fiche · {preparationStatus(course)}
-              </AppText>
+            <View key={course.id} style={styles.draftRow}>
+              <View style={styles.draftTitle}>
+                <AppText variant="label">{course.title}</AppText>
+                <AppText variant="small" color={colors.muted}>
+                  Fiche · {preparationStatus(course)}
+                </AppText>
+              </View>
               <Button
                 testID={`review-course-${course.id}`}
                 variant="secondary"
@@ -116,11 +111,13 @@ export function ParentDashboard() {
           {draftSeries
             .slice(0, Math.max(0, 3 - drafts.length))
             .map((series) => (
-              <View key={series.id} style={{ gap: 6 }}>
-                <AppText variant="label">{series.title}</AppText>
-                <AppText variant="small" color={colors.muted}>
-                  Exercices · {preparationStatus(series)}
-                </AppText>
+              <View key={series.id} style={styles.draftRow}>
+                <View style={styles.draftTitle}>
+                  <AppText variant="label">{series.title}</AppText>
+                  <AppText variant="small" color={colors.muted}>
+                    Exercices · {preparationStatus(series)}
+                  </AppText>
+                </View>
                 <Button
                   variant="secondary"
                   icon="pencil"
@@ -149,8 +146,17 @@ export function ParentDashboard() {
             Voir tous les contenus à vérifier
           </Button>
         </Card>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 18 }}>
-          <Card style={{ flexGrow: 1, flexBasis: 300, gap: 16 }}>
+        <View
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.lg }}
+        >
+          <Card
+            style={{
+              flexGrow: 1,
+              flexBasis: compact ? "100%" : 300,
+              minWidth: 0,
+              gap: spacing.lg,
+            }}
+          >
             <AppText variant="heading">Le suivi de {data.childName}</AppText>
             <AppText>
               {plural(
@@ -172,7 +178,14 @@ export function ParentDashboard() {
               Consulter les résultats et les erreurs
             </Button>
           </Card>
-          <Card style={{ flexGrow: 1, flexBasis: 300, gap: 16 }}>
+          <Card
+            style={{
+              flexGrow: 1,
+              flexBasis: compact ? "100%" : 300,
+              minWidth: 0,
+              gap: spacing.lg,
+            }}
+          >
             <AppText variant="heading">Prochains contrôles</AppText>
             {upcoming.length ? (
               upcoming.map((plan) => (
@@ -249,3 +262,15 @@ export function ParentDashboard() {
     </ParentLayout>
   );
 }
+const styles = StyleSheet.create({
+  draftRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.lg,
+  },
+  draftTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 240, gap: spacing.xs },
+});

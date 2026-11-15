@@ -1,22 +1,25 @@
-import { Pressable, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
+  ActionCard,
   AppIcon,
   AppText,
+  Badge,
   Card,
   PageHeading,
   useContentWidth,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { colors, radius, spacing } from "@/theme";
 import { ChildShell, Loading, latestAttempt, useChildData } from "./shared";
 
 export function SubjectGrid() {
   const data = useChildData();
   const router = useRouter();
   const width = useContentWidth();
-  const columns = width >= 1000 ? 5 : width >= 650 ? 3 : 2;
+  const columns = width >= 1100 ? 4 : width >= 650 ? 3 : 2;
+  const gap = spacing.lg;
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>
       {data.subjects.map((subject) => {
         const count = data.publishedCourses.filter(
           (course) => course.subjectId === subject.id,
@@ -27,33 +30,32 @@ export function SubjectGrid() {
             !latestAttempt(data.attempts, series.id)?.completedAt,
         ).length;
         return (
-          <Pressable
+          <ActionCard
             key={subject.id}
             testID={`subject-card-${subject.id}`}
-            accessibilityRole="button"
             accessibilityLabel={`Ouvrir ${subject.title}`}
             onPress={() => router.push(`/student/subject/${subject.id}`)}
-            style={({ pressed }) => ({
-              width: Math.max(120, (width - (columns - 1) * 14) / columns),
-              minHeight: 142,
-              borderRadius: 18,
-              padding: 18,
-              backgroundColor: subject.color + "16",
-              borderWidth: 1,
-              borderColor: subject.color + "30",
-              gap: 16,
-              opacity: pressed ? 0.75 : 1,
-            })}
+            style={[
+              styles.subject,
+              { width: Math.max(120, (width - (columns - 1) * gap) / columns) },
+            ]}
           >
-            <AppIcon name={subject.icon} color={subject.color} size={30} />
-            <View style={{ gap: 6 }}>
+            <View style={styles.top}>
+              <View
+                style={[styles.icon, { backgroundColor: subject.color + "14" }]}
+              >
+                <AppIcon name={subject.icon} color={subject.color} size={25} />
+              </View>
+              <AppIcon name="chevron-right" size={18} color={colors.muted} />
+            </View>
+            <View style={{ gap: spacing.xs, flex: 1 }}>
               <AppText variant="label">{subject.title}</AppText>
               <AppText variant="small" color={colors.muted}>
                 {count ? `${count} cours` : "À découvrir"}
-                {todo ? ` · ${todo} à faire` : ""}
               </AppText>
             </View>
-          </Pressable>
+            {todo > 0 && <Badge>{todo} à faire</Badge>}
+          </ActionCard>
         );
       })}
     </View>
@@ -78,3 +80,25 @@ export function StudentSubjectsScreen() {
     </ChildShell>
   );
 }
+const styles = StyleSheet.create({
+  subject: {
+    minHeight: 176,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    gap: spacing.md,
+    boxShadow: "none",
+  },
+  top: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  icon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

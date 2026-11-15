@@ -1,12 +1,6 @@
-import {
-  Pressable,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
-import { AppIcon, AppText, useFocusVisible } from "@/components/ui";
-import { colors, neumorphic } from "@/theme";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { ActionCard, AppIcon, AppText } from "@/components/ui";
+import { colors, radius, spacing } from "@/theme";
 import type { IconName } from "@/domain/model";
 
 export function NeumorphicProfileCard({
@@ -30,140 +24,83 @@ export function NeumorphicProfileCard({
   testID?: string;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
-  /** Horizontal list layout for phones. */
   compact?: boolean;
 }) {
-  const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const accent = tone === "orange" ? colors.orange : colors.primary;
-  if (compact)
-    return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        testID={testID}
-        onPress={onPress}
-        onFocus={onFocus}
-        onBlur={onBlur}
-        style={({ pressed }) => [
-          styles.compactCard,
-          focused && styles.focusRing,
-          pressed && neumorphic.inset,
-          style,
-        ]}
-      >
-        <View style={[styles.compactAvatar, { backgroundColor: accent }]}>
-          <AppIcon name={icon} size={30} color="#FFFFFF" />
-        </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="heading" style={{ fontSize: 22, lineHeight: 28 }}>
-            {title}
-          </AppText>
-          <AppText variant="label" color={accent}>
-            {subtitle}
-          </AppText>
-          <AppText variant="small" color={colors.muted}>
-            {description}
-          </AppText>
-        </View>
-        <AppIcon name="chevron-right" color={accent} size={26} />
-      </Pressable>
-    );
+  const tint = tone === "orange" ? colors.orangeLight : colors.primaryLight;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+    <ActionCard
+      accessibilityLabel={
+        accessibilityLabel ?? `Entrer dans l’espace de ${title}`
+      }
       testID={testID}
       onPress={onPress}
-      onFocus={onFocus}
-      onBlur={onBlur}
-      style={(state) => [
-        styles.card,
-        (state as { hovered?: boolean }).hovered &&
-          !state.pressed && { boxShadow: neumorphic.hover.boxShadow },
-        focused && styles.focusRing,
-        state.pressed && neumorphic.inset,
-        style,
-      ]}
+      style={[styles.card, compact && styles.compactCard, style]}
     >
-      <View style={[styles.avatar, { backgroundColor: accent }]}>
-        <AppIcon name={icon} size={40} color="#FFFFFF" />
+      <View style={[styles.avatar, { backgroundColor: tint }]}>
+        <AppIcon name={icon} size={compact ? 26 : 32} color={accent} />
       </View>
-      <View style={{ gap: 7, alignItems: "center" }}>
+      <View style={[styles.content, compact && { flex: 1 }]}>
         <AppText
-          variant="heading"
-          style={{ fontSize: 30, lineHeight: 39, textAlign: "center" }}
+          variant="title"
+          style={compact ? styles.compactTitle : undefined}
         >
           {title}
         </AppText>
-        <AppText variant="label" color={accent} style={{ textAlign: "center" }}>
+        <AppText variant="label" color={accent}>
           {subtitle}
         </AppText>
-      </View>
-      <AppText
-        color={colors.muted}
-        style={{ textAlign: "center", maxWidth: 330 }}
-      >
-        {description}
-      </AppText>
-      <View style={[styles.enter]}>
-        <AppText variant="label" color={accent}>
-          Entrer
+        <AppText color={colors.muted} style={styles.description}>
+          {description}
         </AppText>
-        <AppIcon name="chevron-right" color={accent} />
       </View>
-    </Pressable>
+      {compact ? (
+        <AppIcon name="arrow-right" color={accent} />
+      ) : (
+        <View style={styles.enter}>
+          <AppText variant="label" color={accent}>
+            Entrer dans mon espace
+          </AppText>
+          <AppIcon name="arrow-right" color={accent} />
+        </View>
+      )}
+    </ActionCard>
   );
 }
 const styles = StyleSheet.create({
-  focusRing: {
-    outlineColor: colors.primary,
-    outlineStyle: "solid",
-    outlineWidth: 3,
-    outlineOffset: 2,
+  card: {
+    minHeight: 316,
+    borderRadius: radius.lg,
+    padding: spacing.xxl,
+    alignItems: "flex-start",
+    gap: spacing.xl,
   },
   compactCard: {
-    ...neumorphic.raisedCompact,
-    minHeight: 112,
-    borderRadius: 26,
-    padding: 18,
+    minHeight: 144,
+    padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
-  },
-  compactAvatar: {
-    ...neumorphic.colored,
-    width: 60,
-    height: 60,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  card: {
-    ...neumorphic.raised,
-    minHeight: 350,
-    borderRadius: 36,
-    padding: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 24,
+    gap: spacing.lg,
   },
   avatar: {
-    ...neumorphic.colored,
-    width: 86,
-    height: 86,
-    borderRadius: 31,
+    width: 60,
+    height: 60,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },
+  content: { gap: spacing.xs, flexGrow: 1, minWidth: 0 },
+  compactTitle: { fontSize: 24, lineHeight: 32 },
+  description: { marginTop: spacing.sm, maxWidth: 360 },
   enter: {
-    ...neumorphic.small,
-    minHeight: 50,
-    borderRadius: 18,
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 25,
+    justifyContent: "space-between",
+    gap: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.lg,
+    minHeight: 44,
   },
 });

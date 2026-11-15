@@ -161,7 +161,7 @@ export function Field({
       </AppText>
       <TextInput
         accessibilityLabel={label}
-        placeholderTextColor="#718099"
+        placeholderTextColor={colors.muted}
         onFocus={(event) => {
           setFocused(true);
           onFocus?.(event);

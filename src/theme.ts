@@ -1,31 +1,50 @@
 import { Platform, type ViewStyle } from "react-native";
 
 export const colors = {
-  background: "#F3F5FF",
+  background: "#F6F7FC",
   surface: "#FFFFFF",
   surfaceRaised: "#FFFFFF",
-  surfaceInset: "#F1F2FC",
+  surfaceInset: "#EFF1F8",
   highlight: "#FFFFFF",
   shadow: "#D7DDF0",
   ink: "#161B45",
-  muted: "#626B8D",
+  muted: "#596381",
   primary: "#6045D9",
   primaryDark: "#4730B7",
   primaryLight: "#EDE8FF",
-  orange: "#B65C16",
+  orange: "#A34D11",
   orangeLight: "#FFF0D7",
   green: "#22765C",
   greenLight: "#E0F4EC",
-  border: "#E3E6F5",
+  border: "#DEE3F0",
+  navigation: "#192451",
+  navigationMuted: "#CED5FF",
+  navigationHover: "#2B3665",
+  onPrimary: "#FFFFFF",
+  welcome: "#EDF1FF",
+  welcomeInk: "#455176",
   danger: "#B73754",
   dangerLight: "#FBE6EC",
 };
 
 export const radius = { sm: 12, md: 18, lg: 24, xl: 30 };
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+  xxxl: 40,
+};
 export type WindowClass = "compact" | "medium" | "expanded";
 export const breakpoints = { medium: 600, expanded: 1000 };
 export function windowClassFor(width: number): WindowClass {
-  return width < breakpoints.medium ? "compact" : width < breakpoints.expanded ? "medium" : "expanded";
+  return width < breakpoints.medium
+    ? "compact"
+    : width < breakpoints.expanded
+      ? "medium"
+      : "expanded";
 }
 export const layout = {
   gutter: { compact: 16, medium: 26, expanded: 34 },
@@ -46,14 +65,14 @@ export const neumorphic = {
   raised: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "rgba(215,221,245,0.8)",
-    boxShadow: "0px 8px 26px rgba(32,42,108,0.08)",
+    borderColor: colors.border,
+    boxShadow: "0px 4px 16px rgba(32,42,108,0.035)",
   },
   small: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    boxShadow: "0px 3px 11px rgba(32,42,108,0.055)",
+    boxShadow: "none",
   },
   inset: {
     backgroundColor: colors.surfaceInset,
@@ -66,16 +85,16 @@ export const neumorphic = {
     boxShadow: "0px 0px 0px 3px rgba(96,69,217,0.18)",
   },
   colored: {
-    boxShadow: "0px 8px 17px rgba(85,62,196,0.17)",
+    boxShadow: "0px 4px 10px rgba(85,62,196,0.12)",
   },
   raisedCompact: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    boxShadow: "0px 5px 16px rgba(32,42,108,0.065)",
+    boxShadow: "0px 3px 12px rgba(32,42,108,0.035)",
   },
   hover: {
-    boxShadow: "0px 11px 26px rgba(32,42,108,0.12)",
+    boxShadow: "0px 6px 20px rgba(32,42,108,0.08)",
   },
   coloredPressed: {
     boxShadow: "0px 2px 6px rgba(42,28,123,0.15)",

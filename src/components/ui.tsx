@@ -321,8 +321,9 @@ export function Button({
           focused && !disabled && styles.focusRing,
           pressed &&
             !disabled &&
-            (filled ? neumorphic.coloredPressed : neumorphic.inset),
-          pressed && !disabled && { transform: [{ scale: 0.985 }] },
+            (filled
+              ? [neumorphic.coloredPressed, filledHover[variant]]
+              : { backgroundColor: colors.surfaceInset }),
           disabled && { opacity: 0.48, boxShadow: neumorphic.inset.boxShadow },
           style,
         ];
@@ -400,6 +401,41 @@ export function Card({
     </View>
   );
 }
+/** A whole-card action with the same touch, pointer and keyboard feedback. */
+export function ActionCard({
+  children,
+  onPress,
+  accessibilityLabel,
+  testID,
+  style,
+}: {
+  children: ReactNode;
+  onPress: () => void;
+  accessibilityLabel: string;
+  testID?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { focusVisible, onFocus, onBlur } = useFocusVisible();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      onPress={onPress}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      style={(state) => [
+        styles.card,
+        style,
+        isHovered(state) && !state.pressed && styles.actionCardHover,
+        state.pressed && { backgroundColor: colors.surfaceInset },
+        focusVisible && styles.focusRing,
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+}
 export function Badge({
   children,
   tone = "primary",
@@ -411,7 +447,7 @@ export function Badge({
     primary: [colors.primaryLight, colors.primary],
     green: [colors.greenLight, colors.green],
     orange: [colors.orangeLight, colors.orange],
-    muted: ["#ECEEF4", colors.muted],
+    muted: [colors.surfaceInset, colors.muted],
   };
   return (
     <View style={[styles.badge, { backgroundColor: tones[tone][0] }]}>
@@ -505,13 +541,17 @@ export function PageHeading({
           <AppText
             variant="small"
             color={colors.primary}
-            style={{ fontWeight: "700", letterSpacing: 1 }}
+            style={{ fontWeight: "600" }}
           >
-            {eyebrow.toUpperCase()}
+            {eyebrow}
           </AppText>
         )}
         <AppText variant="title">{title}</AppText>
-        {description && <AppText color={colors.muted}>{description}</AppText>}
+        {description && (
+          <AppText color={colors.muted} style={{ maxWidth: 680 }}>
+            {description}
+          </AppText>
+        )}
       </View>
       {action && (
         <View style={{ flexShrink: 1, maxWidth: "100%" }}>{action}</View>
@@ -545,12 +585,20 @@ const MAX_BAR_ITEMS = 5;
 function DrawerItem({
   item,
   onPress,
+  dark = true,
 }: {
   item: Pick<NavigationItem, "label" | "icon" | "active">;
   onPress: () => void;
+  dark?: boolean;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
-  const tint = item.active ? "#FFFFFF" : "#CED5FF";
+  const tint = dark
+    ? item.active
+      ? colors.onPrimary
+      : colors.navigationMuted
+    : item.active
+      ? colors.primaryDark
+      : colors.muted;
   return (
     <Pressable
       accessibilityRole="button"
@@ -561,14 +609,17 @@ function DrawerItem({
       onBlur={onBlur}
       style={(state) => [
         styles.drawerItem,
-        isHovered(state) && !item.active && styles.drawerItemHover,
-        (state.pressed || item.active) && styles.drawerItemActive,
-        focused && styles.focusRing,
+        isHovered(state) &&
+          !item.active &&
+          (dark ? styles.drawerItemHover : styles.raisedHover),
+        (state.pressed || item.active) &&
+          (dark ? styles.drawerItemActive : styles.indicatorActive),
+        focused && (dark ? styles.focusRingDark : styles.focusRing),
       ]}
     >
       <AppIcon name={item.icon} color={tint} />
       <AppText
-        color={item.active ? "#FFFFFF" : "#EDF0FF"}
+        color={dark ? colors.onPrimary : colors.ink}
         style={{
           fontSize: 16,
           lineHeight: 22,
@@ -604,7 +655,13 @@ function StackedNavItem({
   dark?: boolean;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
-  const tint = dark ? (active ? "#FFFFFF" : "#D1D9FF") : (active ? colors.primaryDark : colors.muted);
+  const tint = dark
+    ? active
+      ? "#FFFFFF"
+      : "#D1D9FF"
+    : active
+      ? colors.primaryDark
+      : colors.muted;
   return (
     <Pressable
       accessibilityRole="button"
@@ -624,13 +681,22 @@ function StackedNavItem({
             style={[
               styles.indicator,
               isHovered(state) && !active && styles.indicatorHover,
-              (active || state.pressed) && (dark ? styles.indicatorActiveDark : styles.indicatorActive),
-              focused && styles.focusRing,
+              (active || state.pressed) &&
+                (dark ? styles.indicatorActiveDark : styles.indicatorActive),
+              focused && (dark ? styles.focusRingDark : styles.focusRing),
             ]}
           >
             <AppIcon
               name={icon}
-              color={dark ? (active ? "#FFFFFF" : "#D1D9FF") : (active ? colors.primary : colors.muted)}
+              color={
+                dark
+                  ? active
+                    ? "#FFFFFF"
+                    : "#D1D9FF"
+                  : active
+                    ? colors.primary
+                    : colors.muted
+              }
             />
           </View>
           <AppText
@@ -689,12 +755,14 @@ function NavigationSheet({
             <DrawerItem
               key={item.label}
               item={item}
+              dark={false}
               onPress={() => onNavigate(item)}
             />
           ))}
           <View style={styles.divider} />
           <DrawerItem
             item={{ label: "Changer de profil", icon: "users" }}
+            dark={false}
             onPress={onSwitchProfile}
           />
         </View>
@@ -859,16 +927,16 @@ export function AppShell({
             <AppText
               variant="small"
               color={role === "parent" ? "#FFD59E" : "#BFC8FB"}
-              style={{ fontWeight: "700", letterSpacing: 1 }}
+              style={{ fontWeight: "600", paddingHorizontal: 12 }}
             >
-              {role === "parent" ? "ESPACE PARENT" : "MON ESPACE DE RÉVISION"}
+              {role === "parent" ? "Espace parent" : "Mon espace de révision"}
             </AppText>
             {subject && (
               <View
                 style={[styles.subject, { backgroundColor: subject.color }]}
               >
                 <AppIcon name={subject.icon} color="#FFFFFF" size={28} />
-                <AppText variant="heading" color="#FFFFFF">
+                <AppText variant="label" color={colors.onPrimary}>
                   {subject.title}
                 </AppText>
                 <AppText variant="small" color="#FFFFFF">
@@ -886,11 +954,17 @@ export function AppShell({
               ))}
             </View>
             <View style={{ flex: 1, minHeight: 24 }} />
-            <View style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.18)", paddingTop: 15 }}>
-              <Pressable accessibilityRole="button" onPress={switchProfile} style={{ minHeight: 48, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14 }}>
-                <AppIcon name="users" color="#FFFFFF" />
-                <AppText color="#FFFFFF" style={{ fontWeight: "600" }}>Changer de profil</AppText>
-              </Pressable>
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: "rgba(255,255,255,0.18)",
+                paddingTop: 15,
+              }}
+            >
+              <DrawerItem
+                item={{ label: "Changer de profil", icon: "users" }}
+                onPress={switchProfile}
+              />
             </View>
           </ScrollView>
         </View>
@@ -983,7 +1057,13 @@ export function AppShell({
     </View>
   );
 }
-function BrandMark({ size = 44, dark = false }: { size?: number; dark?: boolean }) {
+function BrandMark({
+  size = 44,
+  dark = false,
+}: {
+  size?: number;
+  dark?: boolean;
+}) {
   return (
     <View
       style={{
@@ -995,11 +1075,21 @@ function BrandMark({ size = 44, dark = false }: { size?: number; dark?: boolean 
         justifyContent: "center",
       }}
     >
-      <AppIcon name="book" color={dark ? "#FFFFFF" : colors.primary} size={Math.round(size * 0.62)} />
+      <AppIcon
+        name="book"
+        color={dark ? "#FFFFFF" : colors.primary}
+        size={Math.round(size * 0.62)}
+      />
     </View>
   );
 }
-export function Brand({ compact = false, dark = false }: { compact?: boolean; dark?: boolean }) {
+export function Brand({
+  compact = false,
+  dark = false,
+}: {
+  compact?: boolean;
+  dark?: boolean;
+}) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
       <BrandMark dark={dark} size={compact ? 36 : 42} />
@@ -1056,7 +1146,7 @@ const buttonStyles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
   },
   secondary: { ...neumorphic.small, backgroundColor: colors.surface },
-  ghost: { backgroundColor: colors.primaryLight, borderColor: "transparent" },
+  ghost: { backgroundColor: "transparent", borderColor: "transparent" },
   orange: {
     ...neumorphic.colored,
     backgroundColor: colors.orange,
@@ -1071,6 +1161,7 @@ const filledHover: Partial<Record<keyof typeof buttonStyles, ViewStyle>> = {
 const styles = StyleSheet.create({
   text: { color: colors.ink, fontFamily, flexShrink: 1 },
   button: {
+    alignSelf: "flex-start",
     minHeight: 52,
     maxWidth: "100%",
     borderRadius: 18,
@@ -1091,11 +1182,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   raisedHover: {
+    backgroundColor: colors.surfaceInset,
+  },
+  actionCardHover: {
     ...neumorphic.hover,
-    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.primary,
   },
   focusRing: {
     outlineColor: colors.primary,
+    outlineStyle: "solid",
+    outlineWidth: 3,
+    outlineOffset: 2,
+  },
+  focusRingDark: {
+    outlineColor: colors.onPrimary,
     outlineStyle: "solid",
     outlineWidth: 3,
     outlineOffset: 2,
@@ -1114,7 +1214,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 18,
   },
-  cardMedium: { borderRadius: 28, padding: 22 },
+  cardMedium: { padding: 24 },
   emptyIcon: {
     backgroundColor: colors.primaryLight,
     width: 64,
@@ -1147,8 +1247,7 @@ const styles = StyleSheet.create({
   shell: { flex: 1, flexDirection: "row", backgroundColor: colors.background },
   sidebar: {
     width: layout.drawer,
-    backgroundColor: "#192451",
-    boxShadow: "4px 0px 18px rgba(25,36,81,0.12)",
+    backgroundColor: colors.navigation,
     zIndex: 1,
   },
   sidebarContent: {
@@ -1177,12 +1276,11 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   drawerItemHover: {
-    backgroundColor: "rgba(255,255,255,0.09)",
+    backgroundColor: colors.navigationHover,
   },
   drawerItemActive: {
-    backgroundColor: "#6045D9",
+    backgroundColor: colors.primary,
     borderColor: "rgba(255,255,255,0.25)",
-    boxShadow: "0px 5px 14px rgba(17,16,83,0.2)",
   },
   stackedItem: {
     minHeight: 60,
@@ -1208,12 +1306,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(96,69,217,0.10)",
   },
   indicatorActiveDark: {
-    backgroundColor: "#6045D9",
+    backgroundColor: colors.primary,
     borderColor: "rgba(255,255,255,0.18)",
   },
   navLabel: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: "600",
     textAlign: "center",
   },
@@ -1241,8 +1339,7 @@ const styles = StyleSheet.create({
   },
   rail: {
     width: layout.rail,
-    backgroundColor: "#192451",
-    boxShadow: "4px 0px 18px rgba(25,36,81,0.12)",
+    backgroundColor: colors.navigation,
     zIndex: 1,
   },
   railContent: {

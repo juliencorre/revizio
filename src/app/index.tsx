@@ -8,12 +8,12 @@ import {
 import { AppIcon, AppText, Badge, Brand, Card, Button } from "@/components/ui";
 import { useSession } from "@/state/session";
 import { NeumorphicProfileCard } from "@/components/NeumorphicProfileCard";
-import { colors } from "@/theme";
+import { colors, spacing } from "@/theme";
 
 export default function ProfilesScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const landscape = width >= 800;
+  const landscape = width >= 600;
   const compact = width < 600;
   const session = useSession();
   const profiles = session.profiles.length
@@ -38,9 +38,9 @@ export default function ProfilesScreen() {
       contentContainerStyle={[
         styles.content,
         {
-          paddingHorizontal: landscape ? 48 : compact ? 16 : 24,
-          paddingVertical: landscape ? 36 : compact ? 20 : 28,
-          gap: compact ? 22 : 30,
+          paddingHorizontal: landscape ? spacing.xxl : spacing.lg,
+          paddingVertical: landscape ? spacing.xxxl : spacing.xl,
+          gap: compact ? spacing.xl : spacing.xxl,
         },
       ]}
     >
@@ -51,8 +51,8 @@ export default function ProfilesScreen() {
         <AppText
           variant="hero"
           style={{
-            fontSize: landscape ? 44 : compact ? 30 : 34,
-            lineHeight: landscape ? 56 : compact ? 38 : 44,
+            fontSize: landscape ? 38 : 30,
+            lineHeight: landscape ? 48 : 40,
             textAlign: "center",
           }}
         >
@@ -74,7 +74,7 @@ export default function ProfilesScreen() {
           styles.profiles,
           {
             flexDirection: landscape ? "row" : "column",
-            gap: compact ? 16 : 32,
+            gap: spacing.xl,
           },
         ]}
       >
@@ -90,12 +90,13 @@ export default function ProfilesScreen() {
             description="Mes cours, mes fiches, mes exercices et mes progrès"
             icon="book"
             testID={index === 0 ? "profile-child" : `profile-${profile.id}`}
-            accessibilityLabel="Entrer dans l’espace enfant"
+            accessibilityLabel={`Entrer dans l’espace enfant de ${profile.name}`}
             compact={compact}
             onPress={() => openChild(profile.id)}
             style={{
-              flex: landscape ? 1 : undefined,
-              minWidth: landscape ? 300 : undefined,
+              flexGrow: 1,
+              flexBasis: landscape ? 280 : "auto",
+              minWidth: 0,
             }}
           />
         ))}
@@ -113,26 +114,47 @@ export default function ProfilesScreen() {
               ? router.push("/parent")
               : router.push({ pathname: "/auth", params: { target: "parent" } })
           }
-          style={{ flex: landscape ? 1 : undefined }}
+          style={{
+            flexGrow: 1,
+            flexBasis: landscape ? 280 : "auto",
+            minWidth: 0,
+          }}
         />
       </View>
       {session.mode === "demo" ? (
         <Card
           inset
-          style={{ width: "100%", maxWidth: 960, padding: 20, gap: 8 }}
+          style={{
+            width: "100%",
+            maxWidth: 960,
+            padding: spacing.xl,
+            gap: spacing.md,
+            backgroundColor: colors.background,
+          }}
         >
-          <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: spacing.sm,
+              alignItems: "center",
+            }}
+          >
             <AppIcon name="lightbulb" size={20} />
             <AppText variant="label">Explorer à son rythme</AppText>
             <Badge tone="muted">Démonstration</Badge>
           </View>
-          <AppText variant="small" color={colors.muted}>
+          <AppText
+            variant="small"
+            color={colors.muted}
+            style={{ maxWidth: 680 }}
+          >
             Alex est un profil de démonstration. Les cours et résultats restent
             sur cet appareil. Connectez votre espace familial pour importer vos
             cours et utiliser l’IA.
           </AppText>
           <Button
-            variant="ghost"
+            variant="secondary"
             icon="users"
             onPress={() => void session.logout()}
           >

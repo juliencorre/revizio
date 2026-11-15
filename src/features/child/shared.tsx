@@ -55,6 +55,7 @@ export function ChildShell({
   const navigation: NavigationItem[] = [
     {
       label: "Aujourd’hui",
+      shortLabel: "Accueil",
       href: "/student",
       icon: "home",
       active: active === "home",
