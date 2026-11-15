@@ -29,6 +29,7 @@ export interface ServerRuntime {
   queue: JobQueue;
   images: ImageProcessor;
   aiDefaults: AiSettings;
+  aiProvider?: "ollama" | "anthropic" | "workers-ai";
   deployment?: "local" | "cloudflare";
   setupToken?: string;
   backupLimitBytes?: number;

@@ -10,6 +10,9 @@ export interface ServerOptions {
   staticDir?: string;
   ollamaUrl?: string;
   ollamaModel?: string;
+  aiProvider?: "ollama" | "anthropic";
+  anthropicApiKey?: string;
+  anthropicModel?: string;
   allowedOrigins?: string[];
   secureCookies?: boolean;
   sessionDays?: number;

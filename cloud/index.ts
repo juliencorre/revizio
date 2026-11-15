@@ -7,6 +7,7 @@ import { CloudAi, cloudAiDefaults, cloudExtractor } from "./ai";
 import { cloudImages } from "./images";
 import { SqliteFiles, sqlDatabase } from "./storage";
 import type { AiClient } from "../server/types";
+import { AnthropicClient, anthropicDefaults } from "../server/anthropic";
 
 export class FamilyServer extends DurableObject<Env> {
   private database: FamilyDatabase;
@@ -22,10 +23,24 @@ export class FamilyServer extends DurableObject<Env> {
       files,
       transaction: (fn) => ctx.storage.transactionSync(fn),
     });
-    const ai = aiClient ?? new CloudAi(env.AI);
+    const provider = env.AI_PROVIDER ?? "workers-ai";
+    if (provider !== "anthropic" && provider !== "workers-ai")
+      throw new Error(
+        "AI_PROVIDER doit être anthropic ou workers-ai sur Cloudflare.",
+      );
+    const defaults =
+      provider === "anthropic"
+        ? anthropicDefaults(env.ANTHROPIC_MODEL)
+        : cloudAiDefaults;
+    const ai =
+      aiClient ??
+      (provider === "anthropic"
+        ? new AnthropicClient(env.ANTHROPIC_API_KEY)
+        : new CloudAi(env.AI));
     this.queue = new JobQueue(this.database, ai, {
       extractUpload: cloudExtractor(files),
       alarmDriven: true,
+      settings: defaults,
     });
     this.app = new CloudHttp(ctx.storage);
     this.ready = ctx.blockConcurrencyWhile(() =>
@@ -36,7 +51,8 @@ export class FamilyServer extends DurableObject<Env> {
           ai,
           queue: this.queue,
           images: cloudImages,
-          aiDefaults: cloudAiDefaults,
+          aiDefaults: defaults,
+          aiProvider: provider,
           deployment: "cloudflare",
           setupToken: env.SETUP_TOKEN,
           backupLimitBytes: 12 * 1024 * 1024,

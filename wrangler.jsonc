@@ -39,6 +39,11 @@
   },
   "vars": {
     "FAMILY_ID": "famille",
+    "AI_PROVIDER": "anthropic",
+    "ANTHROPIC_MODEL": "claude-sonnet-5-5",
+  },
+  "secrets": {
+    "required": ["SETUP_TOKEN", "ANTHROPIC_API_KEY"],
   },
   "observability": {
     "enabled": true,

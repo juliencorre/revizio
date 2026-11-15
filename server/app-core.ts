@@ -61,6 +61,14 @@ export async function configureServerRoutes(
 ) {
   const { database, ai, queue, images } = runtime;
   const defaults = runtime.aiDefaults;
+  const provider =
+    runtime.aiProvider === "anthropic"
+      ? "anthropic"
+      : (runtime.deployment ?? "local");
+  const managedAi =
+    provider === "anthropic" || runtime.deployment === "cloudflare";
+  const aiSettings = (familyId: string) =>
+    managedAi ? defaults : database.settings(familyId);
   const secure = options.secureCookies ?? process.env.SECURE_COOKIES === "true";
   const origins = new Set(
     options.allowedOrigins ??
@@ -220,7 +228,7 @@ export async function configureServerRoutes(
       available: await ai.available(
         database.needsSetup()
           ? defaults
-          : database.settings(
+          : aiSettings(
               database.profiles()[0]?.familyId ??
                 String(
                   database.db.prepare("SELECT id FROM families LIMIT 1").get()
@@ -230,7 +238,7 @@ export async function configureServerRoutes(
       ),
       model: database.needsSetup()
         ? defaults.model
-        : database.settings(
+        : aiSettings(
             String(
               database.db.prepare("SELECT id FROM families LIMIT 1").get()?.id,
             ),
@@ -718,10 +726,10 @@ export async function configureServerRoutes(
   });
   app.get("/api/settings", async (request) => {
     const { user } = auth(request, true);
-    const settings = database.settings(user.familyId);
+    const settings = aiSettings(user.familyId);
     return {
       ...settings,
-      provider: runtime.deployment ?? "local",
+      provider,
       available: await ai.available(settings),
     };
   });
@@ -729,11 +737,11 @@ export async function configureServerRoutes(
     const { user } = auth(request, true);
     const body = objectBody(request.body);
     const current = database.settings(user.familyId);
-    if (runtime.deployment === "cloudflare") {
-      // Cloud inference uses a binding and a fixed free-tier model, never a client URL.
+    if (managedAi) {
+      // Hosted inference settings are controlled by the server, never a client URL.
       return {
         ...defaults,
-        provider: "cloudflare",
+        provider,
         available: await ai.available(defaults),
       };
     }
