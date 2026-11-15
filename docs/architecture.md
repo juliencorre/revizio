@@ -9,8 +9,12 @@ Les composants de `src/components/ui.tsx` et les tokens de `src/theme.ts` porten
 La mise en page suit les classes de taille de fenêtre de Material Design (`windowClassFor` dans `src/theme.ts`) :
 
 - **compacte** (< 600 px, smartphone) : barre supérieure, barre de navigation en bas avec cinq destinations stables ; pendant un exercice, la barre laisse place à l’action principale fixée sous la question ;
-- **moyenne** (600 à 999 px, tablette en portrait, smartphone en paysage) : rail de navigation vertical ;
-- **étendue** (≥ 1000 px, tablette en paysage, ordinateur) : tiroir latéral.
+- **moyenne** (600 à 999 px, tablette en portrait, smartphone en paysage) : rail de navigation gauche réduit, large de 96 px ;
+- **étendue** (≥ 1000 px, tablette en paysage, ordinateur) : rail étendu de 280 px, avec icônes et libellés sur la même ligne.
+
+Le menu gauche reprend les [recommandations Material 3 de Google pour les rails réduits et étendus](https://github.com/material-components/material-components-android/blob/master/docs/components/NavigationRail.md) : cinq destinations principales, indicateur de sélection arrondi et tonal, icônes de 24 px et libellés toujours visibles. Son bouton permet de réduire ou d’étendre le rail ; ce choix reste conservé entre les pages du même espace. La barre du bas prend le relais sur téléphone.
+
+Les layouts `/parent` et `/student` conservent chacun un cadre commun autour du `Slot` Expo Router. La navigation et son défilement restent montés pendant que le contenu change. Côté parent, le bandeau affiche la matière de la page et donne accès à son menu. La carte de matière se trouve après les destinations pour ne pas déplacer les liens. `PageShell` transmet uniquement le contexte de la page, sa référence de défilement et ses actions fixes au cadre commun. Chaque nouvelle page revient en haut ; le chargement d’une page ou d’un profil est limité à la zone de contenu.
 
 Marges, titres, cartes et grilles s’ajustent à la classe ; `useContentWidth` donne la largeur réellement mesurée dans le cadre. La destination courante est annoncée par `aria-current` et l’anneau de focus n’apparaît qu’à la navigation au clavier. Toutes les zones tactiles gardent au moins 44 px.
 

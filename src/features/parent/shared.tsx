@@ -9,16 +9,16 @@ import {
   type TextInputProps,
   type ScrollViewInstance,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import {
   AppIcon,
-  AppShell,
   AppText,
   Button,
   Card,
   type NavigationItem,
 } from "@/components/ui";
 import { colors, fontFamily, neumorphic } from "@/theme";
+import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import { useSession } from "@/state/session";
@@ -45,10 +45,20 @@ export function ParentLayout({
   subjectId?: string;
   scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
+  const data = useLearning();
+  const subject = data.subjects.find((item) => item.id === subjectId);
+  return (
+    <PageShell subject={subject} scrollRef={scrollRef}>
+      {children}
+    </PageShell>
+  );
+}
+
+export function ParentWorkspace({ children }: { children: ReactNode }) {
+  const active = usePathname().split("/")[2] || "dashboard";
   const router = useRouter();
   const data = useLearning();
   const session = useSession();
-  const subject = data.subjects.find((item) => item.id === subjectId);
   const navigation: NavigationItem[] = [
     {
       label: "Accueil",
@@ -62,6 +72,8 @@ export function ParentLayout({
       icon: "book",
       active: [
         "subjects",
+        "subject",
+        "review",
         "library",
         "import",
         "exercises",
@@ -90,89 +102,99 @@ export function ParentLayout({
     },
   ];
   return (
-    <AppShell role="parent" navigation={navigation} scrollRef={scrollRef}>
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <AppText variant="label">Pour {data.childName}</AppText>
-        {data.profiles.length > 1 &&
-          data.profiles.map((profile) => (
-            <Button
-              key={profile.id}
-              selected={profile.id === data.activeProfileId}
-              variant={
-                profile.id === data.activeProfileId ? "primary" : "secondary"
-              }
-              accessibilityLabel={`Suivre ${profile.name}`}
-              onPress={() => session.selectProfile(profile.id)}
-            >
-              {profile.name}
-            </Button>
-          ))}
-        {subject && (
-          <Button
-            style={{ marginLeft: "auto" }}
-            variant="ghost"
-            icon="arrow-left"
-            onPress={() => router.navigate("/parent/subjects")}
-          >
-            Toutes les matières
-          </Button>
-        )}
-      </View>
-      {subject && (
-        <Card
-          testID="parent-subject-banner"
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-            backgroundColor: subject.color + "0E",
-            borderColor: subject.color + "44",
-          }}
-        >
+    <PersistentAppShell
+      role="parent"
+      navigation={navigation}
+      loading={!data.isReady}
+      header={({ subject }) => (
+        <>
           <View
             style={{
-              width: 44,
-              height: 44,
+              flexDirection: "row",
+              flexWrap: "wrap",
               alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 12,
-              backgroundColor: subject.color + "15",
+              gap: 8,
             }}
           >
-            <AppIcon name={subject.icon} color={subject.color} size={24} />
+            <AppText variant="label">Pour {data.childName}</AppText>
+            {data.profiles.length > 1 &&
+              data.profiles.map((profile) => (
+                <Button
+                  key={profile.id}
+                  selected={profile.id === data.activeProfileId}
+                  variant={
+                    profile.id === data.activeProfileId
+                      ? "primary"
+                      : "secondary"
+                  }
+                  accessibilityLabel={`Suivre ${profile.name}`}
+                  onPress={() => session.selectProfile(profile.id)}
+                >
+                  {profile.name}
+                </Button>
+              ))}
+            {subject && (
+              <Button
+                style={{ marginLeft: "auto" }}
+                variant="ghost"
+                icon="arrow-left"
+                onPress={() => router.navigate("/parent/subjects")}
+              >
+                Toutes les matières
+              </Button>
+            )}
           </View>
-          <AppText
-            variant={active === "subjects" ? "title" : "heading"}
-            style={{ flexGrow: 1, flexShrink: 1 }}
-          >
-            {subject.title}
-          </AppText>
-          {active !== "subjects" && (
-            <Button
-              variant="ghost"
-              icon="arrow-left"
-              onPress={() =>
-                router.navigate({
-                  pathname: "/parent/subject/[id]",
-                  params: { id: subject.id },
-                })
-              }
+          {subject && (
+            <Card
+              testID="parent-subject-banner"
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 16,
+                flexWrap: "wrap",
+                backgroundColor: subject.color + "0E",
+                borderColor: subject.color + "44",
+              }}
             >
-              Menu de la matière
-            </Button>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 12,
+                  backgroundColor: subject.color + "15",
+                }}
+              >
+                <AppIcon name={subject.icon} color={subject.color} size={24} />
+              </View>
+              <AppText
+                variant={active === "subject" ? "title" : "heading"}
+                style={{ flexGrow: 1, flexShrink: 1 }}
+              >
+                {subject.title}
+              </AppText>
+              {active !== "subject" && (
+                <Button
+                  variant="ghost"
+                  icon="arrow-left"
+                  onPress={() =>
+                    router.navigate({
+                      pathname: "/parent/subject/[id]",
+                      params: { id: subject.id },
+                    })
+                  }
+                >
+                  Menu de la matière
+                </Button>
+              )}
+            </Card>
           )}
-        </Card>
+        </>
       )}
+    >
       {children}
-    </AppShell>
+    </PersistentAppShell>
   );
 }
 export function Field({
