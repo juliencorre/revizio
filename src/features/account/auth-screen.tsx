@@ -44,6 +44,7 @@ export function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const [childName, setChildName] = useState("");
   const [grade, setGrade] = useState("5e");
   const [pin, setPin] = useState("");
@@ -127,6 +128,9 @@ export function AuthScreen() {
     try {
       if (setup) {
         await session.setup({
+          ...(session.health?.setupProtected
+            ? { setupCode: setupCode.trim() }
+            : {}),
           parentName: parentName.trim(),
           email: email.trim().toLowerCase(),
           password,
@@ -224,6 +228,19 @@ export function AuthScreen() {
         <Card style={{ gap: 24 }} testID="auth-form">
           {setup ? (
             <>
+              {session.health?.setupProtected && (
+                <Field
+                  label="Code d’installation"
+                  value={setupCode}
+                  onChangeText={change(setSetupCode)}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={256}
+                  editable={!busy}
+                  placeholder="Le code fourni lors du déploiement"
+                  testID="auth-setup-code"
+                />
+              )}
               <View style={s.row}>
                 <AppIcon name="users" />
                 <AppText variant="heading">Votre compte parent</AppText>

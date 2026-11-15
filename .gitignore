@@ -58,3 +58,10 @@ artifacts/
 
 /.revizio/
 /ocr-cache/
+
+# Cloudflare local state
+.wrangler/
+
+.dev.vars
+.dev.vars.*
+.cloudflare/

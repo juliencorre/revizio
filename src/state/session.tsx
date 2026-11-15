@@ -35,6 +35,7 @@ interface SessionContextValue {
   login(email: string, password: string): Promise<void>;
   childLogin(profileId: string, pin: string): Promise<void>;
   setup(input: {
+    setupCode?: string;
     parentName: string;
     email: string;
     password: string;

@@ -35,7 +35,12 @@ import {
   type BackupSelection,
 } from "./backup";
 
-type AiSettings = { baseUrl: string; model: string; available: boolean };
+type AiSettings = {
+  baseUrl: string;
+  model: string;
+  available: boolean;
+  provider?: "local" | "cloudflare";
+};
 type Feedback = {
   section: string;
   error?: string;
@@ -252,7 +257,9 @@ export function ParentSettingsScreen() {
     setFeedback({
       section: "ai",
       message: result.available
-        ? "Le modèle répond. Les prochaines générations utiliseront ces réglages."
+        ? result.provider === "cloudflare"
+          ? "La liaison Cloudflare est configurée. Les préparations utilisent le quota gratuit quotidien."
+          : "Le modèle répond. Les prochaines générations utiliseront ces réglages."
         : "Réglages enregistrés. Le modèle ne répond pas encore : vérifiez le service et son installation.",
       warning: !result.available,
     });
@@ -732,14 +739,16 @@ export function ParentSettingsScreen() {
               {aiLoading
                 ? "Vérification…"
                 : ai?.available
-                  ? "Modèle disponible"
+                  ? ai?.provider === "cloudflare"
+                    ? "IA configurée"
+                    : "Modèle disponible"
                   : "Modèle à vérifier"}
             </Badge>
           </View>
           <AppText color={colors.muted}>
-            Les prochaines générations utiliseront ce service et ce modèle.
-            Votre relecture reste nécessaire avant de publier une fiche ou une
-            série.
+            {ai?.provider === "cloudflare"
+              ? "Les documents utilisés pour préparer les fiches sont traités par l’IA hébergée chez Cloudflare. Le quota gratuit est renouvelé chaque jour. Votre relecture reste nécessaire avant publication."
+              : "Les prochaines générations utiliseront ce service et ce modèle. Votre relecture reste nécessaire avant de publier une fiche ou une série."}
           </AppText>
           <View style={s.formGrid}>
             <View style={s.field}>
@@ -752,7 +761,12 @@ export function ParentSettingsScreen() {
                 keyboardType="url"
                 placeholder="http://127.0.0.1:11434"
                 maxLength={500}
-                editable={!disabled && !aiLoading && online}
+                editable={
+                  !disabled &&
+                  !aiLoading &&
+                  online &&
+                  ai?.provider !== "cloudflare"
+                }
                 testID="settings-ai-url"
               />
             </View>
@@ -765,7 +779,12 @@ export function ParentSettingsScreen() {
                 autoCorrect={false}
                 placeholder="ministral-3:8b"
                 maxLength={120}
-                editable={!disabled && !aiLoading && online}
+                editable={
+                  !disabled &&
+                  !aiLoading &&
+                  online &&
+                  ai?.provider !== "cloudflare"
+                }
                 testID="settings-ai-model"
               />
             </View>
@@ -779,7 +798,9 @@ export function ParentSettingsScreen() {
           >
             {busy === "ai"
               ? "Vérification du modèle…"
-              : "Enregistrer et tester le modèle"}
+              : ai?.provider === "cloudflare"
+                ? "Vérifier la configuration IA"
+                : "Enregistrer et tester le modèle"}
           </Button>
         </Card>
         <Card style={{ gap: 20 }}>

@@ -43,3 +43,14 @@ Publication bloquée par des sections facultatives vides, perte de saisie sur re
 ## Limites pratiques
 
 WebKit sur Linux avec profil iPad ne remplace pas un iPad physique. La caméra, les autorisations Photos/Fichiers, le clavier système, les gestes natifs et les voix effectivement audibles restent à vérifier sur appareil. Le bundle iOS n’est ni signé ni distribué sur l’App Store. Le mode web hors connexion sur iPad demande HTTPS et une première ouverture en ligne. Un corpus familial de manuscrits, formules et schémas réels reste à évaluer avec relecture parentale.
+
+## Installation Cloudflare — 15 novembre 2026
+
+- `npm run typecheck` : client, serveur Node.js et Worker sans erreur.
+- `npm test` : 117 tests réussis, un test Ollama opt-in ignoré. Les trois tests cloud comprennent un parcours réel dans workerd : création protégée de la famille, sessions, rotation et stockage privé d’image, publication enfant, conflit de révision, sauvegarde/restauration, éviction du Durable Object, reprise d’une préparation et extraction d’un PDF de deux pages.
+- Les scénarios cloud utilisent explicitement un double IA dans une entrée de test séparée du Worker publié. Le contrat de sortie structurée du client Workers AI et le rejet d’une sortie tronquée sont vérifiés séparément.
+- `npm run build` et `wrangler deploy --dry-run` : export PWA, serveur local et bundle cloud construits. Le bundle Worker compressé est inférieur à 1 Mo ; le profil local de démarrage relève environ 17 ms de CPU actif, sans préjuger du temps sur les serveurs Cloudflare.
+- Playwright : 36 parcours Chromium puis 36 parcours WebKit réussis, en paysage et portrait. Les huit variantes Ollama opt-in n’ont pas été relancées dans cette campagne. Les dépendances WebKit ont été installées dans le cache navigateur local pour cette machine Linux.
+- Workers AI réel : réponse JSON structurée correcte à un calcul simple, transcription fidèle d’une image imprimée de nombres relatifs, puis fiche extractive de trois sections conforme aux citations du texte fourni. Ces essais utilisent des sources synthétiques, sans document familial privé. Les résultats restent des brouillons à relire.
+
+Le serveur Node.js/Ollama conserve son parcours local. Les différences de capacité de l’installation hébergée (photos, stockage et sauvegardes) sont détaillées dans le [guide Cloudflare](cloudflare.md). WebKit sur Linux ne remplace pas une vérification sur iPad physique.

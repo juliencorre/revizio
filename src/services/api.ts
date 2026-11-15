@@ -16,6 +16,8 @@ export interface SessionResponse {
 }
 export interface ServerHealth {
   needsSetup: boolean;
+  setupProtected?: boolean;
+  deployment?: "local" | "cloudflare";
   version: string;
   ai: { available: boolean; model: string };
 }

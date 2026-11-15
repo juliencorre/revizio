@@ -2,7 +2,7 @@
 
 [Dépôt GitHub public](https://github.com/juliencorre/revizio)
 
-Application familiale de révision, conçue pour l’iPad : les parents importent les cours et relisent les fiches et exercices préparés avec une IA locale ; l’enfant retrouve les contenus publiés, ses plans et ses résultats. Expo, React Native et TypeScript partagent le même socle web et natif, avec une interface neuromorphique et de grandes cartes tactiles.
+Application familiale de révision, conçue pour l’iPad : les parents importent les cours et relisent les fiches et exercices préparés avec une IA locale ou hébergée ; l’enfant retrouve les contenus publiés, ses plans et ses résultats. Expo, React Native et TypeScript partagent le même socle web et natif, avec une interface neuromorphique et de grandes cartes tactiles.
 
 ## Ouvrir l’espace familial
 
@@ -28,6 +28,18 @@ HOST=0.0.0.0 PORT=4173 npm run serve
 ```
 
 Ouvrir alors l’adresse réseau de cette machine dans Safari. Pour une installation durable, servir l’application et `/api` sous la même origine HTTPS ; définir `SECURE_COOKIES=true` derrière cette terminaison HTTPS. Safari permet ensuite **Partager → Sur l’écran d’accueil**. Le cache de l’interface s’installe après une première ouverture en ligne ; une adresse LAN en HTTP ne suffit pas sur iPad. Voir [installation iPad et hors connexion](docs/ipad-offline.md).
+
+## Héberger gratuitement sur Cloudflare
+
+Le [guide Cloudflare](docs/cloudflare.md) installe l’application complète sur Workers : données et documents privés dans un Durable Object SQLite, préparations avec Workers AI, adresse HTTPS gratuite en `workers.dev`. L’ordinateur familial peut être éteint. Le déploiement utilise l’offre Workers Free et ses quotas ; aucun abonnement payant ni stockage R2 n’est nécessaire.
+
+```sh
+npm ci
+npx wrangler login --device
+npm run deploy:cloud
+```
+
+Le premier compte se crée avec un code d’installation privé conservé dans `.cloudflare/installation-code`. Les documents utilisés pour l’IA sont alors traités chez Cloudflare. Les instructions de serveur local ci-dessus restent disponibles pour conserver Ollama sur l’ordinateur familial.
 
 ## Premier parcours
 

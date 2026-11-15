@@ -8,7 +8,7 @@
     "web": "expo start --web",
     "ios": "expo start --ios",
     "android": "expo start --android",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.cloud.json --noEmit",
     "test": "vitest run",
     "export:web": "expo export --platform web && node scripts/prepare-pwa.mjs",
     "test:e2e": "playwright test",
@@ -18,7 +18,10 @@
     "build:server": "esbuild server/index.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=dist-server/index.mjs",
     "build": "npm run export:web && npm run build:server",
     "test:server": "vitest run tests/server",
-    "release:package": "node scripts/package-release.mjs"
+    "release:package": "node scripts/package-release.mjs",
+    "dev:cloud": "wrangler dev",
+    "deploy:cloud": "node scripts/deploy-cloudflare.mjs",
+    "test:cloud": "vitest run tests/cloud"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
@@ -38,7 +41,9 @@
     "expo-speech": "~58.0.3",
     "expo-status-bar": "~58.0.4",
     "fastify": "^5.12.8",
+    "jpeg-js": "^0.4.4",
     "lucide-react-native": "^1.70.0",
+    "pngjs": "^7.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
@@ -49,15 +54,18 @@
     "react-native-webview": "14.0.1",
     "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0",
-    "tsx": "^4.23.15"
+    "tsx": "^4.23.15",
+    "unpdf": "^2.2.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
     "@types/node": "^24.19.2",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "~19.3.0",
     "esbuild": "^0.28.2",
     "prettier": "^3.9.10",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "wrangler": "^4.162.0"
   }
 }
