@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import {
   Modal,
   Pressable,
@@ -20,7 +20,8 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
   const { subjects } = useLearning();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const trigger = useRef<View>(null);
+  const trigger = useRef<ComponentRef<typeof View>>(null);
+  const options = useRef<(ComponentRef<typeof View> | null)[]>([]);
   const [anchor, setAnchor] = useState<{ left: number; bottom: number } | null>(
     null,
   );
@@ -28,6 +29,10 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
   useEffect(() => {
     setAnchor(null);
   }, [width, height, subject.id]);
+  function close() {
+    setAnchor(null);
+    requestAnimationFrame(() => trigger.current?.focus());
+  }
   function open() {
     trigger.current?.measureInWindow((left, top, _width, triggerHeight) =>
       setAnchor({ left, bottom: top + triggerHeight }),
@@ -61,6 +66,8 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
         accessibilityRole="button"
         accessibilityLabel={`Changer de matière : ${subject.title}`}
         accessibilityState={{ expanded: !!anchor }}
+        aria-haspopup="dialog"
+        aria-expanded={!!anchor}
         onPress={open}
         onFocus={onFocus}
         onBlur={onBlur}
@@ -80,7 +87,12 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
         visible={!!anchor}
         transparent
         animationType="none"
-        onRequestClose={() => setAnchor(null)}
+        onRequestClose={close}
+        onShow={() =>
+          options.current[
+            subjects.findIndex((item) => item.id === subject.id)
+          ]?.focus()
+        }
       >
         <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
           <Pressable
@@ -88,7 +100,7 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
             importantForAccessibility="no"
             tabIndex={-1}
             style={StyleSheet.absoluteFill}
-            onPress={() => setAnchor(null)}
+            onPress={close}
           />
           <View
             role="dialog"
@@ -103,18 +115,41 @@ export function SubjectSelector({ subject }: { subject: Subject }) {
               <IconButton
                 icon="close"
                 label="Fermer la liste"
-                onPress={() => setAnchor(null)}
+                onPress={close}
               />
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled">
-              {subjects.map((item) => (
+            <ScrollView
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Matières"
+              keyboardShouldPersistTaps="handled"
+            >
+              {subjects.map((item, index) => (
                 <Pressable
                   key={item.id}
-                  accessibilityRole="button"
+                  ref={(node) => {
+                    options.current[index] = node;
+                  }}
+                  onKeyDown={(event) => {
+                    const key = event.nativeEvent.key;
+                    const last = subjects.length - 1;
+                    const positions: Record<string, number | undefined> = {
+                      Home: 0,
+                      End: last,
+                      ArrowDown: index === last ? 0 : index + 1,
+                      ArrowUp: index === 0 ? last : index - 1,
+                    };
+                    const next = positions[key];
+                    if (next !== undefined) {
+                      event.preventDefault();
+                      options.current[next]?.focus();
+                    }
+                  }}
+                  accessibilityRole="radio"
                   accessibilityLabel={item.title}
-                  accessibilityState={{ selected: item.id === subject.id }}
+                  accessibilityState={{ checked: item.id === subject.id }}
+                  aria-checked={item.id === subject.id}
                   onPress={() => {
-                    setAnchor(null);
+                    close();
                     if (item.id !== subject.id)
                       router.navigate(subjectHref(item.id));
                   }}

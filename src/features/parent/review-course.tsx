@@ -16,6 +16,7 @@ import type {
   RevisionSection,
   LearningDiagram as Diagram,
 } from "@/domain/model";
+import { subjectHref } from "./subject-navigation";
 import { useLearning } from "@/state/learning-store";
 import { DiagramEditor } from "./diagram-editor";
 import {
@@ -635,12 +636,7 @@ export function ReviewCourseScreen() {
                 <Button
                   variant="ghost"
                   icon="arrow-left"
-                  onPress={() =>
-                    router.navigate({
-                      pathname: "/parent/subject/[id]",
-                      params: { id: course.subjectId },
-                    })
-                  }
+                  onPress={() => router.navigate(subjectHref(course.subjectId))}
                 >
                   Retour à la matière
                 </Button>

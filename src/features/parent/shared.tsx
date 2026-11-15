@@ -143,7 +143,11 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Toutes les matières"
-                  style={{ minHeight: 44, minWidth: 44, justifyContent: "center" }}
+                  style={{
+                    minHeight: 44,
+                    minWidth: 44,
+                    justifyContent: "center",
+                  }}
                   onPress={() => router.navigate("/parent/subjects")}
                 >
                   <AppText variant="small" color={colors.muted}>
@@ -152,7 +156,9 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
                 </Pressable>
               </View>
             ) : (
-              <AppText variant="small" color={colors.muted}>Enfant accompagné</AppText>
+              <AppText variant="small" color={colors.muted}>
+                Enfant accompagné
+              </AppText>
             )}
             <ParentChildSelector />
           </View>

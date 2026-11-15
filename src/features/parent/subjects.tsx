@@ -14,7 +14,7 @@ import type { IconName } from "@/domain/model";
 import { SubjectLibrary } from "./subject-library";
 import { useLearning } from "@/state/learning-store";
 import { colors, radius, spacing } from "@/theme";
-import { preparationHref } from "./subject-navigation";
+import { preparationHref, subjectHref } from "./subject-navigation";
 import { LoadingParent, ParentLayout } from "./shared";
 
 const grid = {
@@ -128,12 +128,7 @@ export function ParentSubjectGrid({
             width={Math.floor((width - (columns - 1) * spacing.lg) / columns)}
             detail={detail || "Ajouter un premier cours"}
             href={
-              next
-                ? preparationHref(next, subject.id)
-                : {
-                    pathname: "/parent/subject/[id]",
-                    params: { id: subject.id },
-                  }
+              next ? preparationHref(next, subject.id) : subjectHref(subject.id)
             }
           />
         );

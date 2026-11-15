@@ -1,5 +1,11 @@
-import { useRef } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { useRef, type ComponentRef } from "react";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewProps,
+} from "react-native";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { AppIcon, AppText, Button, useFocusVisible } from "@/components/ui";
 import { englishTenses } from "@/domain/english";
@@ -35,7 +41,9 @@ function TabStrip({
   tab: SubjectTab;
   select: (tab: SubjectTab) => void;
 }) {
-  const refs = useRef<Partial<Record<SubjectTab, View | null>>>({});
+  const refs = useRef<
+    Partial<Record<SubjectTab, ComponentRef<typeof View> | null>>
+  >({});
   return (
     <View
       accessibilityRole="tablist"
@@ -48,20 +56,17 @@ function TabStrip({
           Platform.OS === "web"
             ? {
                 tabIndex: selected ? (0 as const) : (-1 as const),
-                onKeyDown: (event: {
-                  key: string;
-                  preventDefault: () => void;
-                }) => {
-                  const dest =
-                    event.key === "Home"
-                      ? 0
-                      : event.key === "End"
-                        ? tabs.length - 1
-                        : event.key === "ArrowRight"
-                          ? (index + 1) % tabs.length
-                          : event.key === "ArrowLeft"
-                            ? (index + tabs.length - 1) % tabs.length
-                            : undefined;
+                onKeyDown: (
+                  event: Parameters<NonNullable<ViewProps["onKeyDown"]>>[0],
+                ) => {
+                  const key = event.nativeEvent.key;
+                  const positions: Record<string, number | undefined> = {
+                    Home: 0,
+                    End: tabs.length - 1,
+                    ArrowRight: (index + 1) % tabs.length,
+                    ArrowLeft: (index + tabs.length - 1) % tabs.length,
+                  };
+                  const dest = positions[key];
                   if (dest !== undefined) {
                     event.preventDefault();
                     select(tabs[dest]);
@@ -79,6 +84,9 @@ function TabStrip({
             accessibilityRole="tab"
             accessibilityLabel={labels[item]}
             accessibilityState={{ selected }}
+            aria-selected={selected}
+            nativeID={"subject-tab-" + item}
+            aria-controls="subject-tab-panel"
             {...keyboard}
             onPress={() => select(item)}
             style={[styles.tab, selected && styles.activeTab]}
@@ -312,7 +320,8 @@ export function SubjectLibrary({ subject }: { subject: Subject }) {
       />
       <View
         role="tabpanel"
-        aria-label={labels[tab]}
+        nativeID="subject-tab-panel"
+        aria-labelledby={"subject-tab-" + tab}
         testID={tab === "vocabulaire" ? "parent-vocabulary" : "subject-content"}
         style={{ gap: spacing.lg }}
       >

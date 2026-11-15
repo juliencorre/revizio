@@ -1,3 +1,4 @@
+import { subjectHref } from "./subject-navigation";
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, View, useWindowDimensions } from "react-native";
@@ -676,10 +677,7 @@ function ExercisesEditor({
               <Button
                 variant="ghost"
                 onPress={() =>
-                  router.navigate({
-                    pathname: "/parent/subject/[id]",
-                    params: { id: subjectId, tab: "exercices" },
-                  })
+                  router.navigate(subjectHref(subjectId, "exercices"))
                 }
               >
                 Retour à la matière

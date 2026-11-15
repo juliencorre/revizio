@@ -1,3 +1,4 @@
+import { subjectHref } from "@/features/parent/subject-navigation";
 import { useEffect, useRef, useState } from "react";
 import { View, type ScrollViewInstance } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -176,12 +177,7 @@ function VocabularyEditor() {
         <Button
           icon="arrow-left"
           variant="ghost"
-          onPress={() =>
-            router.push({
-              pathname: "/parent/vocabulary",
-              params: { language },
-            })
-          }
+          onPress={() => router.navigate(subjectHref(language, "vocabulaire"))}
         >
           Mes listes de vocabulaire
         </Button>
@@ -403,10 +399,7 @@ function VocabularyEditor() {
                       variant="danger"
                       onPress={() => {
                         data.deleteVocabularyList(id);
-                        router.replace({
-                          pathname: "/parent/vocabulary",
-                          params: { language },
-                        });
+                        router.replace(subjectHref(language, "vocabulaire"));
                       }}
                     >
                       Confirmer la suppression de la liste

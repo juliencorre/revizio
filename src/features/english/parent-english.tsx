@@ -1,3 +1,4 @@
+import { subjectHref } from "@/features/parent/subject-navigation";
 import { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Platform, Pressable, View, useWindowDimensions } from "react-native";
@@ -399,10 +400,7 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
           <Button
             icon="languages"
             onPress={() =>
-              router.push({
-                pathname: "/parent/vocabulary",
-                params: { language: "english" },
-              })
+              router.navigate(subjectHref("english", "vocabulaire"))
             }
           >
             Gérer mes listes de vocabulaire et leur suivi

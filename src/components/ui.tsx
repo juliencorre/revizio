@@ -606,14 +606,12 @@ function DrawerItem({
   parentRail?: boolean;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
-  const tint = dark
-    ? item.active
-      ? parentRail
-        ? colors.onPrimary
-        : colors.primaryDark
-      : colors.navigationMuted
-    : item.active
-      ? colors.primaryDark
+  const tint = item.active
+    ? parentRail
+      ? colors.onPrimary
+      : colors.primaryDark
+    : dark
+      ? colors.navigationMuted
       : colors.muted;
   return (
     <Pressable
@@ -630,7 +628,7 @@ function DrawerItem({
           (dark ? styles.drawerItemHover : styles.raisedHover),
         (state.pressed || item.active) &&
           (dark ? styles.drawerItemActive : styles.indicatorActive),
-        parentRail && { borderRadius: 8 },
+        parentRail && { borderRadius: 8, paddingHorizontal: 10, gap: 10 },
         parentRail &&
           item.active && { backgroundColor: colors.navigationHover },
         focused && (dark ? styles.focusRingDark : styles.focusRing),
@@ -642,7 +640,7 @@ function DrawerItem({
         style={{
           fontSize: 16,
           lineHeight: 22,
-          fontWeight: "600",
+          fontWeight: parentRail ? "500" : "600",
           flex: 1,
         }}
       >
@@ -844,6 +842,7 @@ function NavigationBar({
 /** The same leading rail stays mounted in both Material 3 configurations. */
 function NavigationRail({
   role,
+  width,
   items,
   expanded,
   onToggle,
@@ -860,21 +859,13 @@ function NavigationRail({
   onSwitchProfile: () => void;
   subject?: { title: string; color: string; icon: IconName };
   grade: string;
+  width: number;
 }) {
   return (
     <View
       role="navigation"
       aria-label="Navigation principale"
-      style={[
-        styles.rail,
-        {
-          width: expanded
-            ? role === "parent"
-              ? layout.parentDrawer
-              : layout.drawer
-            : layout.rail,
-        },
-      ]}
+      style={[styles.rail, { width }]}
     >
       <View style={[styles.railHeader, !expanded && { alignItems: "center" }]}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -893,7 +884,7 @@ function NavigationRail({
         </View>
         <AppText
           variant="small"
-          color={role === "parent" ? "#FFD59E" : colors.navigationMuted}
+          color={colors.navigationMuted}
           style={[styles.railRole, expanded && { paddingHorizontal: 14 }]}
         >
           {expanded
@@ -957,6 +948,7 @@ function NavigationRail({
         {expanded ? (
           <DrawerItem
             item={{ label: "Changer de profil", icon: "users" }}
+            parentRail={role === "parent"}
             onPress={onSwitchProfile}
           />
         ) : (
@@ -1064,6 +1056,7 @@ export function AppShell({
     <View style={styles.shell}>
       {windowClass !== "compact" && (
         <NavigationRail
+          width={navigationWidth}
           role={role}
           items={navigation}
           expanded={expanded}
