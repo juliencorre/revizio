@@ -133,6 +133,7 @@ test("relit la photo et ajoute seulement les nouvelles paires acceptées au brou
   await expect(page.getByTestId("vocabulary-translation-1")).toHaveValue(
     "la fenêtre",
   );
+  await expect(page).not.toHaveURL(/photoJob=/);
   await page.reload();
   await expect(page.getByTestId("vocabulary-term-1")).toHaveValue("la ventana");
   await expect(
