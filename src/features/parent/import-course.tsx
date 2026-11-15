@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRef, useState } from "react";
 import { Platform, Pressable, View, useWindowDimensions } from "react-native";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
@@ -94,8 +95,18 @@ function ImportEditor({
   const availableCourses = data.courses.filter(
     (c) => !scope || c.subjectId === scope,
   );
+  const prefix = `revizo.import.${data.activeProfileId || "demo"}.`;
+  async function readImport(key: string) {
+    const current = await AsyncStorage.getItem(key);
+    if (current !== null || !scope || courseId) return current;
+    // Existing installations kept one unfinished import per child.
+    const old = await AsyncStorage.getItem(prefix + "new");
+    if (!old) return null;
+    const value: unknown = JSON.parse(old);
+    return validDraft(value) && value.subjectId === scope ? old : null;
+  }
   const [draft, setDraft, local] = useLocalDraft<ImportDraft>(
-    `revizo.import.${data.activeProfileId || "demo"}.${courseId || (scope ? "subject." + scope : "new")}`,
+    prefix + (courseId || (scope ? "subject." + scope : "new")),
     initial
       ? {
           subjectId: initial.subjectId,
@@ -110,6 +121,7 @@ function ImportEditor({
       (!scope || value.subjectId === scope) &&
       (!value.existingId ||
         availableCourses.some((c) => c.id === value.existingId)),
+    readImport,
   );
   const [busy, setBusy] = useState<string | null>(null);
   const busyRef = useRef(false);

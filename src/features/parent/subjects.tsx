@@ -17,6 +17,7 @@ import { preparationStatus } from "@/domain/study-overview";
 import { vocabularyLanguages } from "@/domain/vocabulary";
 import { useLearning } from "@/state/learning-store";
 import { colors, radius, spacing } from "@/theme";
+import { preparationHref } from "./subject-navigation";
 import { LoadingParent, ParentLayout } from "./shared";
 
 const grid = {
@@ -131,13 +132,7 @@ export function ParentSubjectGrid({
             detail={detail || "Ajouter un premier cours"}
             href={
               next
-                ? {
-                    pathname:
-                      next === "import"
-                        ? "/parent/import"
-                        : "/parent/exercises",
-                    params: { subjectId: subject.id },
-                  }
+                ? preparationHref(next, subject.id)
                 : {
                     pathname: "/parent/subject/[id]",
                     params: { id: subject.id },

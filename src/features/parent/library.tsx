@@ -15,6 +15,7 @@ import { useLearning } from "@/state/learning-store";
 import { preparationStatus } from "@/domain/study-overview";
 import { plural } from "@/domain/format";
 import { colors } from "@/theme";
+import { preparationHref } from "./subject-navigation";
 import { Field, LoadingParent, ParentLayout } from "./shared";
 
 type Filter = "all" | "draft" | "review" | "published";
@@ -99,11 +100,7 @@ export function ParentLibraryScreen() {
               <Button
                 icon="plus"
                 onPress={() =>
-                  router.push(
-                    subjectId
-                      ? { pathname: "/parent/import", params: { subjectId } }
-                      : "/parent/subjects?next=import",
-                  )
+                  router.push(preparationHref("import", subjectId))
                 }
               >
                 Ajouter un cours
@@ -112,11 +109,7 @@ export function ParentLibraryScreen() {
                 icon="pencil"
                 variant="secondary"
                 onPress={() =>
-                  router.push(
-                    subjectId
-                      ? { pathname: "/parent/exercises", params: { subjectId } }
-                      : "/parent/subjects?next=exercises",
-                  )
+                  router.push(preparationHref("exercises", subjectId))
                 }
               >
                 Préparer des exercices
@@ -251,13 +244,7 @@ export function ParentLibraryScreen() {
           >
             <Button
               icon="plus"
-              onPress={() =>
-                router.push(
-                  subjectId
-                    ? { pathname: "/parent/import", params: { subjectId } }
-                    : "/parent/subjects?next=import",
-                )
-              }
+              onPress={() => router.push(preparationHref("import", subjectId))}
             >
               Ajouter un cours
             </Button>

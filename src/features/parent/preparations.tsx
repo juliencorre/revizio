@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useLocalSearchParams, useFocusEffect, useRouter } from "expo-router";
 import {
   AppIcon,
   AppText,
@@ -14,6 +14,7 @@ import { colors } from "@/theme";
 import type { AiJob } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import { apiFetch } from "@/services/api";
+import { preparationHref } from "./subject-navigation";
 import { Notice, ParentLayout, parentStyles as common } from "./shared";
 
 export type PreparationJob = AiJob & {
@@ -205,12 +206,22 @@ export function ParentPreparationsScreen() {
   );
   const [actionError, setActionError] = useState("");
   const [retrying, setRetrying] = useState<string | null>(null);
-  const pending = state.jobs.filter(
+  const { subjectId } = useLocalSearchParams<{ subjectId?: string }>();
+  const jobs = subjectId
+    ? state.jobs.filter(
+        (job) =>
+          (job.kind === "english"
+            ? "english"
+            : (job.input?.subjectId ?? job.result?.course?.subjectId)) ===
+          subjectId,
+      )
+    : state.jobs;
+  const pending = jobs.filter(
     (job) => job.status === "queued" || job.status === "running",
   );
-  const ready = state.jobs.filter((job) => job.status === "succeeded");
-  const failed = state.jobs.filter((job) => job.status === "failed");
-  const visible = state.jobs
+  const ready = jobs.filter((job) => job.status === "succeeded");
+  const failed = jobs.filter((job) => job.status === "failed");
+  const visible = jobs
     .filter(
       (job) =>
         filter === "all" ||
@@ -271,7 +282,7 @@ export function ParentPreparationsScreen() {
     }
   }
   return (
-    <ParentLayout active="preparations">
+    <ParentLayout active="preparations" subjectId={subjectId}>
       <View testID="parent-preparations" style={{ gap: 26 }}>
         <PageHeading
           eyebrow="Du document au contenu vérifié"
@@ -310,7 +321,9 @@ export function ParentPreparationsScreen() {
             <Button
               icon="pencil"
               variant="secondary"
-              onPress={() => router.push("/parent/subjects?next=exercises")}
+              onPress={() =>
+                router.push(preparationHref("exercises", subjectId))
+              }
             >
               Préparer un exercice à la main
             </Button>
@@ -327,7 +340,7 @@ export function ParentPreparationsScreen() {
             <View style={common.row}>
               {(
                 [
-                  { id: "all", label: "Toutes", count: state.jobs.length },
+                  { id: "all", label: "Toutes", count: jobs.length },
                   { id: "active", label: "En cours", count: pending.length },
                   { id: "review", label: "À vérifier", count: ready.length },
                   { id: "failed", label: "À relancer", count: failed.length },
@@ -345,7 +358,7 @@ export function ParentPreparationsScreen() {
                 </Button>
               ))}
             </View>
-            {state.loading && !state.jobs.length ? (
+            {state.loading && !jobs.length ? (
               <Card
                 style={{ alignItems: "center", gap: 14, paddingVertical: 34 }}
               >
@@ -360,7 +373,7 @@ export function ParentPreparationsScreen() {
                 title={
                   state.error
                     ? "Les préparations sont momentanément indisponibles"
-                    : state.jobs.length
+                    : jobs.length
                       ? "Aucune préparation dans cette catégorie"
                       : "Votre première préparation arrivera ici"
                 }
@@ -374,14 +387,18 @@ export function ParentPreparationsScreen() {
               >
                 <Button
                   icon="camera"
-                  onPress={() => router.push("/parent/subjects?next=import")}
+                  onPress={() =>
+                    router.push(preparationHref("import", subjectId))
+                  }
                 >
                   Ajouter un cours
                 </Button>
                 <Button
                   variant="secondary"
                   icon="pencil"
-                  onPress={() => router.push("/parent/subjects?next=exercises")}
+                  onPress={() =>
+                    router.push(preparationHref("exercises", subjectId))
+                  }
                 >
                   Préparer des exercices
                 </Button>

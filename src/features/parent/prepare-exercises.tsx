@@ -969,7 +969,12 @@ function ExercisesEditor({
                 <Button
                   variant="ghost"
                   icon="clock"
-                  onPress={() => router.push("/parent/preparations")}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/parent/preparations",
+                      params: { subjectId },
+                    })
+                  }
                 >
                   Retrouver les préparations en cours
                 </Button>

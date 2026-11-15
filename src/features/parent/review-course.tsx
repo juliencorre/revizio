@@ -355,7 +355,12 @@ export function ReviewCourseScreen() {
                   <Button
                     variant="ghost"
                     icon="clock"
-                    onPress={() => router.push("/parent/preparations")}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/parent/preparations",
+                        params: { subjectId: course.subjectId },
+                      })
+                    }
                   >
                     Voir les préparations
                   </Button>
