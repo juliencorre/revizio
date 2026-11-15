@@ -10,6 +10,7 @@ import {
   EmptyState,
   PageHeading,
   ProgressBar,
+  useWindowClass,
 } from "@/components/ui";
 import { colors } from "@/theme";
 import {
@@ -64,6 +65,7 @@ export function StudentProgressScreen() {
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
     .slice(0, 8);
   const split = width >= 850;
+  const compact = useWindowClass() === "compact";
   return (
     <ChildShell active="progress">
       <PageHeading
@@ -74,7 +76,7 @@ export function StudentProgressScreen() {
         <Loading />
       ) : (
         <>
-          <View style={styles.grid}>
+          <View style={[styles.grid, compact && { gap: 12 }]}>
             {[
               {
                 label: "Séries différentes terminées",
@@ -102,35 +104,72 @@ export function StudentProgressScreen() {
                 note: `Sur ${data.publishedCourses.length} fiches disponibles`,
                 icon: "file" as const,
               },
-            ].map((item) => (
-              <Card
-                key={item.label}
-                style={{
-                  width: width >= 660 ? (width - 36) / 3 : width,
-                  gap: 12,
-                }}
-              >
-                <View style={styles.row}>
-                  <AppIcon name={item.icon} size={21} />
-                  <AppText
-                    variant="small"
-                    color={colors.muted}
-                    style={{ flex: 1, fontWeight: "700" }}
-                  >
-                    {item.label}
-                  </AppText>
-                </View>
-                <AppText
-                  variant="hero"
-                  style={{ fontSize: 40, lineHeight: 50 }}
+            ].map((item) =>
+              compact ? (
+                // One line per indicator on phones: label left, value right.
+                <Card
+                  key={item.label}
+                  style={{
+                    width,
+                    padding: 14,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
                 >
-                  {item.value}
-                </AppText>
-                <AppText variant="small" color={colors.muted}>
-                  {item.note}
-                </AppText>
-              </Card>
-            ))}
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <View style={styles.row}>
+                      <AppIcon name={item.icon} size={20} />
+                      <AppText
+                        variant="small"
+                        color={colors.muted}
+                        style={{ flex: 1, fontWeight: "700" }}
+                      >
+                        {item.label}
+                      </AppText>
+                    </View>
+                    <AppText variant="small" color={colors.muted}>
+                      {item.note}
+                    </AppText>
+                  </View>
+                  <AppText
+                    variant="title"
+                    color={colors.primary}
+                    style={{ fontSize: 30, lineHeight: 36 }}
+                  >
+                    {item.value}
+                  </AppText>
+                </Card>
+              ) : (
+                <Card
+                  key={item.label}
+                  style={{
+                    width: width >= 660 ? (width - 36) / 3 : width,
+                    gap: 12,
+                  }}
+                >
+                  <View style={styles.row}>
+                    <AppIcon name={item.icon} size={21} />
+                    <AppText
+                      variant="small"
+                      color={colors.muted}
+                      style={{ flex: 1, fontWeight: "700" }}
+                    >
+                      {item.label}
+                    </AppText>
+                  </View>
+                  <AppText
+                    variant="hero"
+                    style={{ fontSize: 40, lineHeight: 50 }}
+                  >
+                    {item.value}
+                  </AppText>
+                  <AppText variant="small" color={colors.muted}>
+                    {item.note}
+                  </AppText>
+                </Card>
+              ),
+            )}
           </View>
           <AppText variant="small" color={colors.muted}>
             Les séries refaites comptent comme plusieurs essais. Les réponses

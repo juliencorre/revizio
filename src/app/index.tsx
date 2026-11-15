@@ -14,6 +14,7 @@ export default function ProfilesScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const landscape = width >= 800;
+  const compact = width < 600;
   const session = useSession();
   const profiles = session.profiles.length
     ? session.profiles
@@ -37,8 +38,9 @@ export default function ProfilesScreen() {
       contentContainerStyle={[
         styles.content,
         {
-          paddingHorizontal: landscape ? 48 : 24,
-          paddingVertical: landscape ? 36 : 28,
+          paddingHorizontal: landscape ? 48 : compact ? 16 : 24,
+          paddingVertical: landscape ? 36 : compact ? 20 : 28,
+          gap: compact ? 22 : 30,
         },
       ]}
     >
@@ -49,8 +51,8 @@ export default function ProfilesScreen() {
         <AppText
           variant="hero"
           style={{
-            fontSize: landscape ? 44 : 34,
-            lineHeight: landscape ? 56 : 44,
+            fontSize: landscape ? 44 : compact ? 30 : 34,
+            lineHeight: landscape ? 56 : compact ? 38 : 44,
             textAlign: "center",
           }}
         >
@@ -58,7 +60,11 @@ export default function ProfilesScreen() {
         </AppText>
         <AppText
           color={colors.muted}
-          style={{ fontSize: 19, lineHeight: 29, textAlign: "center" }}
+          style={{
+            fontSize: compact ? 17 : 19,
+            lineHeight: compact ? 25 : 29,
+            textAlign: "center",
+          }}
         >
           Élève ou parent : chacun a son espace.
         </AppText>
@@ -66,7 +72,10 @@ export default function ProfilesScreen() {
       <View
         style={[
           styles.profiles,
-          { flexDirection: landscape ? "row" : "column" },
+          {
+            flexDirection: landscape ? "row" : "column",
+            gap: compact ? 16 : 32,
+          },
         ]}
       >
         {profiles.map((profile, index) => (
@@ -82,6 +91,7 @@ export default function ProfilesScreen() {
             icon="book"
             testID={index === 0 ? "profile-child" : `profile-${profile.id}`}
             accessibilityLabel="Entrer dans l’espace enfant"
+            compact={compact}
             onPress={() => openChild(profile.id)}
             style={{
               flex: landscape ? 1 : undefined,
@@ -97,6 +107,7 @@ export default function ProfilesScreen() {
           tone="orange"
           testID="profile-parent"
           accessibilityLabel="Entrer dans l’espace parent"
+          compact={compact}
           onPress={() =>
             session.mode === "demo" || session.user?.role === "parent"
               ? router.push("/parent")

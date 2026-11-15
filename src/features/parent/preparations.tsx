@@ -265,7 +265,7 @@ export function ParentPreparationsScreen() {
     }
   }
   return (
-    <ParentLayout active="dashboard">
+    <ParentLayout active="preparations">
       <View testID="parent-preparations" style={{ gap: 26 }}>
         <PageHeading
           eyebrow="Du document au contenu vérifié"

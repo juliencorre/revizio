@@ -4,7 +4,15 @@
 
 Expo SDK 58, React Native et TypeScript partagent les écrans iPad, iOS/Android et web. Expo Router sépare les parcours `/parent` et `/student`. La version web est une SPA (`web.output: single`) ; le serveur familial sert l’export `dist/`, les routes dynamiques vers `index.html` et l’API `/api` à la même origine.
 
-Les composants de `src/components/ui.tsx` et les tokens de `src/theme.ts` portent les surfaces neumorphiques, le violet indigo et les couleurs par matière. La navigation s’adapte à la largeur ; les écrans restent des composants React Native. Les 12 maquettes PNG fournies définissent les parcours de référence.
+Les composants de `src/components/ui.tsx` et les tokens de `src/theme.ts` portent les surfaces neumorphiques, le violet indigo et les couleurs par matière. Les écrans restent des composants React Native. Les 12 maquettes PNG fournies définissent les parcours de référence.
+
+La mise en page suit les classes de taille de fenêtre de Material Design (`windowClassFor` dans `src/theme.ts`) :
+
+- **compacte** (< 600 px, smartphone) : barre supérieure, barre de navigation en bas limitée à cinq destinations et feuille « Plus » pour les autres ; pendant un exercice, la barre laisse place à l’action principale fixée sous la question ;
+- **moyenne** (600 à 999 px, tablette en portrait, smartphone en paysage) : rail de navigation vertical ;
+- **étendue** (≥ 1000 px, tablette en paysage, ordinateur) : tiroir latéral.
+
+Marges, titres, cartes et grilles s’ajustent à la classe ; `useContentWidth` donne la largeur réellement mesurée dans le cadre. La destination courante est annoncée par `aria-current` et l’anneau de focus n’apparaît qu’à la navigation au clavier. Toutes les zones tactiles gardent au moins 44 px.
 
 ## Serveur d’une famille
 

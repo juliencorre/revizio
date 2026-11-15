@@ -9,6 +9,7 @@ import {
   Card,
   EmptyState,
   PageHeading,
+  useWindowClass,
 } from "@/components/ui";
 import { colors } from "@/theme";
 import { SourceViewer } from "@/components/source-viewer";
@@ -31,217 +32,8 @@ import {
   useChildData,
   useContentWidth,
 } from "./shared";
-export function StudentHomeScreen() {
-  const router = useRouter();
-  const data = useChildData();
-  const width = useContentWidth();
-  const columns = width >= 1000 ? 4 : width >= 660 ? 3 : width >= 400 ? 2 : 1;
-  const nextSeries = [...data.publishedSeries]
-    .sort((a, b) => {
-      const as = data.attempts.some(
-        (t) => t.seriesId === a.id && !t.completedAt,
-      );
-      const bs = data.attempts.some(
-        (t) => t.seriesId === b.id && !t.completedAt,
-      );
-      return (
-        Number(bs) - Number(as) ||
-        (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999")
-      );
-    })
-    .find((s) => !latestAttempt(data.attempts, s.id)?.completedAt);
-  const dueReviews = (data.spacedReviews ?? []).filter(
-    (review) =>
-      review.dueDate <= new Date().toLocaleDateString("en-CA") &&
-      data.publishedCourses.some((c) => c.id === review.courseId),
-  );
-  const nextAttempt = nextSeries
-    ? latestAttempt(data.attempts, nextSeries.id)
-    : undefined;
-  return (
-    <ChildShell>
-      <View testID="student-home" style={{ gap: 26 }}>
-        <PageHeading
-          title={`Salut ${data.childName} !`}
-          description="Un cours à relire, une question à essayer. Avance à ton rythme."
-          action={<Badge>Élève de {data.childGrade}</Badge>}
-        />
-        {!data.isReady ? (
-          <Loading />
-        ) : (
-          <>
-            <NextControl />
-            {dueReviews.length > 0 && (
-              <Card style={{ gap: 14 }}>
-                <AppText variant="heading">
-                  Un rappel pour mieux retenir
-                </AppText>
-                <AppText color={colors.muted}>
-                  Quelques minutes pour retrouver ce que tu as appris.
-                </AppText>
-                {dueReviews.slice(0, 3).map((review) => (
-                  <Button
-                    key={review.courseId}
-                    variant="secondary"
-                    icon="refresh"
-                    onPress={() =>
-                      router.push(`/student/course/${review.courseId}`)
-                    }
-                  >
-                    {
-                      data.publishedCourses.find(
-                        (c) => c.id === review.courseId,
-                      )?.title
-                    }
-                  </Button>
-                ))}
-              </Card>
-            )}
-            {nextSeries ? (
-              <Card
-                style={{
-                  backgroundColor: colors.orangeLight,
-                  borderColor: "#F0D8C6",
-                  gap: 18,
-                }}
-              >
-                <View style={styles.row}>
-                  <View
-                    style={[
-                      styles.smallIcon,
-                      { backgroundColor: colors.orange },
-                    ]}
-                  >
-                    <AppIcon name="play" color="#FFFFFF" />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 180, gap: 4 }}>
-                    <AppText
-                      variant="small"
-                      color={colors.orange}
-                      style={{ fontWeight: "700", letterSpacing: 1 }}
-                    >
-                      MON PROCHAIN PETIT PAS
-                    </AppText>
-                    <AppText variant="heading">{nextSeries.title}</AppText>
-                    <AppText color={colors.muted}>
-                      {nextAttempt
-                        ? `${nextAttempt.answers.length} réponses déjà enregistrées. Tu peux continuer.`
-                        : `${plural(nextSeries.questions.length, "question")} préparées pour toi.`}
-                    </AppText>
-                  </View>
-                  <Button
-                    variant="orange"
-                    icon="arrow-right"
-                    onPress={() =>
-                      router.push(`/student/exercise/${nextSeries.id}`)
-                    }
-                  >
-                    {nextAttempt ? "Reprendre ma série" : "Je commence"}
-                  </Button>
-                </View>
-              </Card>
-            ) : (
-              <Card
-                style={{
-                  backgroundColor: colors.primaryLight,
-                  borderWidth: 0,
-                  gap: 9,
-                }}
-              >
-                <AppText variant="heading">
-                  Prends un moment pour explorer tes cours.
-                </AppText>
-                <AppText color={colors.muted}>
-                  Tu peux relire une fiche ou refaire une série pour
-                  t’entraîner.
-                </AppText>
-              </Card>
-            )}
-            <View style={styles.sectionHeading}>
-              <AppText variant="heading">
-                Mes matières de {data.childGrade}
-              </AppText>
-              <AppText variant="small" color={colors.muted}>
-                {plural(
-                  data.publishedCourses.length,
-                  "cours disponible",
-                  "cours disponibles",
-                )}
-              </AppText>
-            </View>
-            <View style={styles.grid}>
-              {data.subjects.map((subject) => {
-                const count = data.publishedCourses.filter(
-                  (c) => c.subjectId === subject.id,
-                ).length;
-                const todo = data.publishedSeries.filter(
-                  (s) =>
-                    s.subjectId === subject.id &&
-                    !latestAttempt(data.attempts, s.id)?.completedAt,
-                ).length;
-                return (
-                  <Tappable
-                    key={subject.id}
-                    testID={`subject-card-${subject.id}`}
-                    label={`Ouvrir ${subject.title}`}
-                    onPress={() =>
-                      router.push(`/student/subject/${subject.id}`)
-                    }
-                    style={{
-                      width: (width - (columns - 1) * 18) / columns,
-                      minHeight: 214,
-                    }}
-                  >
-                    <Card style={{ flex: 1, padding: 23, gap: 16 }}>
-                      <View
-                        style={[
-                          styles.row,
-                          { justifyContent: "space-between" },
-                        ]}
-                      >
-                        <View
-                          style={{
-                            backgroundColor: subject.color,
-                            width: 54,
-                            height: 54,
-                            borderRadius: 18,
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <AppIcon
-                            name={subject.icon}
-                            color="#FFFFFF"
-                            size={28}
-                          />
-                        </View>
-                        {todo > 0 && (
-                          <Badge tone="orange">{todo} à faire</Badge>
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }} />
-                      <AppText
-                        variant="heading"
-                        style={{ fontSize: 20, lineHeight: 27 }}
-                      >
-                        {subject.title}
-                      </AppText>
-                      <AppText variant="small" color={colors.muted}>
-                        {count
-                          ? plural(count, "cours", "cours")
-                          : "Bientôt tes premiers cours"}
-                      </AppText>
-                    </Card>
-                  </Tappable>
-                );
-              })}
-            </View>
-          </>
-        )}
-      </View>
-    </ChildShell>
-  );
-}
+export { StudentDashboard as StudentHomeScreen } from "./student-dashboard";
+
 export function StudentSubjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const data = useChildData();
@@ -260,7 +52,7 @@ export function StudentSubjectScreen() {
           <PageHeading
             eyebrow={subject.title}
             title="Mes cours"
-            description="Choisis un cours pour retrouver l’essentiel et t’entraîner."
+            description="Retrouve tes leçons et entraîne-toi à ton rythme."
             action={
               <Button
                 variant="ghost"
@@ -278,7 +70,7 @@ export function StudentSubjectScreen() {
               description="Un parent peut ajouter un cours et vérifier sa fiche. Tu la retrouveras ici dès qu’elle sera prête."
             />
           ) : (
-            <View style={styles.grid}>
+            <View style={[styles.grid, { gap: 18 }]}>
               {courses.map((course) => (
                 <View
                   key={course.id}
@@ -356,7 +148,9 @@ export function StudentCourseScreen() {
             </Button>
             <Badge tone="green">Vérifiée par un parent</Badge>
           </View>
-          <PageHeading title={course.title} description={course.description} />
+          <View style={{ backgroundColor: colors.primaryLight, borderRadius: 22, padding: width < 600 ? 18 : 26 }}>
+            <PageHeading title={course.title} description={course.description} />
+          </View>
           <View style={styles.wrap}>
             <ReadAloud
               text={[

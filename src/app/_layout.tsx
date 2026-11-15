@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { LearningProvider, useLearning } from "@/state/learning-store";
-import { AppText, Brand, Button } from "@/components/ui";
+import { AppText, Brand, Button, ResponsiveProvider } from "@/components/ui";
 import { SessionProvider } from "@/state/session";
 import { colors } from "@/theme";
 import { useEffect, useRef } from "react";
@@ -104,12 +104,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <SessionProvider>
-          <LearningProvider>
-            <StatusBar style="dark" />
-            <AppNavigator />
-          </LearningProvider>
-        </SessionProvider>
+        <ResponsiveProvider>
+          <SessionProvider>
+            <LearningProvider>
+              <StatusBar style="dark" />
+              <AppNavigator />
+            </LearningProvider>
+          </SessionProvider>
+        </ResponsiveProvider>
       </SafeAreaView>
     </SafeAreaProvider>
   );

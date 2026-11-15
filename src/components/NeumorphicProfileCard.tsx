@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -6,7 +5,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { AppIcon, AppText } from "@/components/ui";
+import { AppIcon, AppText, useFocusVisible } from "@/components/ui";
 import { colors, neumorphic } from "@/theme";
 import type { IconName } from "@/domain/model";
 
@@ -20,6 +19,7 @@ export function NeumorphicProfileCard({
   testID,
   accessibilityLabel,
   style,
+  compact = false,
 }: {
   title: string;
   subtitle: string;
@@ -30,21 +30,58 @@ export function NeumorphicProfileCard({
   testID?: string;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
+  /** Horizontal list layout for phones. */
+  compact?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
+  const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const accent = tone === "orange" ? colors.orange : colors.primary;
+  if (compact)
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        testID={testID}
+        onPress={onPress}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        style={({ pressed }) => [
+          styles.compactCard,
+          focused && styles.focusRing,
+          pressed && neumorphic.inset,
+          style,
+        ]}
+      >
+        <View style={[styles.compactAvatar, { backgroundColor: accent }]}>
+          <AppIcon name={icon} size={30} color="#FFFFFF" />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="heading" style={{ fontSize: 22, lineHeight: 28 }}>
+            {title}
+          </AppText>
+          <AppText variant="label" color={accent}>
+            {subtitle}
+          </AppText>
+          <AppText variant="small" color={colors.muted}>
+            {description}
+          </AppText>
+        </View>
+        <AppIcon name="chevron-right" color={accent} size={26} />
+      </Pressable>
+    );
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       testID={testID}
       onPress={onPress}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      style={({ pressed }) => [
+      onFocus={onFocus}
+      onBlur={onBlur}
+      style={(state) => [
         styles.card,
-        focused && neumorphic.focus,
-        pressed && neumorphic.inset,
+        (state as { hovered?: boolean }).hovered &&
+          !state.pressed && { boxShadow: neumorphic.hover.boxShadow },
+        focused && styles.focusRing,
+        state.pressed && neumorphic.inset,
         style,
       ]}
     >
@@ -78,6 +115,29 @@ export function NeumorphicProfileCard({
   );
 }
 const styles = StyleSheet.create({
+  focusRing: {
+    outlineColor: colors.primary,
+    outlineStyle: "solid",
+    outlineWidth: 3,
+    outlineOffset: 2,
+  },
+  compactCard: {
+    ...neumorphic.raisedCompact,
+    minHeight: 112,
+    borderRadius: 26,
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  compactAvatar: {
+    ...neumorphic.colored,
+    width: 60,
+    height: 60,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   card: {
     ...neumorphic.raised,
     minHeight: 350,

@@ -37,24 +37,28 @@ export function ParentLayout({
   const navigation: NavigationItem[] = [
     {
       label: "Tableau de bord",
+      shortLabel: "Accueil",
       href: "/parent",
       icon: "home",
       active: active === "dashboard",
     },
     {
       label: "Ajouter un cours",
+      shortLabel: "Ajouter",
       href: "/parent/import",
       icon: "camera",
       active: active === "import",
     },
     {
       label: "Préparer des exercices",
+      shortLabel: "Exercices",
       href: "/parent/exercises",
       icon: "pencil",
       active: active === "exercises",
     },
     {
       label: "Contrôles et plans",
+      shortLabel: "Contrôles",
       href: "/parent/controls",
       icon: "calendar",
       active: active === "controls",
@@ -66,16 +70,17 @@ export function ParentLayout({
       active: active === "english",
     },
     {
-      label: "Réglages",
-      href: "/parent/settings",
-      icon: "users",
-      active: active === "settings",
-    },
-    {
       label: "Mes préparations",
+      shortLabel: "Préparations",
       href: "/parent/preparations",
       icon: "refresh",
       active: active === "preparations",
+    },
+    {
+      label: "Réglages",
+      href: "/parent/settings",
+      icon: "settings",
+      active: active === "settings",
     },
   ];
   return (

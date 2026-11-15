@@ -4,7 +4,7 @@ import {
   Pressable,
   StyleSheet,
   View,
-  useWindowDimensions,
+  type ScrollViewInstance,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -15,9 +15,11 @@ import {
   Button,
   Card,
   EmptyState,
+  useContentWidth,
+  useWindowClass,
   type NavigationItem,
 } from "@/components/ui";
-import { colors } from "@/theme";
+import { colors, neumorphic } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import type { Attempt, Course, ExerciseSeries, Subject } from "@/domain/model";
 export function useChildData() {
@@ -36,22 +38,35 @@ export function ChildShell({
   children,
   active = "home",
   subject,
+  focus,
+  footer,
+  scrollRef,
 }: {
   children: ReactNode;
-  active?: "home" | "courses" | "exercises" | "progress";
+  active?: "home" | "courses" | "exercises" | "progress" | "plans" | "english";
   subject?: Subject;
+  /** Keeps the phone screen for the task only (exercise in progress). */
+  focus?: boolean;
+  /** Actions pinned under the page, within thumb reach. */
+  footer?: ReactNode;
+  scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
+  // The phone navigation bar keeps the same five destinations everywhere:
+  // the subject's courses stay reachable from the subject page itself.
+  const compact = useWindowClass() === "compact";
   const navigation: NavigationItem[] = [
     {
       label: "Mes matières",
+      shortLabel: "Matières",
       href: "/student",
       icon: "home",
-      active: active === "home",
+      active: active === "home" || (compact && active === "courses"),
     },
-    ...(subject
+    ...(subject && !compact
       ? [
           {
             label: "Mes cours",
+            shortLabel: "Cours",
             href: `/student/subject/${subject.id}` as const,
             icon: "book" as const,
             active: active === "courses",
@@ -60,6 +75,7 @@ export function ChildShell({
       : []),
     {
       label: "Mes exercices",
+      shortLabel: "Exercices",
       href: subject
         ? `/student/exercises?subjectId=${subject.id}`
         : "/student/exercises",
@@ -68,15 +84,35 @@ export function ChildShell({
     },
     {
       label: "Mes progrès",
+      shortLabel: "Progrès",
       href: "/student/progress",
       icon: "chart",
       active: active === "progress",
     },
-    { label: "Mes contrôles", href: "/student/plans", icon: "calendar" },
-    { label: "Mon anglais", href: "/student/english", icon: "languages" },
+    {
+      label: "Mes contrôles",
+      shortLabel: "Contrôles",
+      href: "/student/plans",
+      icon: "calendar",
+      active: active === "plans",
+    },
+    {
+      label: "Mon anglais",
+      shortLabel: "Anglais",
+      href: "/student/english",
+      icon: "languages",
+      active: active === "english",
+    },
   ];
   return (
-    <AppShell role="child" navigation={navigation} subject={subject}>
+    <AppShell
+      role="child"
+      navigation={navigation}
+      subject={subject}
+      focus={focus}
+      footer={footer}
+      scrollRef={scrollRef}
+    >
       {children}
     </AppShell>
   );
@@ -103,13 +139,7 @@ export function Unavailable({ kind = "cours" }: { kind?: string }) {
     </EmptyState>
   );
 }
-export function useContentWidth() {
-  const { width } = useWindowDimensions();
-  return Math.max(
-    240,
-    Math.min(1360, width >= 1000 ? width - 336 : width - 40),
-  );
-}
+export { useContentWidth };
 export function subjectFor(subjects: Subject[], id: string) {
   return subjects.find((s) => s.id === id);
 }
@@ -151,20 +181,21 @@ export function CourseCard({
   const router = useRouter();
   return (
     <View testID={`course-card-${course.id}`} style={{ flex: 1 }}>
-      <Card style={{ gap: 16, flex: 1 }}>
+      <Card style={{ gap: 16, flex: 1, minHeight: 222 }}>
         <View style={styles.row}>
           <View
-            style={[styles.smallIcon, { backgroundColor: colors.primaryLight }]}
+            style={[styles.smallIcon, { backgroundColor: "#EAE0FF", width: 58, height: 58, borderRadius: 17 }]}
           >
-            <AppIcon name="file" />
+            <AppIcon name="file" size={26} />
           </View>
           <Badge tone="green">Fiche vérifiée</Badge>
         </View>
-        <AppText variant="heading">{course.title}</AppText>
+        <AppText variant="heading" style={{ fontSize: 22 }}>{course.title}</AppText>
         <AppText color={colors.muted}>{course.description}</AppText>
         <View style={{ flex: 1 }} />
         <View style={styles.wrap}>
           <Button
+            variant="secondary"
             icon="book"
             onPress={() => router.push(`/student/course/${course.id}`)}
           >
@@ -290,4 +321,9 @@ export const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   stack: { gap: 18 },
+  quietCard: {
+    backgroundColor: "#F8F9FE",
+    borderColor: colors.border,
+    boxShadow: "none",
+  },
 });
