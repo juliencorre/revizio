@@ -16,11 +16,12 @@ import {
   Card,
   EmptyState,
   useContentWidth,
-  useWindowClass,
   type NavigationItem,
 } from "@/components/ui";
 import { colors, neumorphic } from "@/theme";
 import { useLearning } from "@/state/learning-store";
+import { plural } from "@/domain/format";
+export { plural } from "@/domain/format";
 import type { Attempt, Course, ExerciseSeries, Subject } from "@/domain/model";
 export function useChildData() {
   const data = useLearning();
@@ -51,43 +52,26 @@ export function ChildShell({
   footer?: ReactNode;
   scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
-  // The phone navigation bar keeps the same five destinations everywhere:
-  // the subject's courses stay reachable from the subject page itself.
-  const compact = useWindowClass() === "compact";
   const navigation: NavigationItem[] = [
+    {
+      label: "Aujourd’hui",
+      href: "/student",
+      icon: "home",
+      active: active === "home",
+    },
     {
       label: "Mes matières",
       shortLabel: "Matières",
-      href: "/student",
-      icon: "home",
-      active: active === "home" || (compact && active === "courses"),
+      href: "/student/subjects",
+      icon: "book",
+      active: active === "courses" || active === "english",
     },
-    ...(subject && !compact
-      ? [
-          {
-            label: "Mes cours",
-            shortLabel: "Cours",
-            href: `/student/subject/${subject.id}` as const,
-            icon: "book" as const,
-            active: active === "courses",
-          },
-        ]
-      : []),
     {
       label: "Mes exercices",
       shortLabel: "Exercices",
-      href: subject
-        ? `/student/exercises?subjectId=${subject.id}`
-        : "/student/exercises",
+      href: "/student/exercises",
       icon: "pencil",
       active: active === "exercises",
-    },
-    {
-      label: "Mes progrès",
-      shortLabel: "Progrès",
-      href: "/student/progress",
-      icon: "chart",
-      active: active === "progress",
     },
     {
       label: "Mes contrôles",
@@ -97,11 +81,11 @@ export function ChildShell({
       active: active === "plans",
     },
     {
-      label: "Mon anglais",
-      shortLabel: "Anglais",
-      href: "/student/english",
-      icon: "languages",
-      active: active === "english",
+      label: "Mes progrès",
+      shortLabel: "Progrès",
+      href: "/student/progress",
+      icon: "chart",
+      active: active === "progress",
     },
   ];
   return (
@@ -133,7 +117,7 @@ export function Unavailable({ kind = "cours" }: { kind?: string }) {
       title={`Ce ${kind} n’est pas disponible`}
       description="Il a peut-être été retiré ou n’est pas encore prêt. Retrouve les contenus préparés pour toi dans ton espace."
     >
-      <Button icon="home" onPress={() => router.replace("/student")}>
+      <Button icon="home" onPress={() => router.replace("/student/subjects")}>
         Mes matières
       </Button>
     </EmptyState>
@@ -164,13 +148,6 @@ export function levelLabel(level: ExerciseSeries["level"]) {
     challenge: "Défi",
   }[level];
 }
-export function plural(
-  count: number,
-  singular: string,
-  multiple = `${singular}s`,
-) {
-  return `${count} ${count === 1 ? singular : multiple}`;
-}
 export function CourseCard({
   course,
   series,
@@ -184,13 +161,23 @@ export function CourseCard({
       <Card style={{ gap: 16, flex: 1, minHeight: 222 }}>
         <View style={styles.row}>
           <View
-            style={[styles.smallIcon, { backgroundColor: "#EAE0FF", width: 58, height: 58, borderRadius: 17 }]}
+            style={[
+              styles.smallIcon,
+              {
+                backgroundColor: "#EAE0FF",
+                width: 58,
+                height: 58,
+                borderRadius: 17,
+              },
+            ]}
           >
             <AppIcon name="file" size={26} />
           </View>
           <Badge tone="green">Fiche vérifiée</Badge>
         </View>
-        <AppText variant="heading" style={{ fontSize: 22 }}>{course.title}</AppText>
+        <AppText variant="heading" style={{ fontSize: 22 }}>
+          {course.title}
+        </AppText>
         <AppText color={colors.muted}>{course.description}</AppText>
         <View style={{ flex: 1 }} />
         <View style={styles.wrap}>

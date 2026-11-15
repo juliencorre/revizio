@@ -100,9 +100,16 @@ export function StudentEnglishScreen() {
   return (
     <StudyWorkspace role="child" active="english">
       <View testID="student-english" style={{ gap: 26 }}>
+        <Button
+          variant="ghost"
+          icon="arrow-left"
+          onPress={() => router.push("/student/subject/english")}
+        >
+          Mes cours d’anglais
+        </Button>
         <PageHeading
-          eyebrow="Des mots qui deviennent familiers"
-          title="Mon anglais"
+          eyebrow="Anglais"
+          title="Vocabulaire et verbes"
           description="Retrouve les mots et les verbes que tu as étudiés en classe."
         />
         {!englishFlashcards(data.english).length ? (
@@ -110,14 +117,7 @@ export function StudentEnglishScreen() {
             icon="languages"
             title="Tes cartes d’anglais arriveront ici"
             description="Un parent peut ajouter et vérifier les mots, les verbes et les temps vus en classe."
-          >
-            <Button
-              icon="book"
-              onPress={() => router.push("/student/subject/english")}
-            >
-              Mes cours d’anglais
-            </Button>
-          </EmptyState>
+          />
         ) : (
           <>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>

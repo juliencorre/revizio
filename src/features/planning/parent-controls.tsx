@@ -342,7 +342,7 @@ export function ParentControlsScreen() {
     }
     setEditor((current) => ({ ...current, id, steps }));
     setMessage(
-      "Le plan est publié. Votre enfant le retrouve dans « Mes plans ».",
+      "Le plan est publié. Votre enfant le retrouve dans « Mes contrôles ».",
     );
     setError("");
     setConfirmedKey(null);
@@ -396,7 +396,7 @@ export function ParentControlsScreen() {
       <View testID="parent-controls" style={{ gap: 26 }}>
         <PageHeading
           eyebrow="Préparer avec sérénité"
-          title="Contrôles et plans"
+          title="Contrôles"
           description="Des séances courtes et un programme que vous pouvez ajuster."
           action={
             <Button

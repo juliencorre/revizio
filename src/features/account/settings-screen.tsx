@@ -317,7 +317,7 @@ export function ParentSettingsScreen() {
     return (
       <ParentLayout active="settings">
         <PageHeading
-          title="Les réglages"
+          title="Famille"
           description="Vous explorez Révizo avec un profil de démonstration."
         />
         <Notice>
@@ -413,7 +413,7 @@ export function ParentSettingsScreen() {
       <View testID="settings-screen" style={{ gap: 28 }}>
         <PageHeading
           eyebrow="Votre espace familial"
-          title="Les réglages de la famille"
+          title="Famille"
           description="Gérez les profils, les connexions et les sauvegardes de vos enfants."
           action={
             <Button

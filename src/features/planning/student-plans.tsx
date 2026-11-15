@@ -78,7 +78,7 @@ export function StudentPlansScreen() {
     <StudyWorkspace role="child" active="plans">
       <View testID="student-plans" style={{ gap: 26 }}>
         <PageHeading
-          title="Mes plans de révision"
+          title="Mes contrôles"
           description="Un petit programme pour savoir quoi faire avant un contrôle."
         />
         {!plans.length ? (
@@ -87,7 +87,7 @@ export function StudentPlansScreen() {
             title="Un plan arrivera ici"
             description="Un parent peut préparer ton prochain contrôle et partager des séances courtes avec toi."
           >
-            <Button icon="book" onPress={() => router.push("/student")}>
+            <Button icon="book" onPress={() => router.push("/student/subjects")}>
               Retrouver mes cours
             </Button>
           </EmptyState>

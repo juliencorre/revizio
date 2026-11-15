@@ -224,7 +224,7 @@ export function PrepareExercisesScreen() {
   const initialCourse =
     publishedCourses.find((course) => course.id === params.courseId) ??
     publishedCourses[0];
-  const editorKey = `revizo.exercise-editor.${data.activeProfileId || "demo"}`;
+  const editorKey = `revizo.exercise-editor.${data.activeProfileId || "demo"}${params.courseId ? `.course.${params.courseId}` : ""}`;
   const [editor, setEditor, local] = useLocalDraft<Editor>(
     editorKey,
     requestedSeries
@@ -553,8 +553,11 @@ export function PrepareExercisesScreen() {
               <Button icon="plus" onPress={reset}>
                 Préparer une autre série
               </Button>
-              <Button variant="ghost" onPress={() => router.replace("/parent")}>
-                Tableau de bord
+              <Button
+                variant="ghost"
+                onPress={() => router.replace("/parent/library")}
+              >
+                Cours et exercices
               </Button>
             </View>
           </Card>
@@ -1207,7 +1210,7 @@ export function PrepareExercisesScreen() {
                 onPress={() => {
                   saveEditor(editor);
                   setNotice(
-                    "Brouillon enregistré. Vous pourrez le reprendre depuis cette page ou le tableau de bord.",
+                    "Brouillon enregistré. Vous pourrez le reprendre depuis les cours et exercices.",
                   );
                 }}
                 testID="save-series-draft"

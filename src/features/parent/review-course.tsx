@@ -630,9 +630,9 @@ export function ReviewCourseScreen() {
                 <Button
                   variant="ghost"
                   icon="arrow-left"
-                  onPress={() => router.replace("/parent")}
+                  onPress={() => router.replace("/parent/library")}
                 >
-                  Tableau de bord
+                  Cours et exercices
                 </Button>
               </View>
             </>

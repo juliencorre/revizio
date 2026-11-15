@@ -57,12 +57,16 @@ export function StudentSubjectScreen() {
               <Button
                 variant="ghost"
                 icon="arrow-left"
-                onPress={() => router.push("/student")}
+                onPress={() => router.push("/student/subjects")}
               >
                 Toutes mes matières
               </Button>
             }
           />
+          <View style={styles.wrap}>
+            <Button variant="secondary" icon="pencil" onPress={() => router.push(`/student/exercises?subjectId=${subject.id}`)}>Les exercices de cette matière</Button>
+            {subject.id === "english" && <Button icon="languages" onPress={() => router.push("/student/english")}>Vocabulaire et verbes</Button>}
+          </View>
           <NextControl subjectId={subject.id} />
           {courses.length === 0 ? (
             <EmptyState
@@ -461,7 +465,7 @@ export function StudentExercisesScreen() {
           <Button
             variant="secondary"
             icon="book"
-            onPress={() => router.push("/student")}
+            onPress={() => router.push("/student/subjects")}
           >
             Voir mes matières
           </Button>

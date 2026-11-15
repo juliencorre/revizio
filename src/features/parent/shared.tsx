@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -19,12 +20,16 @@ import {
 } from "@/components/ui";
 import { colors, fontFamily, neumorphic } from "@/theme";
 import type { CourseSource } from "@/domain/model";
+import { useLearning } from "@/state/learning-store";
+import { useSession } from "@/state/session";
 import { SourceThumbnail, SourceViewer } from "@/components/source-viewer";
 export function ParentLayout({
   active,
   children,
 }: {
   active:
+    | "library"
+    | "progress"
     | "dashboard"
     | "import"
     | "exercises"
@@ -34,57 +39,106 @@ export function ParentLayout({
     | "preparations";
   children: ReactNode;
 }) {
+  const router = useRouter();
+  const data = useLearning();
+  const session = useSession();
+  const inLibrary = [
+    "library",
+    "import",
+    "exercises",
+    "english",
+    "preparations",
+  ].includes(active);
   const navigation: NavigationItem[] = [
     {
-      label: "Tableau de bord",
-      shortLabel: "Accueil",
+      label: "Accueil",
       href: "/parent",
       icon: "home",
       active: active === "dashboard",
     },
     {
-      label: "Ajouter un cours",
-      shortLabel: "Ajouter",
-      href: "/parent/import",
-      icon: "camera",
-      active: active === "import",
+      label: "Cours et exercices",
+      shortLabel: "Contenus",
+      href: "/parent/library",
+      icon: "book",
+      active: inLibrary,
     },
     {
-      label: "Préparer des exercices",
-      shortLabel: "Exercices",
-      href: "/parent/exercises",
-      icon: "pencil",
-      active: active === "exercises",
-    },
-    {
-      label: "Contrôles et plans",
-      shortLabel: "Contrôles",
+      label: "Contrôles",
       href: "/parent/controls",
       icon: "calendar",
       active: active === "controls",
     },
     {
-      label: "Anglais",
-      href: "/parent/english",
-      icon: "languages",
-      active: active === "english",
+      label: "Suivi",
+      href: "/parent/progress",
+      icon: "chart",
+      active: active === "progress",
     },
     {
-      label: "Mes préparations",
-      shortLabel: "Préparations",
-      href: "/parent/preparations",
-      icon: "refresh",
-      active: active === "preparations",
-    },
-    {
-      label: "Réglages",
+      label: "Famille",
       href: "/parent/settings",
-      icon: "settings",
+      icon: "users",
       active: active === "settings",
     },
   ];
   return (
     <AppShell role="parent" navigation={navigation}>
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <AppText variant="label">Pour {data.childName}</AppText>
+        {data.profiles.length > 1 &&
+          data.profiles.map((profile) => (
+            <Button
+              key={profile.id}
+              selected={profile.id === data.activeProfileId}
+              variant={
+                profile.id === data.activeProfileId ? "primary" : "secondary"
+              }
+              accessibilityLabel={`Suivre ${profile.name}`}
+              onPress={() => session.selectProfile(profile.id)}
+            >
+              {profile.name}
+            </Button>
+          ))}
+      </View>
+      {inLibrary && (
+        <ScrollView
+          accessibilityLabel="Rubriques des cours et exercices"
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ flexDirection: "row", gap: 8 }}
+        >
+          <Button
+            variant={active === "library" ? "secondary" : "ghost"}
+            icon="book"
+            onPress={() => router.push("/parent/library")}
+          >
+            Bibliothèque
+          </Button>
+          <Button
+            variant={active === "preparations" ? "secondary" : "ghost"}
+            icon="refresh"
+            onPress={() => router.push("/parent/preparations")}
+          >
+            Préparations IA
+          </Button>
+          <Button
+            variant={active === "english" ? "secondary" : "ghost"}
+            icon="languages"
+            onPress={() => router.push("/parent/english")}
+          >
+            Anglais
+          </Button>
+        </ScrollView>
+      )}
       {children}
     </AppShell>
   );
@@ -163,7 +217,15 @@ export function LoadingParent({
   active = "dashboard",
 }: {
   active?:
-    "dashboard" | "import" | "exercises" | "controls" | "english" | "settings";
+    | "dashboard"
+    | "library"
+    | "progress"
+    | "preparations"
+    | "import"
+    | "exercises"
+    | "controls"
+    | "english"
+    | "settings";
 }) {
   return (
     <ParentLayout active={active}>
@@ -180,10 +242,13 @@ export function ParentNotFound() {
       <Card style={{ gap: 18 }}>
         <AppText variant="heading">Ce cours est introuvable.</AppText>
         <AppText color={colors.muted}>
-          Retrouvez vos cours depuis le tableau de bord.
+          Retrouvez vos cours dans la bibliothèque.
         </AppText>
-        <Button icon="arrow-left" onPress={() => router.replace("/parent")}>
-          Retour au tableau de bord
+        <Button
+          icon="arrow-left"
+          onPress={() => router.replace("/parent/library")}
+        >
+          Retour aux cours et exercices
         </Button>
       </Card>
     </ParentLayout>

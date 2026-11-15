@@ -269,7 +269,7 @@ export function ParentPreparationsScreen() {
       <View testID="parent-preparations" style={{ gap: 26 }}>
         <PageHeading
           eyebrow="Du document au contenu vérifié"
-          title="Mes préparations"
+          title="Préparations IA"
           description={
             "Retrouvez les lectures et les générations pour " +
             data.childName +
@@ -323,7 +323,7 @@ export function ParentPreparationsScreen() {
                 [
                   { id: "all", label: "Toutes", count: state.jobs.length },
                   { id: "active", label: "En cours", count: pending.length },
-                  { id: "review", label: "À relire", count: ready.length },
+                  { id: "review", label: "À vérifier", count: ready.length },
                   { id: "failed", label: "À relancer", count: failed.length },
                 ] as const
               ).map((item) => (

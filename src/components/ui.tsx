@@ -276,6 +276,8 @@ export function Button({
   style,
   testID,
   accessibilityLabel,
+  selected,
+  expanded,
 }: {
   children: ReactNode;
   onPress: () => void;
@@ -285,6 +287,8 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   testID?: string;
   accessibilityLabel?: string;
+  selected?: boolean;
+  expanded?: boolean;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const compact = useWindowClass() === "compact";
@@ -298,7 +302,9 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: !!disabled }}
+      {...(selected === undefined ? {} : { "aria-pressed": selected })}
+      {...(expanded === undefined ? {} : { "aria-expanded": expanded })}
+      accessibilityState={{ disabled: !!disabled, selected, expanded }}
       disabled={disabled}
       testID={testID}
       onPress={onPress}
