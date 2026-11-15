@@ -13,9 +13,15 @@ test("retrouver, filtrer et rouvrir les contenus depuis la bibliothèque", async
   const navigation = page.getByRole("navigation", {
     name: "Navigation principale",
   });
-  await navigation
-    .getByRole("button", { name: "Cours et exercices", exact: true })
-    .click();
+  const openLibrary = async () => {
+    await navigation
+      .getByRole("button", { name: "Matières", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Bibliothèque", exact: true })
+      .click();
+  };
+  await openLibrary();
   await expect(page.getByTestId("parent-library")).toBeVisible();
   await page
     .getByRole("button", { name: "Filtrer les contenus", exact: true })
@@ -44,9 +50,9 @@ test("retrouver, filtrer et rouvrir les contenus depuis la bibliothèque", async
     .click();
   await expect(page).toHaveURL(/\/parent\/review\/maths-relative-numbers$/);
   await expect(
-    navigation.getByRole("button", { name: "Cours et exercices", exact: true }),
+    navigation.getByRole("button", { name: "Matières", exact: true }),
   ).toHaveAttribute("aria-current", "page");
-  await page.getByRole("button", { name: "Bibliothèque", exact: true }).click();
+  await openLibrary();
   await page
     .getByTestId("library-maths-relative-practice")
     .getByRole("button", { name: /Ouvrir les exercices/ })
@@ -55,7 +61,7 @@ test("retrouver, filtrer et rouvrir les contenus depuis la bibliothèque", async
   await expect(
     page.getByText(initialData.series[0].title, { exact: true }).first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Bibliothèque", exact: true }).click();
+  await openLibrary();
   await page
     .getByTestId("library-maths-relative-numbers")
     .getByRole("button", { name: "Préparer ses exercices", exact: true })
@@ -66,7 +72,7 @@ test("retrouver, filtrer et rouvrir les contenus depuis la bibliothèque", async
   await page
     .getByTestId("series-title")
     .fill("Un entraînement de maths conservé");
-  await page.getByRole("button", { name: "Bibliothèque", exact: true }).click();
+  await openLibrary();
   const otherCourse = initialData.courses.find(
     (course) => course.status === "published" && course.subjectId !== "maths",
   )!;
@@ -77,7 +83,7 @@ test("retrouver, filtrer et rouvrir les contenus depuis la bibliothèque", async
   await expect(
     page.getByTestId(`ai-exercise-course-${otherCourse.id}`),
   ).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("button", { name: "Bibliothèque", exact: true }).click();
+  await openLibrary();
   await page
     .getByTestId("library-maths-relative-numbers")
     .getByRole("button", { name: "Préparer ses exercices", exact: true })

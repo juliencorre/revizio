@@ -96,13 +96,28 @@ export function ParentLibraryScreen() {
           description={`Tous les contenus de ${data.childName}, du brouillon à la publication.`}
           action={
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-              <Button icon="plus" onPress={() => router.push("/parent/import")}>
+              <Button
+                icon="plus"
+                onPress={() =>
+                  router.push(
+                    subjectId
+                      ? { pathname: "/parent/import", params: { subjectId } }
+                      : "/parent/subjects?next=import",
+                  )
+                }
+              >
                 Ajouter un cours
               </Button>
               <Button
                 icon="pencil"
                 variant="secondary"
-                onPress={() => router.push("/parent/exercises")}
+                onPress={() =>
+                  router.push(
+                    subjectId
+                      ? { pathname: "/parent/exercises", params: { subjectId } }
+                      : "/parent/subjects?next=exercises",
+                  )
+                }
               >
                 Préparer des exercices
               </Button>
@@ -234,7 +249,16 @@ export function ParentLibraryScreen() {
             title="Un premier cours à partager"
             description="Ajoutez vos documents pour préparer une fiche de révision."
           >
-            <Button icon="plus" onPress={() => router.push("/parent/import")}>
+            <Button
+              icon="plus"
+              onPress={() =>
+                router.push(
+                  subjectId
+                    ? { pathname: "/parent/import", params: { subjectId } }
+                    : "/parent/subjects?next=import",
+                )
+              }
+            >
               Ajouter un cours
             </Button>
           </EmptyState>
@@ -302,7 +326,10 @@ export function ParentLibraryScreen() {
                         ? router.push(`/parent/review/${item.id}`)
                         : router.push({
                             pathname: "/parent/exercises",
-                            params: { draftId: item.id },
+                            params: {
+                              draftId: item.id,
+                              subjectId: item.subjectId,
+                            },
                           })
                     }
                   >

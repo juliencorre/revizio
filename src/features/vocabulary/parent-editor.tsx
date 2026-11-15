@@ -167,7 +167,11 @@ function VocabularyEditor() {
     }
   }
   return (
-    <ParentLayout active="vocabulary" scrollRef={scrollRef}>
+    <ParentLayout
+      active="vocabulary"
+      scrollRef={scrollRef}
+      subjectId={language}
+    >
       <View style={vocabularyStyles.section} testID="vocabulary-editor">
         <Button
           icon="arrow-left"

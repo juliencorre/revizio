@@ -16,6 +16,7 @@ import { dateOnly, stepIsLate } from "@/domain/planning";
 import { learningOverview, preparationStatus } from "@/domain/study-overview";
 import { LoadingParent, Notice, ParentLayout } from "./shared";
 import { usePreparationJobs } from "./preparations";
+import { ParentSubjectGrid } from "./subjects";
 
 export function ParentDashboard() {
   const router = useRouter();
@@ -44,32 +45,18 @@ export function ParentDashboard() {
     <ParentLayout active="dashboard">
       <View testID="parent-dashboard" style={{ gap: spacing.xl }}>
         <PageHeading
-          title={`Accompagner ${data.childName}`}
-          description={`Voici où en est ${data.childName}, et ce que vous pouvez préparer.`}
-          action={
-            <Button icon="plus" onPress={() => router.push("/parent/import")}>
-              Ajouter un cours
-            </Button>
-          }
+          title="Choisir une matière"
+          description={`Quelle matière souhaitez-vous préparer pour ${data.childName} ?`}
         />
-        <View
-          style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}
+        <ParentSubjectGrid preview />
+        <Button
+          icon="book"
+          variant="ghost"
+          style={{ alignSelf: "flex-start" }}
+          onPress={() => router.push("/parent/subjects")}
         >
-          <Button
-            icon="book"
-            variant="ghost"
-            onPress={() => router.push("/parent/library")}
-          >
-            Retrouver les cours et exercices
-          </Button>
-          <Button
-            icon="chart"
-            variant="ghost"
-            onPress={() => router.push("/parent/progress")}
-          >
-            Voir le suivi de {data.childName}
-          </Button>
-        </View>
+          Voir toutes les matières
+        </Button>
         <Card style={{ gap: spacing.lg }}>
           <View
             style={{
@@ -81,7 +68,7 @@ export function ParentDashboard() {
           >
             <AppIcon name="pencil" />
             <AppText variant="heading" style={{ flex: 1 }}>
-              Contenus à vérifier
+              Reprendre un brouillon
             </AppText>
             <Badge tone="orange">{drafts.length + draftSeries.length}</Badge>
           </View>
@@ -94,7 +81,11 @@ export function ParentDashboard() {
               <View style={styles.draftTitle}>
                 <AppText variant="label">{course.title}</AppText>
                 <AppText variant="small" color={colors.muted}>
-                  Fiche · {preparationStatus(course)}
+                  {
+                    data.subjects.find((s) => s.id === course.subjectId)
+                      ?.shortLabel
+                  }{" "}
+                  · Fiche · {preparationStatus(course)}
                 </AppText>
               </View>
               <Button
@@ -115,7 +106,11 @@ export function ParentDashboard() {
                 <View style={styles.draftTitle}>
                   <AppText variant="label">{series.title}</AppText>
                   <AppText variant="small" color={colors.muted}>
-                    Exercices · {preparationStatus(series)}
+                    {
+                      data.subjects.find((s) => s.id === series.subjectId)
+                        ?.shortLabel
+                    }{" "}
+                    · Exercices · {preparationStatus(series)}
                   </AppText>
                 </View>
                 <Button
@@ -124,7 +119,10 @@ export function ParentDashboard() {
                   onPress={() =>
                     router.push({
                       pathname: "/parent/exercises",
-                      params: { draftId: series.id },
+                      params: {
+                        draftId: series.id,
+                        subjectId: series.subjectId,
+                      },
                     })
                   }
                 >
@@ -146,6 +144,13 @@ export function ParentDashboard() {
             Voir tous les contenus à vérifier
           </Button>
         </Card>
+        <Button
+          variant="ghost"
+          icon="book"
+          onPress={() => router.push("/parent/library")}
+        >
+          Bibliothèque
+        </Button>
         <View
           style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.lg }}
         >

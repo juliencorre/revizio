@@ -265,7 +265,7 @@ export function ReviewCourseScreen() {
     }
   }
   return (
-    <ParentLayout active="import">
+    <ParentLayout active="import" subjectId={course.subjectId}>
       <View testID="parent-review" style={{ gap: 26 }}>
         <PageHeading
           eyebrow={subject?.title}
@@ -630,9 +630,14 @@ export function ReviewCourseScreen() {
                 <Button
                   variant="ghost"
                   icon="arrow-left"
-                  onPress={() => router.replace("/parent/library")}
+                  onPress={() =>
+                    router.navigate({
+                      pathname: "/parent/subject/[id]",
+                      params: { id: course.subjectId },
+                    })
+                  }
                 >
-                  Cours et exercices
+                  Retour à la matière
                 </Button>
               </View>
             </>

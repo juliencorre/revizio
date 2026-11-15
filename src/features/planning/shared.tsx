@@ -13,7 +13,10 @@ export function StudyWorkspace({
   children: ReactNode;
 }) {
   return role === "parent" ? (
-    <ParentLayout active={active === "plans" ? "controls" : "english"}>
+    <ParentLayout
+      subjectId={active === "english" ? "english" : undefined}
+      active={active === "plans" ? "controls" : "english"}
+    >
       {children}
     </ParentLayout>
   ) : (

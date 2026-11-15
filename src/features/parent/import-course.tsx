@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Platform, Pressable, View, useWindowDimensions } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import {
@@ -33,8 +33,8 @@ type ImportDraft = {
   sourceText: string;
   existingId: string;
 };
-const emptyDraft = (): ImportDraft => ({
-  subjectId: "maths",
+const emptyDraft = (subjectId = "maths"): ImportDraft => ({
+  subjectId,
   title: "",
   sources: [],
   sourceText: "",
@@ -59,13 +59,43 @@ function validDraft(value: unknown): value is ImportDraft {
   );
 }
 export function ImportCourseScreen() {
+  const data = useLearning();
+  const params = useLocalSearchParams<{
+    courseId?: string;
+    subjectId?: string;
+  }>();
+  if (!data.isReady) return <LoadingParent active="import" />;
+  const initial = data.courses.find((c) => c.id === params.courseId);
+  if (
+    (params.courseId && !initial) ||
+    (params.subjectId && !data.subjects.some((s) => s.id === params.subjectId))
+  )
+    return <Redirect href="/parent/subjects" />;
+  const scope = initial?.subjectId ?? params.subjectId;
+  return (
+    <ImportEditor
+      key={JSON.stringify([data.activeProfileId, scope, params.courseId])}
+      courseId={params.courseId}
+      scope={scope}
+    />
+  );
+}
+function ImportEditor({
+  courseId,
+  scope,
+}: {
+  courseId?: string;
+  scope?: string;
+}) {
   const router = useRouter();
-  const params = useLocalSearchParams<{ courseId?: string }>();
   const { width } = useWindowDimensions();
   const data = useLearning();
-  const initial = data.courses.find((course) => course.id === params.courseId);
+  const initial = data.courses.find((course) => course.id === courseId);
+  const availableCourses = data.courses.filter(
+    (c) => !scope || c.subjectId === scope,
+  );
   const [draft, setDraft, local] = useLocalDraft<ImportDraft>(
-    `revizo.import.${data.activeProfileId || "demo"}.${params.courseId || "new"}`,
+    `revizo.import.${data.activeProfileId || "demo"}.${courseId || (scope ? "subject." + scope : "new")}`,
     initial
       ? {
           subjectId: initial.subjectId,
@@ -74,8 +104,12 @@ export function ImportCourseScreen() {
           sourceText: initial.sourceText ?? "",
           existingId: initial.id,
         }
-      : emptyDraft(),
-    validDraft,
+      : emptyDraft(scope),
+    (value): value is ImportDraft =>
+      validDraft(value) &&
+      (!scope || value.subjectId === scope) &&
+      (!value.existingId ||
+        availableCourses.some((c) => c.id === value.existingId)),
   );
   const [busy, setBusy] = useState<string | null>(null);
   const busyRef = useRef(false);
@@ -222,12 +256,13 @@ export function ImportCourseScreen() {
             : {}),
         });
       }
+      if (!courseId) setDraft(emptyDraft(scope));
       router.replace({ pathname: "/parent/review/[id]", params: { id } });
     });
   }
   if (!data.isReady || !local.ready) return <LoadingParent active="import" />;
   return (
-    <ParentLayout active="import">
+    <ParentLayout active="import" subjectId={scope}>
       <View testID="parent-import" style={{ gap: 26 }}>
         <PageHeading
           eyebrow="Un cours, une fiche claire"
@@ -263,7 +298,7 @@ export function ImportCourseScreen() {
               icon="plus"
               disabled={!!busy}
               onPress={() => {
-                setDraft(emptyDraft());
+                setDraft(emptyDraft(scope));
                 setShowCourses(false);
               }}
             >
@@ -288,8 +323,8 @@ export function ImportCourseScreen() {
           )}
           {showCourses && (
             <View style={s.grid}>
-              {data.courses.length ? (
-                data.courses.map((course) => (
+              {availableCourses.length ? (
+                availableCourses.map((course) => (
                   <Button
                     key={course.id}
                     variant={
@@ -324,47 +359,53 @@ export function ImportCourseScreen() {
           style={[s.grid, { flexDirection: width >= 1150 ? "row" : "column" }]}
         >
           <Card style={s.column}>
-            <AppText variant="heading">1. La matière</AppText>
-            <View style={s.grid}>
-              {data.subjects.map((subject) => (
-                <Pressable
-                  key={subject.id}
-                  accessibilityRole="radio"
-                  accessibilityLabel={subject.title}
-                  accessibilityState={{
-                    checked: draft.subjectId === subject.id,
-                  }}
-                  disabled={!!busy || !!existing}
-                  onPress={() => change({ subjectId: subject.id })}
-                  style={[
-                    s.choice,
-                    draft.subjectId === subject.id && s.selected,
-                    { flexGrow: 1, minWidth: 130 },
-                  ]}
-                >
-                  <AppIcon
-                    name={subject.icon}
-                    color={subject.color}
-                    size={20}
-                  />
-                  <AppText
-                    variant="small"
-                    color={
-                      draft.subjectId === subject.id
-                        ? colors.primary
-                        : colors.ink
-                    }
-                  >
-                    {subject.shortLabel}
-                  </AppText>
-                  {draft.subjectId === subject.id && (
-                    <AppIcon name="check" size={16} />
-                  )}
-                </Pressable>
-              ))}
-            </View>
-            <View style={s.divider} />
-            <AppText variant="heading">2. Le titre du cours</AppText>
+            {!scope && (
+              <>
+                <AppText variant="heading">1. La matière</AppText>
+                <View style={s.grid}>
+                  {data.subjects.map((subject) => (
+                    <Pressable
+                      key={subject.id}
+                      accessibilityRole="radio"
+                      accessibilityLabel={subject.title}
+                      accessibilityState={{
+                        checked: draft.subjectId === subject.id,
+                      }}
+                      disabled={!!busy || !!existing}
+                      onPress={() => change({ subjectId: subject.id })}
+                      style={[
+                        s.choice,
+                        draft.subjectId === subject.id && s.selected,
+                        { flexGrow: 1, minWidth: 130 },
+                      ]}
+                    >
+                      <AppIcon
+                        name={subject.icon}
+                        color={subject.color}
+                        size={20}
+                      />
+                      <AppText
+                        variant="small"
+                        color={
+                          draft.subjectId === subject.id
+                            ? colors.primary
+                            : colors.ink
+                        }
+                      >
+                        {subject.shortLabel}
+                      </AppText>
+                      {draft.subjectId === subject.id && (
+                        <AppIcon name="check" size={16} />
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={s.divider} />
+              </>
+            )}
+            <AppText variant="heading">
+              {scope ? "1." : "2."} Le titre du cours
+            </AppText>
             <Field
               label="Titre du cours"
               testID="course-title"
@@ -392,7 +433,9 @@ export function ImportCourseScreen() {
           </Card>
           <Card style={s.column}>
             <View style={[s.row, { justifyContent: "space-between" }]}>
-              <AppText variant="heading">3. Les documents du cours</AppText>
+              <AppText variant="heading">
+                {scope ? "2." : "3."} Les documents du cours
+              </AppText>
               <Badge tone="muted">{draft.sources.length} / 30</Badge>
             </View>
             <AppText color={colors.muted}>

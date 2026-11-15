@@ -14,11 +14,15 @@ export function useLocalDraft<T>(
   key: string,
   fallback: T,
   accept: (value: unknown) => value is T,
+  read: (key: string) => Promise<string | null> = (key) =>
+    AsyncStorage.getItem(key),
 ): [
   T,
   Dispatch<SetStateAction<T>>,
   { ready: boolean; error: string | null; clear: () => Promise<void> },
 ] {
+  const readRef = useRef(read);
+  readRef.current = read;
   const fallbackRef = useRef(fallback);
   fallbackRef.current = fallback;
   const acceptRef = useRef(accept);
@@ -76,7 +80,7 @@ export function useLocalDraft<T>(
     setReady(false);
     loadedKey.current = null;
     void writes.current
-      .then(() => AsyncStorage.getItem(key))
+      .then(() => readRef.current(key))
       .then(
         (raw) => {
           if (!active) return;

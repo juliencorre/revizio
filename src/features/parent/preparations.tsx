@@ -255,7 +255,13 @@ export function ParentPreparationsScreen() {
       if (job.kind === "course")
         router.push({ pathname: "/parent/review/[id]", params: { id } });
       else
-        router.push({ pathname: "/parent/exercises", params: { draftId: id } });
+        router.push({
+          pathname: "/parent/exercises",
+          params: {
+            draftId: id,
+            ...(job.input?.subjectId ? { subjectId: job.input.subjectId } : {}),
+          },
+        });
     } catch (cause) {
       setActionError(
         cause instanceof Error
@@ -304,7 +310,7 @@ export function ParentPreparationsScreen() {
             <Button
               icon="pencil"
               variant="secondary"
-              onPress={() => router.push("/parent/exercises")}
+              onPress={() => router.push("/parent/subjects?next=exercises")}
             >
               Préparer un exercice à la main
             </Button>
@@ -368,14 +374,14 @@ export function ParentPreparationsScreen() {
               >
                 <Button
                   icon="camera"
-                  onPress={() => router.push("/parent/import")}
+                  onPress={() => router.push("/parent/subjects?next=import")}
                 >
                   Ajouter un cours
                 </Button>
                 <Button
                   variant="secondary"
                   icon="pencil"
-                  onPress={() => router.push("/parent/exercises")}
+                  onPress={() => router.push("/parent/subjects?next=exercises")}
                 >
                   Préparer des exercices
                 </Button>

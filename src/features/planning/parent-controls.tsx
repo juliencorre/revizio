@@ -523,7 +523,10 @@ export function ParentControlsScreen() {
             title="Ajoutez d’abord un cours"
             description="Un plan s’appuie sur les chapitres que vous avez vérifiés."
           >
-            <Button icon="plus" onPress={() => router.push("/parent/import")}>
+            <Button
+              icon="plus"
+              onPress={() => router.push("/parent/subjects?next=import")}
+            >
               Ajouter un cours
             </Button>
           </EmptyState>
@@ -948,7 +951,12 @@ export function ParentControlsScreen() {
             {error.includes("série d’exercices") && (
               <Button
                 icon="pencil"
-                onPress={() => router.push("/parent/exercises")}
+                onPress={() =>
+                  router.push({
+                    pathname: "/parent/exercises",
+                    params: { subjectId: editor.subjectId },
+                  })
+                }
               >
                 Préparer les exercices des chapitres
               </Button>

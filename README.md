@@ -47,11 +47,11 @@ Le premier compte se crée avec un code d’installation privé conservé dans `
 
 ## Premier parcours
 
-1. **Ajouter un cours** : choisir matière et titre, joindre photos/PDF ou texte, conserver le brouillon.
+1. Sur l’accueil parent, choisir la matière puis **Cours**. Donner un titre au cours, joindre les photos, le PDF ou le texte, puis créer le brouillon.
 2. **Préparer la fiche** : lancer la vraie préparation IA ou rédiger à la main, comparer aux documents, corriger et confirmer la relecture avant de publier.
-3. **Préparer des exercices** : choisir les cours, les formats, le niveau et le nombre ; relire les questions et corrections avant publication.
-4. **Contrôles** : choisir une date et un temps quotidien, ajuster les séances puis partager le plan. **Anglais** définit les verbes, temps et éléments autorisés dans les exercices d’anglais.
-5. **Cours et exercices → Vocabulaire** : créer des listes en anglais, espagnol ou latin, ajouter les mots et leurs traductions puis publier pour l’enfant. Les mots peuvent être saisis un par un ou collés au format `mot = traduction`, une paire par ligne. Un point-virgule sépare les variantes acceptées.
+3. Dans **Exercices**, choisir les cours publiés de la matière, les formats, le niveau et le nombre de questions. Relire les questions et les corrections avant publication.
+4. **Contrôles** : choisir une date et un temps quotidien, ajuster les séances puis partager le plan. Dans **Anglais → Conjugaison**, le parent choisit les verbes et les temps étudiés.
+5. Dans **Anglais**, **Espagnol** ou **Latin**, ouvrir **Vocabulaire** pour créer des listes, ajouter les mots et leurs traductions puis publier pour l’enfant. Les mots peuvent être saisis un par un ou collés au format `mot = traduction`, une paire par ligne. Un point-virgule sépare les variantes acceptées.
 6. L’enfant entre avec son profil et son code ; il lit, s’exerce, reprend ses essais et revoit ses erreurs. La rubrique **Famille** gère les profils et l’export/restauration des sauvegardes.
 
 Les générations continuent sur le serveur et se retrouvent dans **Préparations IA**. Aucun résultat IA n’est publié automatiquement. La rédaction manuelle et le quiz lexical déterministe ne sont pas présentés comme de l’IA.
@@ -62,7 +62,7 @@ L’enfant retrouve cinq rubriques stables : **Aujourd’hui**, **Matières**, *
 
 Chaque liste distingue les mots **À découvrir**, **En cours**, **À revoir** et **Connus**. Un mot devient connu après **deux réussites consécutives dans chaque sens** ; une erreur le remet à revoir. Le suivi détaille les deux sens, peut être filtré et permet de travailler seulement les mots non connus. Les accents comptent, tandis que les majuscules et les espaces autour d’une réponse sont ignorés. Consulter les traductions ne valide aucun mot. Le parent retrouve le même suivi, séparé pour chaque enfant. Les corrections utilisent les traductions publiées, sans appel à une IA.
 
-L’espace parent comporte **Accueil**, **Cours et exercices**, **Contrôles**, **Suivi** et **Famille**. La bibliothèque permet de rechercher et filtrer les fiches et séries par matière, type et statut. **Brouillon** désigne un contenu encore vide ; **À vérifier** un brouillon contenant une fiche ou des questions ; **Publié** un contenu partagé après confirmation parentale. Les préparations IA et les outils d’anglais se trouvent dans cet espace. Les éditeurs ouverts depuis un cours conservent leur brouillon séparément.
+L’espace parent comporte **Accueil**, **Matières**, **Contrôles**, **Suivi** et **Famille**. L’accueil propose six matières et les brouillons à reprendre. **Voir toutes les matières** donne accès à chaque discipline, y compris celles sans contenu. Dans chaque matière, le bandeau indique le nom, la couleur et l’icône pendant la préparation. La bibliothèque permet de rechercher et filtrer les fiches et séries par matière, type et statut. **Brouillon** désigne un contenu encore vide ; **À vérifier** un brouillon contenant une fiche ou des questions ; **Publié** un contenu partagé après confirmation parentale. Les préparations IA sont accessibles depuis l’accueil. Un parent peut reprendre la saisie d’un cours dans sa matière ou rouvrir une série depuis la fiche associée.
 
 Le **Suivi** présente les résultats du dernier essai terminé de chaque série, les erreurs encore présentes avec les questions et corrections réellement présentées, les lectures déclarées et les séances à accompagner. Les résultats et l’activité ne sont pas présentés comme une mesure de maîtrise. Le profil suivi reste visible et peut être changé depuis chaque page parent.
 

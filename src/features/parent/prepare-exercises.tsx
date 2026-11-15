@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, View, useWindowDimensions } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   AppIcon,
   AppText,
@@ -208,29 +208,99 @@ function toQuestion(form: QuestionForm, original?: Question): Question {
 }
 export function PrepareExercisesScreen() {
   const data = useLearning();
-  const router = useRouter();
   const params = useLocalSearchParams<{
     draftId?: string;
     courseId?: string;
+    subjectId?: string;
   }>();
+  if (!data.isReady) return <LoadingParent active="exercises" />;
+  const series = data.series.find((item) => item.id === params.draftId);
+  const course = data.courses.find((item) => item.id === params.courseId);
+  const scope = params.subjectId || course?.subjectId;
+  if (
+    (params.subjectId && !data.subjects.some((item) => item.id === scope)) ||
+    (params.courseId && (!course || course.status !== "published")) ||
+    (params.draftId && !series) ||
+    (course && scope !== course.subjectId) ||
+    (series && scope && series.subjectId !== scope)
+  )
+    return <Redirect href="/parent/subjects" />;
+  return (
+    <ExercisesEditor
+      key={JSON.stringify([data.activeProfileId, scope, params.courseId])}
+      scope={scope}
+      courseId={params.courseId}
+      requestedId={params.draftId || ""}
+    />
+  );
+}
+function ExercisesEditor({
+  scope,
+  courseId,
+  requestedId,
+}: {
+  scope?: string;
+  courseId?: string;
+  requestedId: string;
+}) {
+  const data = useLearning();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const publishedCourses = data.courses.filter(
-    (course) => course.status === "published",
+    (course) =>
+      course.status === "published" && (!scope || course.subjectId === scope),
   );
-  const requestedId = typeof params.draftId === "string" ? params.draftId : "";
-  const requestedSeries = data.series.find(
-    (series) => series.id === requestedId,
+  const draftSeries = data.series.filter(
+    (series) =>
+      series.status === "draft" && (!scope || series.subjectId === scope),
   );
+  const requestedSeries = data.series.find((item) => item.id === requestedId);
   const initialCourse =
-    publishedCourses.find((course) => course.id === params.courseId) ??
+    publishedCourses.find((item) => item.id === courseId) ??
     publishedCourses[0];
-  const editorKey = `revizo.exercise-editor.${data.activeProfileId || "demo"}${params.courseId ? `.course.${params.courseId}` : ""}`;
+  const suffix = courseId
+    ? ".course." + courseId
+    : scope
+      ? ".subject." + scope
+      : "";
+  const editorKey =
+    "revizo.exercise-editor." + (data.activeProfileId || "demo") + suffix;
+  const seriesKey = (id: string) =>
+    `revizo.exercise-editor.${data.activeProfileId || "demo"}.series.${id}`;
+  // A course shortcut and the subject menu can both reopen the same unfinished question.
+  async function readEditor(key: string) {
+    const entry = await AsyncStorage.getItem(key);
+    const previous = entry ? (JSON.parse(entry) as unknown) : null;
+    const entryId = validEditor(previous) ? previous.draftId : "";
+    const id = requestedId || entryId;
+    if (!id) return entry;
+    const series = data.series.find(
+      (item) => item.id === id && (!scope || item.subjectId === scope),
+    );
+    if (!series || series.status === "published") return null;
+    return (
+      (await AsyncStorage.getItem(seriesKey(id))) ??
+      (entryId === id ? entry : JSON.stringify(fromSeries(series)))
+    );
+  }
   const [editor, setEditor, local] = useLocalDraft<Editor>(
     editorKey,
     requestedSeries
       ? fromSeries(requestedSeries)
       : emptyEditor(initialCourse?.id),
-    validEditor,
+    (value): value is Editor =>
+      validEditor(value) &&
+      (!requestedId || value.draftId === requestedId) &&
+      (!scope ||
+        (value.courseIds.every((id) =>
+          publishedCourses.some((course) => course.id === id),
+        ) &&
+          (!value.draftId ||
+            data.series.some(
+              (series) =>
+                series.id === value.draftId && series.subjectId === scope,
+            )))),
+    readEditor,
   );
   const editorRef = useRef(editor);
   editorRef.current = editor;
@@ -250,33 +320,64 @@ export function PrepareExercisesScreen() {
     editor.courseIds.includes(course.id),
   );
   const subjectId =
-    selectedCourses[0]?.subjectId ?? initialCourse?.subjectId ?? "maths";
+    scope ??
+    selectedCourses[0]?.subjectId ??
+    currentSeries?.subjectId ??
+    initialCourse?.subjectId ??
+    "maths";
   const published = currentSeries?.status === "published";
   function persistLocal(next: Editor) {
-    void AsyncStorage.setItem(editorKey, JSON.stringify(next)).catch(() =>
+    if (!next.draftId) return;
+    void AsyncStorage.setItem(
+      seriesKey(next.draftId),
+      JSON.stringify(next),
+    ).catch(() =>
       setError(
         "La saisie n’a pas pu être conservée sur cet appareil. Gardez cet écran ouvert.",
       ),
     );
   }
-  function loadSeries(series: ExerciseSeries) {
-    const next = fromSeries(series);
-    editorRef.current = next;
-    draftIdRef.current = series.id;
-    setEditor(next);
-    persistLocal(next);
-    setPreview(false);
-    setConfirmed(false);
-    setError("");
-    setNotice("");
-  }
   useEffect(() => {
-    if (!data.isReady || !local.ready) return;
-    if (requestedId && requestedId !== editorRef.current.draftId) {
-      const series = data.series.find((item) => item.id === requestedId);
-      if (series) loadSeries(series);
+    if (
+      !local.ready ||
+      !requestedSeries ||
+      requestedId === editorRef.current.draftId
+    )
+      return;
+    let active = true;
+    async function resume(series: ExerciseSeries) {
+      let next = fromSeries(series);
+      try {
+        const raw = await readEditor(editorKey);
+        const stored: unknown = raw && JSON.parse(raw);
+        if (
+          validEditor(stored) &&
+          stored.draftId === series.id &&
+          stored.courseIds.every((id) =>
+            publishedCourses.some((course) => course.id === id),
+          )
+        )
+          next = stored;
+      } catch {
+        if (active)
+          setError(
+            "La saisie locale est illisible. La série enregistrée a été chargée.",
+          );
+      }
+      if (!active) return;
+      editorRef.current = next;
+      draftIdRef.current = next.draftId;
+      setEditor(next);
+      setPreview(false);
+      setConfirmed(false);
+      setNotice("");
     }
-  }, [data.isReady, local.ready, requestedId, data.series, data.courses]);
+    setError("");
+    void resume(requestedSeries);
+    return () => {
+      active = false;
+    };
+  }, [local.ready, requestedSeries, requestedId, editorKey, setEditor]);
   function saveEditor(next: Editor, persist = true) {
     if (persist && (next.title.trim() || next.questions.length)) {
       const existing = data.series.find(
@@ -510,22 +611,38 @@ export function PrepareExercisesScreen() {
     setError("");
     setNotice("");
     setJob(null);
-    router.setParams({ draftId: "", courseId: "" });
+    router.setParams({ draftId: "" });
   }
-  if (!data.isReady || !local.ready)
+  if (
+    !data.isReady ||
+    !local.ready ||
+    (requestedSeries && requestedId !== editor.draftId)
+  )
     return <LoadingParent active="exercises" />;
   if (!publishedCourses.length)
     return (
-      <ParentLayout active="exercises">
+      <ParentLayout
+        active="exercises"
+        subjectId={scope ?? currentSeries?.subjectId}
+      >
         <PageHeading
           title="Préparer des exercices"
           description="Les séries s’appuient sur les cours que vous avez vérifiés."
         />
         <EmptyState
           title="Publiez d’abord une fiche"
-          description={`Un cours publié est nécessaire pour préparer une série pour ${data.childName}.`}
+          description={`Publiez un premier cours dans cette matière pour préparer une série pour ${data.childName}.`}
         >
-          <Button icon="plus" onPress={() => router.push("/parent/import")}>
+          <Button
+            icon="plus"
+            onPress={() =>
+              router.push(
+                scope
+                  ? { pathname: "/parent/import", params: { subjectId: scope } }
+                  : "/parent/import",
+              )
+            }
+          >
             Ajouter un cours
           </Button>
         </EmptyState>
@@ -533,7 +650,10 @@ export function PrepareExercisesScreen() {
     );
   if (published)
     return (
-      <ParentLayout active="exercises">
+      <ParentLayout
+        active="exercises"
+        subjectId={scope ?? currentSeries?.subjectId}
+      >
         <View testID="parent-exercises" style={{ gap: 26 }}>
           <PageHeading
             eyebrow="Une nouvelle occasion de s’entraîner"
@@ -555,9 +675,14 @@ export function PrepareExercisesScreen() {
               </Button>
               <Button
                 variant="ghost"
-                onPress={() => router.replace("/parent/library")}
+                onPress={() =>
+                  router.navigate({
+                    pathname: "/parent/subject/[id]",
+                    params: { id: subjectId },
+                  })
+                }
               >
-                Cours et exercices
+                Retour à la matière
               </Button>
             </View>
           </Card>
@@ -565,7 +690,10 @@ export function PrepareExercisesScreen() {
       </ParentLayout>
     );
   return (
-    <ParentLayout active="exercises">
+    <ParentLayout
+      active="exercises"
+      subjectId={scope ?? currentSeries?.subjectId}
+    >
       <View testID="parent-exercises" style={{ gap: 26 }}>
         <PageHeading
           eyebrow="Des exercices qui suivent son cours"
@@ -605,26 +733,29 @@ export function PrepareExercisesScreen() {
                 </Button>
               </View>
               <View style={s.row}>
-                {data.series
-                  .filter((series) => series.status === "draft")
-                  .map((series) => (
-                    <Button
-                      key={series.id}
-                      variant={
-                        editor.draftId === series.id ? "primary" : "secondary"
-                      }
-                      disabled={busy}
-                      onPress={() => {
-                        loadSeries(series);
-                        router.setParams({ draftId: series.id });
-                      }}
-                      testID={"ai-series-draft-" + series.id}
-                    >
-                      {series.title || "Série sans titre"} ·{" "}
-                      {series.questions.length} questions
-                    </Button>
-                  ))}
-                {!data.series.some((series) => series.status === "draft") && (
+                {draftSeries.map((series) => (
+                  <Button
+                    key={series.id}
+                    variant={
+                      editor.draftId === series.id ? "primary" : "secondary"
+                    }
+                    disabled={busy}
+                    onPress={() => {
+                      router.push({
+                        pathname: "/parent/exercises",
+                        params: {
+                          subjectId: series.subjectId,
+                          draftId: series.id,
+                        },
+                      });
+                    }}
+                    testID={"ai-series-draft-" + series.id}
+                  >
+                    {series.title || "Série sans titre"} ·{" "}
+                    {series.questions.length} questions
+                  </Button>
+                ))}
+                {!draftSeries.length && (
                   <AppText color={colors.muted}>
                     Vos séries sont conservées en brouillon pendant la
                     préparation.

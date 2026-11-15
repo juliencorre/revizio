@@ -16,7 +16,6 @@ import {
   AppText,
   Button,
   Card,
-  useWindowClass,
   type NavigationItem,
 } from "@/components/ui";
 import { colors, fontFamily, neumorphic } from "@/theme";
@@ -28,8 +27,10 @@ export function ParentLayout({
   active,
   children,
   scrollRef,
+  subjectId,
 }: {
   active:
+    | "subjects"
     | "library"
     | "progress"
     | "dashboard"
@@ -41,23 +42,13 @@ export function ParentLayout({
     | "settings"
     | "preparations";
   children: ReactNode;
+  subjectId?: string;
   scrollRef?: React.RefObject<ScrollViewInstance | null>;
 }) {
   const router = useRouter();
   const data = useLearning();
   const session = useSession();
-  const compact = useWindowClass() === "compact";
-  const tabStyle = compact
-    ? { minWidth: 44, paddingHorizontal: 10 }
-    : undefined;
-  const inLibrary = [
-    "library",
-    "import",
-    "exercises",
-    "english",
-    "vocabulary",
-    "preparations",
-  ].includes(active);
+  const subject = data.subjects.find((item) => item.id === subjectId);
   const navigation: NavigationItem[] = [
     {
       label: "Accueil",
@@ -66,11 +57,18 @@ export function ParentLayout({
       active: active === "dashboard",
     },
     {
-      label: "Cours et exercices",
-      shortLabel: "Contenus",
-      href: "/parent/library",
+      label: "Matières",
+      href: "/parent/subjects",
       icon: "book",
-      active: inLibrary,
+      active: [
+        "subjects",
+        "library",
+        "import",
+        "exercises",
+        "english",
+        "vocabulary",
+        "preparations",
+      ].includes(active),
     },
     {
       label: "Contrôles",
@@ -116,51 +114,62 @@ export function ParentLayout({
               {profile.name}
             </Button>
           ))}
+        {subject && (
+          <Button
+            style={{ marginLeft: "auto" }}
+            variant="ghost"
+            icon="arrow-left"
+            onPress={() => router.navigate("/parent/subjects")}
+          >
+            Toutes les matières
+          </Button>
+        )}
       </View>
-      {inLibrary && (
-        <View
-          accessibilityLabel="Rubriques des cours et exercices"
-          style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+      {subject && (
+        <Card
+          testID="parent-subject-banner"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+            backgroundColor: subject.color + "0E",
+            borderColor: subject.color + "44",
+          }}
         >
-          <Button
-            variant={active === "library" ? "secondary" : "ghost"}
-            selected={active === "library"}
-            accessibilityLabel="Bibliothèque"
-            style={tabStyle}
-            icon={compact ? undefined : "book"}
-            onPress={() => router.push("/parent/library")}
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 12,
+              backgroundColor: subject.color + "15",
+            }}
           >
-            {compact ? "Cours" : "Bibliothèque"}
-          </Button>
-          <Button
-            variant={active === "vocabulary" ? "secondary" : "ghost"}
-            selected={active === "vocabulary"}
-            style={tabStyle}
-            icon={compact ? undefined : "languages"}
-            onPress={() => router.push("/parent/vocabulary")}
+            <AppIcon name={subject.icon} color={subject.color} size={24} />
+          </View>
+          <AppText
+            variant={active === "subjects" ? "title" : "heading"}
+            style={{ flexGrow: 1, flexShrink: 1 }}
           >
-            Vocabulaire
-          </Button>
-          <Button
-            variant={active === "preparations" ? "secondary" : "ghost"}
-            selected={active === "preparations"}
-            accessibilityLabel="Préparations IA"
-            style={tabStyle}
-            icon={compact ? undefined : "refresh"}
-            onPress={() => router.push("/parent/preparations")}
-          >
-            {compact ? "IA" : "Préparations IA"}
-          </Button>
-          <Button
-            variant={active === "english" ? "secondary" : "ghost"}
-            selected={active === "english"}
-            style={tabStyle}
-            icon={compact ? undefined : "languages"}
-            onPress={() => router.push("/parent/english")}
-          >
-            Anglais
-          </Button>
-        </View>
+            {subject.title}
+          </AppText>
+          {active !== "subjects" && (
+            <Button
+              variant="ghost"
+              icon="arrow-left"
+              onPress={() =>
+                router.navigate({
+                  pathname: "/parent/subject/[id]",
+                  params: { id: subject.id },
+                })
+              }
+            >
+              Menu de la matière
+            </Button>
+          )}
+        </Card>
       )}
       {children}
     </AppShell>

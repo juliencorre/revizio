@@ -53,10 +53,12 @@ export function VocabularyCollection({ role }: { role: "parent" | "child" }) {
           ) : undefined
         }
       />
-      <LanguagePicker
-        language={language}
-        onChange={(language) => router.setParams({ language })}
-      />
+      {role === "child" && (
+        <LanguagePicker
+          language={language}
+          onChange={(language) => router.setParams({ language })}
+        />
+      )}
       {!data.isReady ? (
         <Loading />
       ) : !lists.length ? (
@@ -110,7 +112,9 @@ export function VocabularyCollection({ role }: { role: "parent" | "child" }) {
           icon="book"
           onPress={() =>
             router.push(
-              role === "parent" ? "/parent/english" : "/student/english",
+              role === "parent"
+                ? "/parent/english?section=conjugaison"
+                : "/student/english",
             )
           }
         >
@@ -120,7 +124,9 @@ export function VocabularyCollection({ role }: { role: "parent" | "child" }) {
     </View>
   );
   return role === "parent" ? (
-    <ParentLayout active="vocabulary">{content}</ParentLayout>
+    <ParentLayout active="vocabulary" subjectId={language}>
+      {content}
+    </ParentLayout>
   ) : (
     <ChildShell
       active="courses"
