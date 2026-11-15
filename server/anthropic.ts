@@ -66,7 +66,8 @@ export class AnthropicClient implements AiClient {
         `${ANTHROPIC_URL}/v1/models/${encodeURIComponent(settings.model)}`,
         {
           headers: this.headers(),
-          redirect: "error",
+          // workerd supports manual redirects; response.ok rejects any 3xx.
+          redirect: "manual",
           signal: AbortSignal.timeout(5000),
         },
       );
@@ -97,7 +98,8 @@ export class AnthropicClient implements AiClient {
       response = await fetch(`${ANTHROPIC_URL}/v1/messages`, {
         method: "POST",
         headers: this.headers(),
-        redirect: "error",
+        // Never forward the API key to a redirect target, including on Workers.
+        redirect: "manual",
         signal: requestSignal,
         body: JSON.stringify({
           model: settings.model,

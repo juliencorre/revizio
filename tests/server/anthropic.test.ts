@@ -65,7 +65,7 @@ describe("API Anthropic", () => {
     expect(result).toEqual({ text: "Le cours" });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${ANTHROPIC_URL}/v1/messages`);
-    expect(init.redirect).toBe("error");
+    expect(init.redirect).toBe("manual");
     expect(init.headers.Authorization).toBe(`Bearer ${key}`);
     expect(init.headers["anthropic-version"]).toBe("2026-10-21");
     const body = JSON.parse(init.body);
@@ -107,6 +107,7 @@ describe("API Anthropic", () => {
       `${ANTHROPIC_URL}/v1/models/${settings.model}`,
     );
     expect(fetchMock.mock.calls[0][1].body).toBeUndefined();
+    expect(fetchMock.mock.calls[0][1].redirect).toBe("manual");
   });
 
   it("signale une clé manquante et ne contacte aucun fournisseur de secours", async () => {
@@ -121,6 +122,7 @@ describe("API Anthropic", () => {
   });
 
   it.each([
+    [302, "302"],
     [401, "clé API"],
     [403, "autorisations"],
     [402, "crédit"],
