@@ -7,14 +7,13 @@ import type {
   EnglishSettings,
   QuestionType,
 } from "../src/domain/model";
-import { FamilyDatabase } from "./database";
+import type { FamilyDatabase } from "./database";
 import {
-  extractUpload,
   generateCourse,
   generateEnglish,
   generateExercises,
   type ExtractedPage,
-} from "./ai";
+} from "./ai-core";
 import { HttpError, isoNow, type AiClient, type StoredJob } from "./types";
 
 export class JobQueue {
@@ -24,6 +23,10 @@ export class JobQueue {
   constructor(
     private database: FamilyDatabase,
     private client: AiClient,
+    private options: {
+      extractUpload: typeof import("./ai").extractUpload;
+      alarmDriven?: boolean;
+    },
   ) {
     for (const job of database.jobs())
       if (job.status === "running")
@@ -84,6 +87,7 @@ export class JobQueue {
     return this.database.job(id)!;
   }
   start() {
+    if (this.options.alarmDriven) return;
     if (!this.running && !this.stopped) {
       this.running = true;
       void this.drain();
@@ -95,9 +99,15 @@ export class JobQueue {
     for (let i = 0; this.running && i < 100; i++)
       await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  private async drain() {
+  async runOne() {
+    if (this.running || this.stopped) return;
+    this.running = true;
+    await this.drain(1);
+  }
+  private async drain(limit = Infinity) {
+    let count = 0;
     try {
-      while (!this.stopped) {
+      while (!this.stopped && count++ < limit) {
         const job = this.database
           .jobs()
           .reverse()
@@ -169,7 +179,7 @@ export class JobQueue {
         retained.every((source) => typeof source.extractedText === "string")
           ? retained.map(savedPage)
           : (
-              await extractUpload(
+              await this.options.extractUpload(
                 upload,
                 this.client,
                 settings,

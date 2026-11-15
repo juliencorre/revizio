@@ -2,6 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { nodeFiles } from "./files-node";
+import type { PrivateFiles, SqlDatabase } from "./runtime";
 import type { AiJob, LearningData, SessionUser } from "../src/domain/model";
 import {
   emptyLearningData,
@@ -16,16 +18,32 @@ import {
 } from "./types";
 
 export class FamilyDatabase {
-  readonly db: DatabaseSync;
+  readonly db: SqlDatabase;
+  readonly files: PrivateFiles;
+  private atomic?: <T>(fn: () => T) => T;
   readonly filesDir: string;
-  constructor(readonly dataDir: string) {
-    mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+  constructor(
+    readonly dataDir: string,
+    backend?: {
+      db: SqlDatabase;
+      files: PrivateFiles;
+      transaction: <T>(fn: () => T) => T;
+    },
+  ) {
+    this.files = backend?.files ?? nodeFiles;
     this.filesDir = join(dataDir, "private");
-    mkdirSync(this.filesDir, { recursive: true, mode: 0o700 });
-    const path = join(dataDir, "family.sqlite");
-    this.db = new DatabaseSync(path, { timeout: 5000 });
-    chmodSync(path, 0o600);
-    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+    if (backend) {
+      this.db = backend.db;
+      this.atomic = backend.transaction;
+    } else {
+      mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+      mkdirSync(this.filesDir, { recursive: true, mode: 0o700 });
+      const path = join(dataDir, "family.sqlite");
+      this.db = new DatabaseSync(path, { timeout: 5000 });
+      chmodSync(path, 0o600);
+      this.db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
+    }
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, settings TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS parents (id TEXT PRIMARY KEY, family_id TEXT NOT NULL REFERENCES families(id) ON DELETE CASCADE, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, password_hash TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS profiles (id TEXT PRIMARY KEY, family_id TEXT NOT NULL REFERENCES families(id) ON DELETE CASCADE, name TEXT NOT NULL, grade TEXT NOT NULL, pin_hash TEXT NOT NULL);
@@ -38,6 +56,7 @@ export class FamilyDatabase {
     `);
   }
   transaction<T>(fn: () => T): T {
+    if (this.atomic) return this.atomic(fn);
     this.db.exec("BEGIN IMMEDIATE");
     try {
       const result = fn();

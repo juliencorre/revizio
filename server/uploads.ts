@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import sharp from "sharp";
+import type { ImageProcessor } from "./runtime";
 import type { CourseSource, SessionUser } from "../src/domain/model";
-import { FamilyDatabase } from "./database";
+import type { FamilyDatabase } from "./database";
 import { HttpError, isoNow, type StoredUpload } from "./types";
 export function sourceFor(upload: StoredUpload): CourseSource {
   return {
@@ -22,6 +21,7 @@ export async function storeUpload(
   buffer: Buffer,
   name: string,
   mimeType: string,
+  images: ImageProcessor,
 ): Promise<StoredUpload> {
   if (!buffer.length || buffer.length > 25 * 1024 * 1024)
     throw new HttpError(413, "Chaque document doit peser au maximum 25 Mo.");
@@ -33,16 +33,7 @@ export async function storeUpload(
     actualMime = "application/pdf";
   if (!isPdf) {
     try {
-      bytes = await sharp(buffer, { limitInputPixels: 40_000_000 })
-        .rotate()
-        .resize({
-          width: 2200,
-          height: 2200,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .png()
-        .toBuffer();
+      bytes = await images.normalize(buffer);
       actualMime = "image/png";
     } catch {
       throw new HttpError(
@@ -52,9 +43,9 @@ export async function storeUpload(
     }
   }
   const path = join(database.filesDir, id + (isPdf ? ".pdf" : ".png"));
-  await writeFile(originalPath, buffer, { mode: 0o600 });
+  await database.files.write(originalPath, buffer);
   try {
-    await writeFile(path, bytes, { mode: 0o600 });
+    await database.files.write(path, bytes);
     const upload: StoredUpload = {
       id,
       familyId: user.familyId,
@@ -70,8 +61,8 @@ export async function storeUpload(
     database.saveUpload(upload);
     return upload;
   } catch (error) {
-    await unlink(originalPath).catch(() => {});
-    await unlink(path).catch(() => {});
+    await database.files.unlink(originalPath).catch(() => {});
+    await database.files.unlink(path).catch(() => {});
     throw error;
   }
 }
@@ -97,6 +88,7 @@ export async function rotateUpload(
   database: FamilyDatabase,
   upload: StoredUpload,
   rotation: number,
+  images: ImageProcessor,
 ): Promise<StoredUpload> {
   if (
     ![0, 90, 180, 270].includes(rotation) ||
@@ -106,30 +98,19 @@ export async function rotateUpload(
       400,
       "Choisissez une rotation de 0, 90, 180 ou 270 degrés pour une image.",
     );
-  const bytes = await sharp(await readFile(upload.originalPath), {
-    limitInputPixels: 40_000_000,
-  })
-    .rotate()
-    .png()
-    .toBuffer();
-  const result = await sharp(bytes)
-    .rotate(rotation)
-    .resize({
-      width: 2200,
-      height: 2200,
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .png()
-    .toBuffer();
-  const temporary = upload.path + ".next";
-  await writeFile(temporary, result, { mode: 0o600 });
-  await rename(temporary, upload.path);
+  const result = await images.normalize(
+    await database.files.read(upload.originalPath),
+    rotation,
+  );
+  await database.files.write(upload.path, result);
   const updated = { ...upload, rotation, size: result.length };
   database.saveUpload(updated);
   return updated;
 }
-export async function removeUploadFiles(upload: StoredUpload) {
+export async function removeUploadFiles(
+  database: FamilyDatabase,
+  upload: StoredUpload,
+) {
   for (const path of new Set([upload.path, upload.originalPath]))
-    await unlink(path).catch(() => {});
+    await database.files.unlink(path).catch(() => {});
 }

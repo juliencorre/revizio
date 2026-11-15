@@ -1,10 +1,9 @@
-import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import sharp from "sharp";
+import type { ImageProcessor } from "./runtime";
 import type { LearningData } from "../src/domain/model";
 import { parseLearningData } from "../src/domain/learning";
-import { FamilyDatabase } from "./database";
+import type { FamilyDatabase } from "./database";
 import { HttpError, isoNow, type StoredUpload } from "./types";
 import { removeUploadFiles } from "./uploads";
 const row = (v: unknown): Record<string, unknown> =>
@@ -15,19 +14,23 @@ const text = (v: unknown, max = 200) =>
   typeof v === "string" && v.length <= max ? v : "";
 const identifier = (v: unknown) =>
   typeof v === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
-export async function exportBackup(database: FamilyDatabase, familyId: string) {
+export async function exportBackup(
+  database: FamilyDatabase,
+  familyId: string,
+  limitBytes = 100 * 1024 * 1024,
+) {
   const uploads = [];
   let total = 0;
   for (const upload of database.uploads(familyId)) {
     const [bytes, originalBytes] = await Promise.all([
-      readFile(upload.path),
-      readFile(upload.originalPath),
+      database.files.read(upload.path),
+      database.files.read(upload.originalPath),
     ]);
     total += bytes.length + originalBytes.length;
-    if (total > 100 * 1024 * 1024)
+    if (total > limitBytes)
       throw new HttpError(
         413,
-        "La sauvegarde dépasse 100 Mo. Exportez ou archivez les documents volumineux séparément.",
+        `La sauvegarde dépasse ${Math.floor(limitBytes / 1024 / 1024)} Mo. Exportez ou archivez les documents volumineux séparément.`,
       );
     uploads.push({
       id: upload.id,
@@ -56,6 +59,8 @@ export async function restoreBackup(
   database: FamilyDatabase,
   familyId: string,
   value: unknown,
+  images: ImageProcessor,
+  limitBytes = 100 * 1024 * 1024,
 ) {
   const backup = row(value);
   if (
@@ -120,7 +125,7 @@ export async function restoreBackup(
       if (
         !bytes.length ||
         !original.length ||
-        total > 100 * 1024 * 1024 ||
+        total > limitBytes ||
         bytes.length > 25 * 1024 * 1024 ||
         original.length > 25 * 1024 * 1024
       )
@@ -130,10 +135,7 @@ export async function restoreBackup(
           throw new HttpError(400, "Un PDF de la sauvegarde est invalide.");
       } else {
         try {
-          const metadata = await sharp(bytes, {
-            limitInputPixels: 40_000_000,
-          }).metadata();
-          if (metadata.format !== "png") throw new Error("format");
+          await images.validatePng(bytes);
         } catch {
           throw new HttpError(400, "Une image de la sauvegarde est invalide.");
         }
@@ -144,9 +146,9 @@ export async function restoreBackup(
         prefix + (source.mimeType === "application/pdf" ? ".pdf" : ".png"),
       );
       const originalPath = join(database.filesDir, prefix + ".original");
-      await writeFile(path, bytes, { mode: 0o600 });
+      await database.files.write(path, bytes);
       temporaryPaths.push(path);
-      await writeFile(originalPath, original, { mode: 0o600 });
+      await database.files.write(originalPath, original);
       temporaryPaths.push(originalPath);
       files.push({
         id: String(source.id),
@@ -197,13 +199,12 @@ export async function restoreBackup(
         }
     const previousProfiles = database.profiles(familyId),
       previousFiles = database.uploads(familyId);
-    const previous = await exportBackup(database, familyId);
+    const previous = await exportBackup(database, familyId, limitBytes);
     const backupDir = join(database.dataDir, "backups");
-    await mkdir(backupDir, { recursive: true, mode: 0o700 });
-    await writeFile(
+    await database.files.mkdir(backupDir);
+    await database.files.write(
       join(backupDir, `before-restore-${Date.now()}.json`),
       JSON.stringify(previous),
-      { mode: 0o600 },
     );
     database.transaction(() => {
       database.db
@@ -239,7 +240,7 @@ export async function restoreBackup(
       for (const file of files) database.saveUpload(file);
     });
     for (const previousFile of previousFiles)
-      await removeUploadFiles(previousFile);
+      await removeUploadFiles(database, previousFile);
     return {
       ok: true,
       profiles: database.profiles(familyId).map((profile) => ({
@@ -252,7 +253,8 @@ export async function restoreBackup(
         "La sauvegarde a été restaurée. Les codes des profils existants sont conservés ; définissez un code pour les profils récupérés.",
     };
   } catch (error) {
-    for (const path of temporaryPaths) await unlink(path).catch(() => {});
+    for (const path of temporaryPaths)
+      await database.files.unlink(path).catch(() => {});
     throw error;
   }
 }
