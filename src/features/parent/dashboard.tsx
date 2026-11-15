@@ -102,7 +102,8 @@ export function ParentDashboard() {
     .slice(0, 6);
   return (
     <ParentLayout active="dashboard">
-      <View testID="parent-dashboard" style={{ gap: 26 }}>
+      <View testID="parent-dashboard" style={{ gap: compact ? 18 : 24 }}>
+        <View style={{ backgroundColor: "#EDE8FF", borderRadius: 24, padding: compact ? 18 : 28 }}>
         <PageHeading
           eyebrow="Ensemble, à son rythme"
           title="Bonjour !"
@@ -131,6 +132,7 @@ export function ParentDashboard() {
             </View>
           }
         />
+        </View>
         {data.profiles.length > 1 && (
           <View style={common.row}>
             <AppText variant="label">Suivre :</AppText>
