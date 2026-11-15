@@ -1,12 +1,9 @@
 import { subjectHref } from "@/features/parent/subject-navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Platform, Pressable, View, useWindowDimensions } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import {
-  pickDocuments as selectDocuments,
-  documentExamples,
-} from "@/services/pick-documents";
+import { Pressable, View, useWindowDimensions } from "react-native";
+import { LanguageSourceImport } from "@/features/parent/import-sources";
+import { documentExamples } from "@/services/pick-documents";
 import {
   AppIcon,
   AppText,
@@ -160,6 +157,8 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
     setSettings,
   ]);
   const showToolInput = toolInput ?? settings.toolWords.join(", ");
+  const liveToolInput = useRef(showToolInput);
+  liveToolInput.current = showToolInput;
   const effective: EnglishSettings = conjugation
     ? {
         ...data.english,
@@ -234,79 +233,35 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
     setVerb({ base: "", past: "", participle: "", meaning: "" });
   }
   async function importSources(sources: CourseSource[]) {
-    if (!sources.length) return;
-    setBusy(true);
     setError("");
     setMessage("");
-    try {
-      const result = await data.extractEnglish(sources);
-      const next = mergeExtracted(effective, result);
-      setSettings(next);
-      setToolInput(next.toolWords.join(", "));
-      setPreview(false);
-      setConfirmed(false);
-      setMessage(
-        "Les éléments lus ont été ajoutés au brouillon. Vérifiez chaque mot, chaque forme et les temps avant de les partager.",
+    const result = await data.extractEnglish(sources);
+    if (conjugation && !result.verbs.length && !result.tenses.length)
+      throw new Error(
+        "Aucun verbe irrégulier ni temps trouvé. Vérifiez les documents sélectionnés.",
       );
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "La lecture du document a échoué. Réessayez ou complétez les listes à la main.",
+    if (conjugation) {
+      setSettings((current) => {
+        const merged = mergeExtracted(current, result);
+        return { ...current, verbs: merged.verbs, tenses: merged.tenses };
+      });
+    } else {
+      const toolWords = liveToolInput.current
+        .split(/[,;\n]/)
+        .map((word) => word.trim())
+        .filter(Boolean);
+      setSettings((current) =>
+        mergeExtracted({ ...current, toolWords }, result),
       );
-    } finally {
-      setBusy(false);
+      setToolInput(null);
     }
-  }
-  async function photos(camera = false) {
-    try {
-      if (camera && Platform.OS !== "web") {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          setError(
-            "L’accès à la caméra est refusé. Utilisez Photos ou Fichiers, ou autorisez la caméra dans les réglages.",
-          );
-          return;
-        }
-      }
-      const result = camera
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ["images"],
-            quality: 0.9,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            allowsMultipleSelection: true,
-            selectionLimit: 8,
-            quality: 0.9,
-          });
-      if (!result.canceled)
-        await importSources(
-          result.assets.map((asset, index) => ({
-            id: localId("english-source"),
-            name: asset.fileName ?? `Anglais page ${index + 1}.jpg`,
-            uri: asset.uri,
-            mimeType: asset.mimeType ?? "image/jpeg",
-          })),
-        );
-    } catch {
-      setError(
-        "Le sélecteur de photos n’a pas pu être ouvert. Essayez l’import de fichiers.",
-      );
-    }
-  }
-  async function documents() {
-    try {
-      await importSources(
-        await selectDocuments(true, () => localId("english-source")),
-      );
-    } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Le fichier n’a pas pu être sélectionné.",
-      );
-    }
+    setPreview(false);
+    setConfirmed(false);
+    setMessage(
+      conjugation
+        ? "Les verbes et les temps lus sont prêts à relire."
+        : "Les éléments lus ont été ajoutés au brouillon. Vérifiez-les avant de les partager.",
+    );
   }
   function openPreview() {
     const issue = englishValidation(effective);
@@ -407,49 +362,16 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
         {draft.error && <Notice error>{draft.error}</Notice>}
         {error && <Notice error>{error}</Notice>}
         {message && <Notice success>{message}</Notice>}
+        <Card style={{ gap: 16 }}>
+          <AppText variant="heading">Documents du cours</AppText>
+          <AppText color={colors.muted}>{documentExamples}.</AppText>
+          <LanguageSourceImport
+            onAnalyze={importSources}
+            onBusyChange={setBusy}
+          />
+        </Card>
         {!conjugation && (
           <>
-            <Card style={{ gap: 16 }}>
-              <View style={[common.row, { justifyContent: "space-between" }]}>
-                <AppText variant="heading">Depuis un document du cours</AppText>
-                <Badge tone="muted">Brouillon avant publication</Badge>
-              </View>
-              <AppText color={colors.muted}>
-                Choisissez vos fichiers : {documentExamples}. Vous pourrez
-                corriger les mots et les verbes avant de les partager.
-              </AppText>
-              <View style={common.row}>
-                <Button
-                  icon="camera"
-                  onPress={() => void photos(true)}
-                  disabled={busy}
-                >
-                  Photographier
-                </Button>
-                <Button
-                  icon="upload"
-                  variant="secondary"
-                  onPress={() => void photos(false)}
-                  disabled={busy}
-                >
-                  Photos
-                </Button>
-                <Button
-                  icon="file"
-                  variant="secondary"
-                  onPress={() => void documents()}
-                  disabled={busy}
-                >
-                  Choisir des fichiers
-                </Button>
-              </View>
-              {busy && (
-                <Notice>
-                  Lecture du document en cours. Vous pouvez garder cette page
-                  ouverte ; aucune liste ne sera publiée automatiquement.
-                </Notice>
-              )}
-            </Card>
             <Card style={{ gap: 18 }}>
               <View style={[common.row, { justifyContent: "space-between" }]}>
                 <AppText variant="heading">Les mots à connaître</AppText>

@@ -9,14 +9,19 @@ import {
   useWindowClass,
 } from "@/components/ui";
 import { SourceViewer } from "@/components/source-viewer";
-import type { AiJob, VocabularyList, VocabularyWord } from "@/domain/model";
+import type {
+  AiJob,
+  CourseSource,
+  VocabularyList,
+  VocabularyWord,
+} from "@/domain/model";
 import { languageLabel, reviewVocabularyPhoto } from "@/domain/vocabulary";
-import { Field, Notice, localId } from "@/features/parent/shared";
-import { pickDocuments, documentExamples } from "@/services/pick-documents";
-import { apiFetch, uploadCourseSource, waitForJob } from "@/services/api";
+import { Field, Notice } from "@/features/parent/shared";
+import { documentExamples } from "@/services/pick-documents";
+import { apiFetch, waitForJob } from "@/services/api";
 import { useLearning } from "@/state/learning-store";
 import { radius, spacing, useTheme } from "@/theme";
-import { pickVocabularyPhoto } from "./photo-source";
+import { LanguageSourceImport } from "@/features/parent/import-sources";
 import { useVocabularyStyles } from "./shared";
 
 interface ImportProps {
@@ -37,7 +42,7 @@ function PhotoReview({
       id: `photo-${job.id}-${index}`,
     })),
   );
-  const [showPhoto, setShowPhoto] = useState(false);
+  const [viewing, setViewing] = useState<CourseSource | null>(null);
   const sources = job.input?.sourceIds;
   const photoId =
     Array.isArray(sources) && typeof sources[0] === "string"
@@ -55,6 +60,7 @@ function PhotoReview({
           mimeType: "image/png",
         }
       : null);
+  const documents = job.result?.sources ?? (source ? [source] : []);
   const compact = useWindowClass() === "compact";
   const fieldStyle = {
     flex: compact ? undefined : 1,
@@ -91,18 +97,19 @@ function PhotoReview({
   }
   return (
     <>
-      {source && (
+      {documents.map((doc) => (
         <Button
+          key={doc.id}
           icon="search"
           variant="ghost"
           style={{ alignSelf: "flex-start" }}
-          onPress={() => setShowPhoto(true)}
+          onPress={() => setViewing(doc)}
         >
-          Voir le document
+          {documents.length === 1 ? "Voir le document" : "Voir " + doc.name}
         </Button>
-      )}
-      {showPhoto && source && (
-        <SourceViewer source={source} onClose={() => setShowPhoto(false)} />
+      ))}
+      {viewing && (
+        <SourceViewer source={viewing} onClose={() => setViewing(null)} />
       )}
       {!compact && rows.length > 0 && (
         <View style={vocabularyStyles.row}>
@@ -198,7 +205,7 @@ export function VocabularyPhotoImport({
 }: ImportProps & { jobId?: string }) {
   const { colors } = useTheme();
   const vocabularyStyles = useVocabularyStyles();
-  const { activeProfileId, isDemo, serverAvailable } = useLearning();
+  const { activeProfileId, isDemo } = useLearning();
   const navigation = useNavigation<{
     setParams(params: { photoJob?: string }): void;
   }>();
@@ -259,46 +266,19 @@ export function VocabularyPhotoImport({
     return () => controller.abort();
   }, [jobId, activeProfileId, id, language, isDemo]);
 
-  async function choose(mode: "camera" | "photos" | "files") {
+  async function analyze(sources: CourseSource[]) {
     setError("");
-    setChoosing(true);
-    try {
-      let source;
-      if (mode === "files") {
-        const [file] = await pickDocuments(false, () =>
-          localId("vocabulary-source"),
-        );
-        if (!file) return;
-        try {
-          source = await uploadCourseSource(file, activeProfileId);
-        } finally {
-          if (file.uri?.startsWith("blob:")) URL.revokeObjectURL(file.uri);
-        }
-      } else
-        source = await pickVocabularyPhoto(mode === "camera", activeProfileId);
-      if (!source || !mounted.current) return;
-      const { job: queued } = await apiFetch<{ job: AiJob }>("/ai/vocabulary", {
-        method: "POST",
-        body: JSON.stringify({
-          profileId: activeProfileId,
-          listId: id,
-          subjectId: language,
-          title: list.title.trim() || undefined,
-          sourceIds: [source.id],
-        }),
-      });
-      // A reload of the editor can resume this specific reading without submitting the photo again.
-      if (mounted.current) navigation.setParams({ photoJob: queued.id });
-    } catch (cause) {
-      if (mounted.current)
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Le document n’a pas pu être importé.",
-        );
-    } finally {
-      if (mounted.current) setChoosing(false);
-    }
+    const { job: queued } = await apiFetch<{ job: AiJob }>("/ai/vocabulary", {
+      method: "POST",
+      body: JSON.stringify({
+        profileId: activeProfileId,
+        listId: id,
+        subjectId: language,
+        title: list.title.trim() || undefined,
+        sourceIds: sources.map((source) => source.id),
+      }),
+    });
+    if (mounted.current) navigation.setParams({ photoJob: queued.id });
   }
   function close() {
     setOpen(false);
@@ -313,7 +293,7 @@ export function VocabularyPhotoImport({
         style={{ alignSelf: "flex-start" }}
         onPress={() => setOpen(true)}
       >
-        Importer un document
+        Importer des documents
       </Button>
     );
   return (
@@ -327,54 +307,28 @@ export function VocabularyPhotoImport({
     >
       <View style={[vocabularyStyles.row, { justifyContent: "space-between" }]}>
         <AppText variant="heading">
-          {job ? "Relire les mots du document" : "Importer un document"}
+          {job ? "Relire les mots proposés" : "Importer des documents"}
         </AppText>
         {!choosing && (
           <IconButton icon="close" label="Fermer l’import" onPress={close} />
         )}
       </View>
       {error && <Notice error>{error}</Notice>}
-      {isDemo ? (
-        <Notice>
-          Connectez-vous à votre espace familial pour faire lire un document par
-          l’IA.
-        </Notice>
-      ) : job ? (
+      {job ? (
         <PhotoReview job={job} list={list} onAdd={onAdd} onClose={close} />
-      ) : choosing || progress ? (
-        <Notice>
-          {choosing ? "Sélection et envoi du document…" : progress}
-        </Notice>
-      ) : serverAvailable ? (
+      ) : progress && !isDemo ? (
+        <Notice>{progress}</Notice>
+      ) : (
         <>
           <AppText>
-            Choisissez un fichier : {documentExamples}. Vous pourrez corriger
-            les mots avant de les ajouter.
+            {documentExamples}. Vous pourrez corriger les mots avant de les
+            ajouter.
           </AppText>
-          <View style={vocabularyStyles.row}>
-            <Button icon="camera" onPress={() => void choose("camera")}>
-              Prendre une photo
-            </Button>
-            <Button
-              icon="upload"
-              variant="secondary"
-              onPress={() => void choose("photos")}
-            >
-              Choisir une photo
-            </Button>
-            <Button
-              icon="file"
-              variant="secondary"
-              onPress={() => void choose("files")}
-            >
-              Choisir un fichier
-            </Button>
-          </View>
+          <LanguageSourceImport
+            onAnalyze={analyze}
+            onBusyChange={setChoosing}
+          />
         </>
-      ) : (
-        <Notice>
-          Reconnectez-vous au serveur familial pour importer un document.
-        </Notice>
       )}
     </View>
   );

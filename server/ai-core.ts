@@ -139,10 +139,6 @@ export async function readVocabularyDocument(
       };
     })
     .filter((word) => word.term || word.translation);
-  if (!words.length)
-    throw new Error(
-      "Aucun mot lisible pour cette langue. Vérifiez la langue et la lisibilité du document.",
-    );
   // Keep the transcription intact. A text-only pass fills absent sides, never illegible ones.
   const gaps = words.flatMap((word, index) => {
     if (word.reading === "uncertain" || (word.term && word.translation))

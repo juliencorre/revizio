@@ -718,10 +718,10 @@ export async function configureServerRoutes(
         if (body.title)
           payload.title = requiredString(body.title, "Le titre", 160);
         const sourceIds = validSourceIds(user, profile.id, body.sourceIds);
-        if (sourceIds.length !== 1)
+        if (!sourceIds.length)
           throw new HttpError(
             400,
-            "Choisissez un seul document de vocabulaire.",
+            "Ajoutez au moins une image ou un fichier de vocabulaire.",
           );
         payload.sourceIds = sourceIds;
       }

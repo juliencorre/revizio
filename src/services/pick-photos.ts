@@ -1,14 +1,18 @@
 import { Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { uploadCourseSource } from "@/services/api";
-import { localId } from "@/features/parent/shared";
+import type { CourseSource } from "@/domain/model";
 
 // Safari can return the original HEIC or a full-resolution photo from the library.
-async function webPhotoUri(asset: ImagePicker.ImagePickerAsset) {
+async function webPhotoUri(
+  asset: ImagePicker.ImagePickerAsset,
+  maxEdge: number,
+) {
   if (
     ["image/jpeg", "image/png"].includes(asset.mimeType ?? "") &&
     asset.width > 0 &&
-    Math.max(asset.width, asset.height) <= 1600
+    asset.height > 0 &&
+    Math.max(asset.width, asset.height) <= maxEdge &&
+    (asset.fileSize ?? 0) <= 25 * 1024 * 1024
   )
     return asset.uri;
   const image = new window.Image();
@@ -20,7 +24,7 @@ async function webPhotoUri(asset: ImagePicker.ImagePickerAsset) {
   });
   const scale = Math.min(
     1,
-    1600 / Math.max(image.naturalWidth, image.naturalHeight),
+    maxEdge / Math.max(image.naturalWidth, image.naturalHeight),
   );
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -40,7 +44,12 @@ async function webPhotoUri(asset: ImagePicker.ImagePickerAsset) {
   return URL.createObjectURL(jpeg);
 }
 
-export async function pickVocabularyPhoto(camera: boolean, profileId: string) {
+export async function pickPhotos(
+  camera: boolean,
+  limit: number,
+  makeId: () => string,
+  maxEdge: number,
+): Promise<CourseSource[]> {
   if (
     camera &&
     Platform.OS !== "web" &&
@@ -61,7 +70,11 @@ export async function pickVocabularyPhoto(camera: boolean, profileId: string) {
           ...options,
           cameraType: ImagePicker.CameraType.back,
         })
-      : ImagePicker.launchImageLibraryAsync(options)
+      : ImagePicker.launchImageLibraryAsync({
+          ...options,
+          allowsMultipleSelection: true,
+          selectionLimit: limit,
+        })
   ).catch(() => {
     throw new Error(
       camera
@@ -69,27 +82,34 @@ export async function pickVocabularyPhoto(camera: boolean, profileId: string) {
         : "Cette photo ne peut pas être ouverte. Choisissez une image JPEG ou PNG.",
     );
   });
-  if (result.canceled) return null;
-  const asset = result.assets[0];
-  let uri = asset.uri;
+  if (result.canceled) return [];
+  const photos: CourseSource[] = [];
   try {
-    if (Platform.OS === "web") uri = await webPhotoUri(asset);
-    const converted = uri !== asset.uri;
-    return await uploadCourseSource(
-      {
-        id: localId("vocabulary-photo"),
+    if (result.assets.length > limit)
+      throw new Error(`Choisissez au maximum ${limit} images supplémentaires.`);
+    for (const asset of result.assets) {
+      const uri =
+        Platform.OS === "web" ? await webPhotoUri(asset, maxEdge) : asset.uri;
+      const converted = uri !== asset.uri;
+      const id = makeId();
+      const name = asset.fileName || id + ".jpg";
+      photos.push({
+        id,
         uri,
-        name: converted
-          ? "Liste de vocabulaire.jpg"
-          : (asset.fileName ?? "Vocabulaire.jpg"),
+        name: converted ? name.replace(/(\.[^.]+)?$/, ".jpg") : name,
         mimeType: converted ? "image/jpeg" : (asset.mimeType ?? "image/jpeg"),
-      },
-      profileId,
-    );
-  } finally {
-    if (Platform.OS === "web") {
-      for (const url of new Set([asset.uri, uri]))
-        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+        rotation: 0,
+      });
     }
+    return photos;
+  } catch (error) {
+    for (const photo of photos)
+      if (photo.uri?.startsWith("blob:")) URL.revokeObjectURL(photo.uri);
+    throw error;
+  } finally {
+    const kept = new Set(photos.map((source) => source.uri));
+    for (const asset of result.assets)
+      if (asset.uri.startsWith("blob:") && !kept.has(asset.uri))
+        URL.revokeObjectURL(asset.uri);
   }
 }

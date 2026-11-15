@@ -7,6 +7,7 @@ import type {
   CourseSource,
   EnglishSettings,
   QuestionType,
+  VocabularyPhotoWord,
 } from "../src/domain/model";
 import type { FamilyDatabase } from "./database";
 import { isVocabularyLanguage } from "../src/domain/vocabulary";
@@ -203,31 +204,54 @@ export class JobQueue {
       );
     };
     if (job.kind === "vocabulary") {
-      if (ids.length !== 1 || !isVocabularyLanguage(payload.subjectId))
-        throw new Error("Choisissez un document et la langue de la liste.");
-      const upload = this.sourceFor(job, ids[0]);
-      this.database.updateJob(job.id, {
-        stage: "vocabulaire",
-        message: "Lecture des mots et de leurs traductions dans le document.",
-      });
-      const input =
-        upload.mimeType === "image/png"
-          ? await this.database.files.read(upload.path)
-          : (await extract(upload)).map((page) => page.text).join("\n\n");
-      if (typeof input === "string" && input.length > 150000)
+      if (!ids.length || !isVocabularyLanguage(payload.subjectId))
+        throw new Error("Choisissez les documents et la langue de la liste.");
+      const vocabulary: VocabularyPhotoWord[] = [];
+      const sources: CourseSource[] = [];
+      for (const [index, id] of ids.entries()) {
+        signal.throwIfAborted();
+        const upload = this.sourceFor(job, id);
+        this.database.updateJob(job.id, {
+          stage: "vocabulaire",
+          message: `Lecture de ${upload.name} (${index + 1}/${ids.length}).`,
+        });
+        try {
+          const input =
+            upload.mimeType === "image/png"
+              ? await this.database.files.read(upload.path)
+              : (await extract(upload)).map((page) => page.text).join("\n\n");
+          if (typeof input === "string" && input.length > 150000)
+            throw new Error(
+              "Ce document est trop long. Importez une liste plus courte.",
+            );
+          vocabulary.push(
+            ...(await readVocabularyDocument(
+              this.client,
+              settings,
+              payload.subjectId,
+              input,
+              signal,
+            )),
+          );
+        } catch (cause) {
+          if (signal.aborted) throw cause;
+          throw new Error(
+            upload.name +
+              " : " +
+              (cause instanceof Error ? cause.message : "La lecture a échoué."),
+          );
+        }
+        if (vocabulary.length > 200)
+          throw new Error(
+            "Plus de 200 propositions à relire. Répartissez ces documents entre plusieurs listes de vocabulaire.",
+          );
+        sources.push(sourceFor(upload));
+      }
+      if (!vocabulary.length)
         throw new Error(
-          "Ce document est trop long. Importez une liste plus courte.",
+          "Aucun mot lisible pour cette langue. Vérifiez les documents sélectionnés.",
         );
-      return {
-        source: sourceFor(upload),
-        vocabulary: await readVocabularyDocument(
-          this.client,
-          settings,
-          payload.subjectId,
-          input,
-          signal,
-        ),
-      };
+      return { source: sources[0], sources, vocabulary };
     }
     const data = this.database.data(job.profileId).data;
     const old =

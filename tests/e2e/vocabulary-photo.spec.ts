@@ -23,7 +23,7 @@ async function openList(page: Page) {
   await page.getByTestId("vocabulary-title").fill("Mon cahier");
   return (await setup.json()).profiles[0].id as string;
 }
-async function importPhoto(page: Page, monolingual = false, camera = false) {
+async function selectPhoto(page: Page, monolingual = false, camera = false) {
   // Only image pixels reach the model. When present, French is in the left column.
   const french = monolingual
     ? ""
@@ -36,12 +36,12 @@ async function importPhoto(page: Page, monolingual = false, camera = false) {
     .jpeg()
     .toBuffer();
   await page
-    .getByRole("button", { name: "Importer un document", exact: true })
+    .getByRole("button", { name: "Importer des documents", exact: true })
     .click();
   const picker = page.waitForEvent("filechooser");
   await page
     .getByRole("button", {
-      name: camera ? "Prendre une photo" : "Choisir une photo",
+      name: camera ? "Prendre une photo" : "Choisir des images",
     })
     .click();
   const chooser = await picker;
@@ -98,7 +98,8 @@ test("relit la photo et ajoute seulement les nouvelles paires acceptées au brou
   await page.route("**/api/jobs/photo-test", (route) =>
     route.fulfill({ json: { job } }),
   );
-  await importPhoto(page);
+  await selectPhoto(page);
+  await page.getByRole("button", { name: "Analyser les documents" }).click();
   await expect(page.getByText("Mot en double · ignoré")).toBeVisible();
   await page.reload();
   await expect(
@@ -138,7 +139,7 @@ test("relit la photo et ajoute seulement les nouvelles paires acceptées au brou
   await page.reload();
   await expect(page.getByTestId("vocabulary-term-1")).toHaveValue("la ventana");
   await expect(
-    page.getByRole("button", { name: "Importer un document", exact: true }),
+    page.getByRole("button", { name: "Importer des documents", exact: true }),
   ).toBeVisible();
   expect(await words()).toHaveLength(1);
   await page.getByTestId("publish-vocabulary-list").click();
@@ -157,7 +158,8 @@ for (const monolingual of [false, true]) {
     );
     test.setTimeout(600000);
     await openList(page);
-    await importPhoto(page, monolingual, monolingual);
+    await selectPhoto(page, monolingual, monolingual);
+    await page.getByRole("button", { name: "Analyser les documents" }).click();
     await expect(page).toHaveURL(/photoJob=/, { timeout: 15000 });
     await expect(
       page.getByRole("textbox", { name: "Mot proposé 1", exact: true }),
@@ -195,8 +197,8 @@ for (const format of ["DOCX", "PDF"]) {
     );
     test.setTimeout(240000);
     await openList(page);
-    await page.getByRole("button", { name: "Importer un document" }).click();
-    const button = page.getByRole("button", { name: "Choisir un fichier" });
+    await page.getByRole("button", { name: "Importer des documents" }).click();
+    const button = page.getByRole("button", { name: "Choisir des fichiers" });
     const bounds = await button.boundingBox();
     expect(Math.min(bounds!.width, bounds!.height)).toBeGreaterThanOrEqual(44);
     const pending = page.waitForEvent("filechooser");
@@ -213,6 +215,7 @@ for (const format of ["DOCX", "PDF"]) {
           "Vocabulaire : espagnol - francais. la casa = la maison",
         ]),
       });
+    await page.getByRole("button", { name: "Analyser les documents" }).click();
     const expected = format === "DOCX" ? "la ventana" : "la casa";
     await expect(
       page.getByRole("button", { name: "Ajouter 2 mots au brouillon" }),
@@ -239,3 +242,54 @@ for (const format of ["DOCX", "PDF"]) {
       .toContain(expected);
   });
 }
+
+test("Ollama réunit les mots d’une image et d’un DOCX dans la même relecture", async ({
+  page,
+}) => {
+  test.skip(process.env.REVIZIO_LIVE_AI !== "1", "Nécessite le modèle local.");
+  test.setTimeout(300000);
+  await openList(page);
+  await selectPhoto(page);
+  await expect(
+    page.getByRole("button", { name: "Retirer cahier.jpg" }),
+  ).toBeVisible();
+  const picked = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choisir des fichiers" }).click();
+  await (await picked).setFiles("tests/fixtures/vocabulaire.docx");
+  const queued = page.waitForResponse(
+    (r) => new URL(r.url()).pathname === "/api/ai/vocabulary",
+  );
+  await page.getByRole("button", { name: "Analyser les documents" }).click();
+  const started = (await (await queued).json()).job as AiJob;
+  expect(started.input?.sourceIds).toHaveLength(2);
+  await expect(
+    page.getByRole("button", { name: "Voir cahier.jpg" }),
+  ).toBeVisible({ timeout: 240000 });
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Voir cahier.jpg" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Voir vocabulaire.docx" }).click();
+  await expect(page.getByText(/la ventana.*la fenêtre/s)).toBeVisible();
+  await page.getByRole("button", { name: "Fermer le document" }).click();
+  // The parent selects one term from the image and one from the Word document.
+  const rows = page.getByRole("textbox", { name: /^Mot proposé \d+$/ });
+  const selected = new Set<string>();
+  for (let i = await rows.count(); i >= 1; i--) {
+    const term = await rows.nth(i - 1).inputValue();
+    if (!["la casa", "el jardín"].includes(term) || selected.has(term))
+      await page
+        .getByRole("button", {
+          name: "Écarter la proposition " + i,
+          exact: true,
+        })
+        .click();
+    else selected.add(term);
+  }
+  expect([...selected].sort()).toEqual(["el jardín", "la casa"]);
+  await page
+    .getByRole("button", { name: "Ajouter 2 mots au brouillon" })
+    .click();
+  await expect(page.getByTestId("vocabulary-term-0")).toHaveValue("la casa");
+  await expect(page.getByTestId("vocabulary-term-1")).toHaveValue("el jardín");
+});

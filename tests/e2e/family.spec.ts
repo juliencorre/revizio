@@ -621,3 +621,71 @@ test("reprendre un import mixte de documents après le refus d’un fichier", as
     .toEqual(["text/plain", "application/pdf"]);
   expect(uploads).toBe(3);
 });
+
+test.describe("Import en conjugaison", () => {
+  test.use({ serviceWorkers: "block" });
+  test("réunir une image et un fichier dans le brouillon de conjugaison", async ({
+    page,
+  }) => {
+    const profileId = await setup(page);
+    await page.goto("/parent/english?section=conjugaison");
+    const photo = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Choisir des images" }).click();
+    await (await photo).setFiles(imagePath);
+    await expect(
+      page.getByRole("button", { name: "Retirer cours-image.png" }),
+    ).toBeVisible();
+    const file = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Choisir des fichiers" }).click();
+    await (await file).setFiles("tests/fixtures/vocabulaire.docx");
+    const job = {
+      id: "conjugaison-test",
+      kind: "english",
+      status: "succeeded",
+      profileId,
+      result: {
+        verbs: [
+          {
+            id: "run",
+            base: "run",
+            past: "ran",
+            participle: "run",
+            meaning: "courir",
+          },
+        ],
+        words: [{ id: "private-word", en: "window", fr: "fenêtre" }],
+        tenses: [],
+        toolWords: [],
+      },
+    };
+    await page.route("**/api/ai/english", async (route) => {
+      const { sourceIds } = route.request().postDataJSON();
+      expect(sourceIds).toHaveLength(2);
+      const files = await Promise.all(
+        sourceIds.map((id: string) => page.request.get("/api/uploads/" + id)),
+      );
+      expect(
+        files.map((r) => r.headers()["content-type"].split(";")[0]),
+      ).toEqual(["image/png", "text/plain"]);
+      await route.fulfill({ json: { job } });
+    });
+    await page.route("**/api/jobs/conjugaison-test", (route) =>
+      route.fulfill({ json: { job } }),
+    );
+    await page.getByRole("button", { name: "Analyser les documents" }).click();
+    await expect(
+      page.getByRole("textbox", { name: "Base verbale du verbe 1" }),
+    ).toHaveValue("run");
+    await page.reload();
+    await expect(
+      page.getByRole("textbox", { name: "Prétérit du verbe 1" }),
+    ).toHaveValue("ran");
+    expect((await envelope(page, profileId)).data.english?.verbs).toHaveLength(
+      0,
+    );
+    await page.goto("/parent/english");
+    await expect(
+      page.getByText("0 mots", { exact: true }).first(),
+    ).toBeVisible();
+  });
+});

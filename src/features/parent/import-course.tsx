@@ -1,13 +1,10 @@
 import { documentKind } from "@/domain/document-kind";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRef, useState } from "react";
-import { Platform, Pressable, View, useWindowDimensions } from "react-native";
+import { Pressable, View, useWindowDimensions } from "react-native";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
-import {
-  pickDocuments as selectDocuments,
-  documentExamples,
-} from "@/services/pick-documents";
+import { selectSources, SourceButtons } from "./import-sources";
+import { documentExamples } from "@/services/pick-documents";
 import {
   AppIcon,
   AppText,
@@ -19,7 +16,6 @@ import {
 import { useTheme } from "@/theme";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
-import { cacheSource } from "@/services/source-cache";
 import { useLocalDraft } from "@/features/planning/use-local-draft";
 import {
   Field,
@@ -27,7 +23,6 @@ import {
   Notice,
   ParentLayout,
   SourcePreview,
-  localId,
   useParentStyles,
 } from "./shared";
 
@@ -157,60 +152,6 @@ function ImportEditor({
       busyRef.current = false;
       setBusy(null);
     }
-  }
-  async function appendSources(incoming: CourseSource[]) {
-    const room = Math.max(0, 30 - draft.sources.length);
-    for (const source of incoming.slice(0, room)) {
-      const cached = await cacheSource(source);
-      // Keep each successful page if a later page fails to be read.
-      setDraft((current) => ({
-        ...current,
-        sources: [...current.sources, cached].slice(0, 30),
-      }));
-    }
-    if (incoming.length > room)
-      setError(
-        "Vous pouvez joindre 30 documents à un cours. Les documents supplémentaires n’ont pas été ajoutés.",
-      );
-  }
-  async function pickImages(camera: boolean) {
-    await run("Ouverture des photos…", async () => {
-      if (camera && Platform.OS !== "web") {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted)
-          throw new Error(
-            "L’accès à l’appareil photo est refusé. Autorisez-le dans les réglages ou importez une photo existante.",
-          );
-      }
-      const result = camera
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ["images"],
-            quality: 0.9,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            allowsMultipleSelection: true,
-            selectionLimit: Math.max(1, 30 - draft.sources.length),
-            quality: 0.9,
-          });
-      if (!result.canceled)
-        await appendSources(
-          result.assets.map((asset, index) => ({
-            id: localId("source"),
-            name:
-              asset.fileName ??
-              "Photo " + (draft.sources.length + index + 1) + ".jpg",
-            uri: asset.uri,
-            mimeType: asset.mimeType ?? "image/jpeg",
-            rotation: 0,
-          })),
-        );
-    });
-  }
-  async function pickDocuments() {
-    await run("Lecture des documents…", async () => {
-      await appendSources(await selectDocuments(true, () => localId("source")));
-    });
   }
   function move(index: number, direction: -1 | 1) {
     setDraft((current) => {
@@ -457,34 +398,20 @@ function ImportEditor({
               Choisissez vos fichiers : {documentExamples}. Vérifiez ensuite
               leur ordre.
             </AppText>
-            <View style={s.row}>
-              <Button
-                icon="camera"
-                onPress={() => void pickImages(true)}
-                disabled={!!busy || draft.sources.length >= 30}
-                testID="ai-import-camera"
-              >
-                Prendre une photo
-              </Button>
-              <Button
-                variant="secondary"
-                icon="upload"
-                onPress={() => void pickImages(false)}
-                disabled={!!busy || draft.sources.length >= 30}
-                testID="ai-import-photos"
-              >
-                Photos
-              </Button>
-              <Button
-                variant="ghost"
-                icon="file"
-                onPress={() => void pickDocuments()}
-                disabled={!!busy || draft.sources.length >= 30}
-                testID="ai-import-files"
-              >
-                Choisir des fichiers
-              </Button>
-            </View>
+            <SourceButtons
+              count={draft.sources.length}
+              disabled={!!busy}
+              onPick={(mode) =>
+                void run("Ajout des documents…", () =>
+                  selectSources(mode, draft.sources.length, (source) =>
+                    setDraft((current) => ({
+                      ...current,
+                      sources: [...current.sources, source],
+                    })),
+                  ),
+                )
+              }
+            />
             {busy && <AppText color={colors.muted}>{busy}</AppText>}
             {draft.sources.length ? (
               <View style={s.grid}>

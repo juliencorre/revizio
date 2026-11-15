@@ -1,3 +1,4 @@
+import { subjects } from "../../src/domain/fixtures";
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
@@ -186,4 +187,29 @@ test("reprendre un ancien import uniquement dans sa matière et garder le contex
   await expect(
     page.getByTestId("ai-exercise-course-maths-relative-numbers"),
   ).toHaveCount(0);
+});
+
+test("ouvrir les sélecteurs de photos et de fichiers pour chaque matière", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  for (const subject of subjects) {
+    await page.goto("/parent/subject/" + subject.id);
+    await page
+      .getByRole("button", { name: "Ajouter un cours", exact: true })
+      .click();
+    await expect(page).toHaveURL(new RegExp("subjectId=" + subject.id));
+    for (const label of [
+      "Prendre une photo",
+      "Choisir des images",
+      "Choisir des fichiers",
+    ]) {
+      const button = page.getByRole("button", { name: label, exact: true });
+      await expect(button).toBeEnabled();
+      const bounds = await button.boundingBox();
+      expect(Math.min(bounds!.width, bounds!.height)).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+  }
 });

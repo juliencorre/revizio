@@ -676,6 +676,86 @@ describe("fichiers privés et sauvegarde", () => {
     expect(json.mock.calls[0][1].at(-1)?.content).toContain(text);
     expect(json.mock.calls[0][1].at(-1)?.images).toBeUndefined();
   });
+  it("relit une image et plusieurs fichiers ensemble en gardant chaque original accessible au parent", async () => {
+    const { token, profiles } = await setup();
+    const headers = bearer(token),
+      profileId = profiles[0].id;
+    const image = (await upload(token, profileId)).json();
+    const notes = (
+      await upload(
+        token,
+        profileId,
+        "titre.txt",
+        Buffer.from("Chapitre huit"),
+        "text/plain",
+      )
+    ).json();
+    const doc = (
+      await upload(
+        token,
+        profileId,
+        "liste.docx",
+        await readFile("tests/fixtures/vocabulaire.docx"),
+        "application/octet-stream",
+      )
+    ).json();
+    const read = vi
+      .spyOn(ai, "json")
+      .mockResolvedValueOnce({
+        words: [
+          {
+            foreignOnPage: "la casa",
+            frenchOnPage: "la maison",
+            uncertain: false,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ words: [] })
+      .mockResolvedValueOnce({
+        words: [
+          {
+            foreignOnPage: "la ventana",
+            frenchOnPage: "la fenêtre",
+            uncertain: false,
+          },
+        ],
+      });
+    const input = {
+      profileId,
+      listId: "maison",
+      subjectId: "spanish",
+      sourceIds: [image.id, notes.id, doc.id],
+    };
+    const start = (sourceIds: string[]) =>
+      app.inject({
+        method: "POST",
+        url: "/api/ai/vocabulary",
+        headers,
+        payload: { ...input, sourceIds },
+      });
+    expect((await start([])).statusCode).toBe(400);
+    expect((await start([image.id, "missing"])).statusCode).toBe(404);
+    const queued = await start(input.sourceIds);
+    expect(queued.statusCode, queued.body).toBe(200);
+    expect(await job(token, queued.json().job.id)).toMatchObject({
+      status: "succeeded",
+      input: {
+        sourceIds: input.sourceIds,
+        listId: input.listId,
+        subjectId: input.subjectId,
+      },
+      profileId,
+      result: {
+        sources: [{ id: image.id }, { id: notes.id }, { id: doc.id }],
+        vocabulary: [
+          { term: "la casa", translation: "la maison" },
+          { term: "la ventana", translation: "la fenêtre" },
+        ],
+      },
+    });
+    expect(read.mock.calls[0][1].at(-1)?.images).toHaveLength(1);
+    expect(read.mock.calls[2][1].at(-1)?.content).toContain("la ventana");
+  });
   it("lit une photo dans la langue de la liste et réserve ses propositions au parent du bon profil", async () => {
     const { token, profiles } = await setup();
     const profileId = profiles[0].id;

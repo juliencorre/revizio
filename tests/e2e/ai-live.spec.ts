@@ -532,6 +532,9 @@ test("Ollama réel : photo de vocabulaire anglais, relecture, cartes et quiz enf
         mimeType: "image/png",
         buffer: await printedEnglishVocabulary(),
       });
+      await page
+        .getByRole("button", { name: "Analyser les documents" })
+        .click();
     });
     const done = await finishedJob(page, info, created, aiDeadline);
     expect(done.result?.words).toHaveLength(2);
