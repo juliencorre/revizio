@@ -511,4 +511,40 @@ export const initialData: LearningData = {
   ],
   attempts: [],
   reviewedCourseIds: [],
+  vocabularyLists: [
+    {
+      id: "vocabulary-demo-english",
+      language: "english",
+      title: "Mes premiers mots",
+      status: "published",
+      words: [
+        { id: "en-house", term: "house", translation: "maison" },
+        { id: "en-book", term: "book", translation: "livre" },
+        { id: "en-friend", term: "friend", translation: "ami ; amie" },
+      ],
+    },
+    {
+      id: "vocabulary-demo-spanish",
+      language: "spanish",
+      title: "Autour de moi",
+      status: "published",
+      words: [
+        { id: "es-casa", term: "casa", translation: "maison" },
+        { id: "es-libro", term: "libro", translation: "livre" },
+        { id: "es-perro", term: "perro", translation: "chien" },
+      ],
+    },
+    {
+      id: "vocabulary-demo-latin",
+      language: "latin",
+      title: "Mes premiers mots latins",
+      status: "published",
+      words: [
+        { id: "la-rosa", term: "rosa", translation: "rose" },
+        { id: "la-aqua", term: "aqua", translation: "eau" },
+        { id: "la-amicus", term: "amicus", translation: "ami" },
+      ],
+    },
+  ],
+  vocabularySessions: [],
 };

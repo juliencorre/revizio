@@ -3,6 +3,8 @@ import { parseLearningData } from "../src/domain/learning";
 import { evaluateAnswer } from "../src/domain/answers";
 import { clone } from "../src/domain/learning";
 import { HttpError } from "./types";
+import { vocabularyListsFor } from "../src/domain/vocabulary";
+import { mergeVocabularySessions } from "./vocabulary";
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
 export function childData(data: LearningData): LearningData {
@@ -19,6 +21,9 @@ export function childData(data: LearningData): LearningData {
         series.courseIds.every((id) => ids.has(id)),
     ),
     plans: (data.plans ?? []).filter((plan) => plan.status === "published"),
+    vocabularyLists: vocabularyListsFor(data).filter(
+      (list) => list.status === "published",
+    ),
   };
 }
 /** Child writes are checked against the server copy, not trusted client snapshots. */
@@ -28,6 +33,11 @@ export function mergeChildData(
   profileId?: string,
 ): LearningData {
   const view = childData(current);
+  if (!same(vocabularyListsFor(incoming), vocabularyListsFor(view)))
+    throw new HttpError(
+      403,
+      "Seul un parent peut modifier les listes de vocabulaire.",
+    );
   for (const key of ["courses", "series", "english"] as const)
     if (
       !same(
@@ -49,7 +59,8 @@ export function mergeChildData(
   for (const supplied of incoming.attempts) {
     const existing = current.attempts.find((a) => a.id === supplied.id);
     const context = supplied as Attempt & { planId?: string; stepId?: string };
-    const oldContext = existing as (Attempt & { planId?: string; stepId?: string }) | undefined;
+    const oldContext = existing as
+      (Attempt & { planId?: string; stepId?: string }) | undefined;
     if (profileId && supplied.profileId && supplied.profileId !== profileId)
       throw new HttpError(403, "Cette tentative n’appartient pas à ce profil.");
     const series = current.series.find(
@@ -62,7 +73,14 @@ export function mergeChildData(
       !same(supplied.questions, questions) ||
       supplied.subjectId !== (existing?.subjectId ?? series!.subjectId) ||
       supplied.seriesTitle !== (existing?.seriesTitle ?? series!.title) ||
-      (existing && (supplied.startedAt !== existing.startedAt || supplied.seriesId !== existing.seriesId || supplied.mode !== existing.mode || supplied.deadlineAt !== existing.deadlineAt || supplied.profileId !== existing.profileId || context.planId !== oldContext?.planId || context.stepId !== oldContext?.stepId))
+      (existing &&
+        (supplied.startedAt !== existing.startedAt ||
+          supplied.seriesId !== existing.seriesId ||
+          supplied.mode !== existing.mode ||
+          supplied.deadlineAt !== existing.deadlineAt ||
+          supplied.profileId !== existing.profileId ||
+          context.planId !== oldContext?.planId ||
+          context.stepId !== oldContext?.stepId))
     )
       throw new HttpError(
         403,
@@ -71,8 +89,18 @@ export function mergeChildData(
     if (!existing && (context.planId || context.stepId)) {
       const plan = view.plans?.find((plan) => plan.id === context.planId);
       const step = plan?.steps.find((step) => step.id === context.stepId);
-      if (!plan || !step || !["practice", "mistakes", "mock"].includes(step.kind) || (step.seriesId && step.seriesId !== supplied.seriesId) || !series!.courseIds.every((id) => step.courseIds.includes(id)) || (step.kind === "mock" && supplied.mode !== "exam"))
-        throw new HttpError(403, "Cette tentative ne correspond pas à une étape publiée du plan.");
+      if (
+        !plan ||
+        !step ||
+        !["practice", "mistakes", "mock"].includes(step.kind) ||
+        (step.seriesId && step.seriesId !== supplied.seriesId) ||
+        !series!.courseIds.every((id) => step.courseIds.includes(id)) ||
+        (step.kind === "mock" && supplied.mode !== "exam")
+      )
+        throw new HttpError(
+          403,
+          "Cette tentative ne correspond pas à une étape publiée du plan.",
+        );
     }
     if (existing?.completedAt) {
       if (!same(supplied, existing))
@@ -184,6 +212,7 @@ export function mergeChildData(
   return parseLearningData(
     JSON.stringify({
       ...current,
+      vocabularySessions: mergeVocabularySessions(current, incoming),
       attempts,
       reviewedCourseIds: [
         ...new Set([

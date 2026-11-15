@@ -170,6 +170,8 @@ export interface LearningData {
   english?: EnglishSettings;
   readingRecords?: ReadingRecord[];
   spacedReviews?: SpacedReview[];
+  vocabularyLists?: VocabularyList[];
+  vocabularySessions?: VocabularySession[];
 }
 export interface CourseDraftInput {
   subjectId: string;
@@ -223,6 +225,43 @@ export interface EnglishSettings {
   verbs: EnglishVerb[];
   tenses: string[];
   toolWords: string[];
+}
+export type VocabularyLanguage = "english" | "spanish" | "latin";
+export type VocabularyDirection = "to-french" | "from-french";
+export type VocabularyMode = VocabularyDirection | "both";
+export interface VocabularyWord {
+  id: string;
+  /** A semicolon separates explicitly accepted variants on either side. */
+  term: string;
+  translation: string;
+}
+export interface VocabularyList {
+  id: string;
+  language: VocabularyLanguage;
+  title: string;
+  status: PublicationStatus;
+  words: VocabularyWord[];
+}
+export interface VocabularyQuestion {
+  id: string;
+  wordId: string;
+  term: string;
+  translation: string;
+  direction: VocabularyDirection;
+  prompt: string;
+  expectedAnswers: string[];
+}
+export interface VocabularySession {
+  id: string;
+  listId: string;
+  language: VocabularyLanguage;
+  listTitle: string;
+  mode: VocabularyMode;
+  scope: "all" | "review";
+  startedAt: string;
+  completedAt?: string;
+  questions: VocabularyQuestion[];
+  answers: Answer[];
 }
 export interface ChildProfile {
   id: string;

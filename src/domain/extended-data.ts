@@ -1,4 +1,9 @@
 import type { Course, ExerciseSeries, LearningData } from "./model";
+import {
+  legacyEnglishVocabulary,
+  restoredVocabularySessions,
+  validateVocabularyData,
+} from "./vocabulary";
 
 const obj = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -20,6 +25,7 @@ export function validateExtendedData(
   courses: Course[],
   series: ExerciseSeries[],
 ): void {
+  validateVocabularyData(data);
   if (data.plans !== undefined) {
     if (
       !Array.isArray(data.plans) ||
@@ -133,5 +139,17 @@ export function extendedDataFields(data: LearningData): Partial<LearningData> {
     ...(data.english ? { english: data.english } : {}),
     ...(data.readingRecords ? { readingRecords: data.readingRecords } : {}),
     ...(data.spacedReviews ? { spacedReviews: data.spacedReviews } : {}),
+    ...(data.vocabularyLists !== undefined
+      ? { vocabularyLists: data.vocabularyLists }
+      : data.english?.words.length
+        ? { vocabularyLists: legacyEnglishVocabulary(data.english) }
+        : {}),
+    ...(data.vocabularySessions
+      ? {
+          vocabularySessions: restoredVocabularySessions(
+            data.vocabularySessions,
+          ),
+        }
+      : {}),
   };
 }
