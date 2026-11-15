@@ -64,3 +64,13 @@ Le serveur Node.js/Ollama conserve son parcours local. Les différences de capac
 - Après les derniers ajustements de mise en page, `npx playwright test tests/e2e/organization.spec.ts tests/e2e/navigation.spec.ts tests/e2e/design-review.spec.ts` : 56 contrôles réussis sur les quatre configurations. Ils incluent les cinq destinations stables, les filtres de bibliothèque, les brouillons conservés par cours, l’anglais accessible depuis sa matière, la reprise du même essai, les corrections visibles côté parent, les contenus privés et les zones tactiles d’au moins 44 px. Sur téléphone 390 × 844, le titre du premier cours est visible sans défiler et les filtres restent accessibles.
 
 Les captures ont été examinées pour l’accueil enfant, la bibliothèque, le tableau de bord et le suivi parent, ainsi que pour la bibliothèque sur téléphone. Les rapports locaux sont conservés dans `artifacts/organization/`. Les données des tests sont synthétiques. WebKit sur Linux ne remplace pas une vérification sur iPad physique.
+
+## Vocabulaire anglais, espagnol et latin — 15 novembre 2026
+
+- `npm run typecheck` et `npm run export:web` : réussis.
+- `npm test` : 156 tests réussis, un test IA réelle ignoré car opt-in. Les contrôles couvrent les traductions dans les deux sens, variantes, accents, progression par mot, seuil de deux réussites par sens, réinitialisation après erreur, snapshots, migration, données locales invalides, sauvegarde/restauration, autorisations et isolement des profils.
+- Campagne `vocabulary.spec.ts`, `planning-english.spec.ts` et `organization.spec.ts` : 52 tests navigateur réussis sur les quatre configurations Chromium/WebKit, paysage/portrait. Les listes sont créées, conservées en brouillon, publiées et utilisées depuis leurs matières ; une séance interrompue reprend après rechargement et le parent retrouve les résultats de l’enfant.
+- Après les corrections de navigation et de compatibilité anglaise : 16 contrôles ciblés réussis sur les quatre configurations. Ils vérifient la bibliothèque compacte, l’ancien brouillon anglais, les champs et corrections sur téléphone, ainsi que la modification/suppression d’un mot dans les deux parcours anglais sans perdre les verbes, temps ou mots outils.
+- La revue Impeccable a validé les deux corrections demandées : accès au vocabulaire visible à 390 px et cohérence du répertoire anglais historique. Les cibles tactiles contrôlées font au moins 44 px. Les captures sont celles de données et de comptes fictifs.
+
+Ces vérifications utilisent les navigateurs de test et les formats d’iPad simulés ; elles ne remplacent pas une recette sur iPad physique.
