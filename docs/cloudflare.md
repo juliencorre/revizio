@@ -1,6 +1,6 @@
 # Révizo hébergé sur Cloudflare
 
-L’application web complète utilise Workers pour l’interface et l’API, un Durable Object SQLite pour l’espace familial et ses documents privés, et Workers AI pour les préparations. L’ordinateur familial peut être éteint. Aucun serveur Node.js, Ollama, R2 ou domaine payant n’est nécessaire pour cette installation.
+L’application web complète utilise Workers pour l’interface et l’API, un Durable Object SQLite pour l’espace familial et ses documents privés, et l’API Anthropic pour les préparations. L’ordinateur familial peut être éteint. Aucun serveur Node.js, Ollama, R2 ou domaine payant n’est nécessaire pour cette installation. Les appels Anthropic sont facturés séparément de l’hébergement Workers Free.
 
 ## Adresse de l’application
 
@@ -19,6 +19,7 @@ npm ci
 npx wrangler login --device
 npm run typecheck
 npm test
+npx wrangler secret put ANTHROPIC_API_KEY
 npm run deploy:cloud
 ```
 
@@ -40,7 +41,7 @@ Les comptes, sessions, révisions, cours, tentatives et préparations utilisent 
 
 Les préparations sont conservées avant leur lancement et traitées par une alarme durable. Une interruption du serveur remet le travail en attente ; une erreur d’IA laisse un travail en échec qui peut être relancé. Fermer le navigateur n’arrête pas le traitement. Aucun résultat IA n’est publié automatiquement.
 
-L’IA hébergée utilise `@cf/google/gemma-4-26b-a4b-it` via une liaison serveur Cloudflare. Les textes et images utilisés pour la préparation sont donc traités chez Cloudflare. L’écran **Réglages** distingue cette installation de l’IA Ollama locale. Le modèle et son adresse sont fixes dans cette version pour conserver le service prévu sur l’offre gratuite.
+La configuration sélectionne l’API Anthropic et `claude-sonnet-5-5`. Les textes et images utilisés pour la préparation sont transmis à Anthropic depuis le Worker. La clé est enregistrée avec `wrangler secret put ANTHROPIC_API_KEY` ; le modèle est configurable dans `wrangler.jsonc`. L’écran **Famille** affiche ce fournisseur et son état, avec des réglages contrôlés par le serveur. Voir le [guide Anthropic](anthropic.md) pour la configuration et l’alternative Workers AI.
 
 Les PDF textuels sont lus page par page avec PDF.js via `unpdf`. Pour les scans, les images de chaque page sont envoyées au modèle de vision ; une page trop complexe est refusée avec une demande de photo séparée ou de texte saisi. Les lectures par vision sont signalées comme incertaines et restent à relire par le parent. Les références conservent le numéro réel de la page.
 
@@ -58,7 +59,7 @@ Pour une photo HEIC/WebP, exporter d’abord en JPEG/PNG. Une sauvegarde locale 
 
 Le nouvel espace cloud est vide. Pour récupérer les cours d’une installation locale, créer d’abord le compte cloud, puis utiliser **Réglages → Restaurer une sauvegarde**. Les mots de passe et codes enfant ne sont pas transférés. Le dépôt et le déploiement ne copient pas automatiquement le répertoire local `.revizio/`.
 
-## Rester sur l’offre gratuite
+## Hébergement gratuit et consommation IA
 
 Conserver le forfait **Workers Free** dans **Calcul → Offres Workers**. Le déploiement n’active aucun abonnement payant ni R2. Le rattachement de `cours.gofel.fr` utilise le domaine déjà détenu ; son renouvellement reste indépendant de l’hébergement Workers gratuit.
 
@@ -71,7 +72,7 @@ Au 15 novembre 2026, les principales enveloppes gratuites Cloudflare sont :
 | SQL Durable Objects       | 5 millions de lignes lues et 100 000 lignes écrites par jour ; 5 Go au total sur le compte |
 | Workers AI                | 10 000 neurones par jour, partagés entre les modèles et applications du compte             |
 
-Un dépassement sur l’offre gratuite bloque les opérations concernées ; il ne bascule pas automatiquement sur l’offre payante. La consommation IA dépend du nombre de pages, de questions et de relances : il n’existe pas de nombre fixe de générations gratuites. Les autres applications du compte partagent les quotas.
+Un dépassement sur l’offre gratuite Cloudflare bloque les opérations concernées ; il ne bascule pas automatiquement sur l’offre payante. Le quota Workers AI du tableau concerne uniquement le fournisseur alternatif `workers-ai`. Avec `AI_PROVIDER=anthropic`, la consommation dépend du nombre de pages, de questions et de relances et est facturée sur le compte API Anthropic. Les autres applications du compte Cloudflare partagent les quotas d’hébergement.
 
 Les limites et tarifs peuvent évoluer. Sources : [Workers](https://developers.cloudflare.com/workers/platform/pricing/), [fichiers statiques](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/), [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/), [Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/).
 
@@ -99,7 +100,7 @@ npm run export:web
 npm run dev:cloud
 ```
 
-Pour créer un espace de développement, ajouter `SETUP_TOKEN=un-code-local` dans `.dev.vars` (ignoré par Git). Le stockage local de Wrangler est distinct de la production. L’IA utilise réellement Cloudflare, même en développement ; les tests automatiques injectent explicitement un double IA dans une configuration séparée.
+Pour créer un espace de développement, ajouter `SETUP_TOKEN=un-code-local` et `ANTHROPIC_API_KEY=…` dans `.dev.vars` (ignoré par Git). Le stockage local de Wrangler est distinct de la production. L’IA utilise réellement Anthropic, même en développement ; les tests automatiques injectent explicitement un double IA dans une configuration séparée.
 
 ```sh
 npm run typecheck

@@ -28,7 +28,7 @@ Les réglages familiaux et **Mes préparations** prolongent les maquettes : prof
 ## Décisions en vigueur
 
 - **Déploiement familial** : une instance Node.js 24 / Fastify, SQLite et documents privés sur le serveur de la famille. PostgreSQL et un service public pour plusieurs familles sont différés.
-- **IA locale réelle** : Ollama ; PDF textuel via Poppler, OCR imprimé Tesseract français, vision de secours avec incertitude visible. Les jobs et leurs résultats sont persistants et ne publient jamais seuls.
+- **IA réelle** : API Anthropic côté serveur Node.js ou Cloudflare, avec clé privée et modèle configurable ; Ollama local et Workers AI restent disponibles. PDF textuel via Poppler ou PDF.js ; images lues par la vision du fournisseur, avec OCR Tesseract indépendant en mode Ollama. Les jobs et leurs résultats sont persistants et ne publient jamais seuls.
 - **Validation parentale** : sources, fiches et corrections restent à relire. L’anglais et le calendrier comportent aussi des constructions déterministes clairement identifiées.
 - **Historique stable** : les tentatives gardent les questions et corrections présentées ; les révisions de contenus ne réécrivent pas les résultats passés.
 - **Synchronisation et hors connexion** : copies locales par profil, révisions serveur, fusion des changements indépendants et choix explicite en cas de conflit. Cache documentaire web/natif séparé du service worker qui conserve uniquement l’interface statique exportée.
