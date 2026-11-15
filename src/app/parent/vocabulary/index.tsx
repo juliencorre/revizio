@@ -1,4 +1,10 @@
-import { VocabularyCollection } from "@/features/vocabulary/collection";
+import { Redirect, useLocalSearchParams } from "expo-router";
+import { vocabularyLanguage } from "@/domain/vocabulary";
+import { subjectHref } from "@/features/parent/subject-navigation";
+
 export default function ParentVocabulary() {
-  return <VocabularyCollection role="parent" />;
+  const { language } = useLocalSearchParams<{ language?: string }>();
+  return (
+    <Redirect href={subjectHref(vocabularyLanguage(language), "vocabulaire")} />
+  );
 }

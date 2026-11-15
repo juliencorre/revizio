@@ -33,6 +33,7 @@ import {
   ChartNoAxesCombined,
   Check,
   ChevronRight,
+  ChevronDown,
   Clock3,
   Cpu,
   FileText,
@@ -114,6 +115,7 @@ const icons: Record<string, typeof Sparkles> = {
   home: House,
   users: Users,
   "chevron-right": ChevronRight,
+  "chevron-down": ChevronDown,
   refresh: RefreshCw,
   menu: Menu,
   trash: Trash2,
@@ -596,15 +598,19 @@ function DrawerItem({
   item,
   onPress,
   dark = true,
+  parentRail = false,
 }: {
   item: Pick<NavigationItem, "label" | "icon" | "active">;
   onPress: () => void;
   dark?: boolean;
+  parentRail?: boolean;
 }) {
   const { focusVisible: focused, onFocus, onBlur } = useFocusVisible();
   const tint = dark
     ? item.active
-      ? colors.primaryDark
+      ? parentRail
+        ? colors.onPrimary
+        : colors.primaryDark
       : colors.navigationMuted
     : item.active
       ? colors.primaryDark
@@ -624,6 +630,9 @@ function DrawerItem({
           (dark ? styles.drawerItemHover : styles.raisedHover),
         (state.pressed || item.active) &&
           (dark ? styles.drawerItemActive : styles.indicatorActive),
+        parentRail && { borderRadius: 8 },
+        parentRail &&
+          item.active && { backgroundColor: colors.navigationHover },
         focused && (dark ? styles.focusRingDark : styles.focusRing),
       ]}
     >
@@ -856,7 +865,16 @@ function NavigationRail({
     <View
       role="navigation"
       aria-label="Navigation principale"
-      style={[styles.rail, { width: expanded ? layout.drawer : layout.rail }]}
+      style={[
+        styles.rail,
+        {
+          width: expanded
+            ? role === "parent"
+              ? layout.parentDrawer
+              : layout.drawer
+            : layout.rail,
+        },
+      ]}
     >
       <View style={[styles.railHeader, !expanded && { alignItems: "center" }]}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -906,6 +924,7 @@ function NavigationRail({
             expanded ? (
               <DrawerItem
                 key={item.label}
+                parentRail={role === "parent"}
                 item={item}
                 onPress={() => onNavigate(item)}
               />
@@ -1004,7 +1023,13 @@ export function AppShell({
   const [menuExpanded, setMenuExpanded] = useState<boolean | null>(null);
   const expanded = menuExpanded ?? windowClass === "expanded";
   const navigationWidth =
-    windowClass === "compact" ? 0 : expanded ? layout.drawer : layout.rail;
+    windowClass === "compact"
+      ? 0
+      : expanded
+        ? role === "parent"
+          ? layout.parentDrawer
+          : layout.drawer
+        : layout.rail;
   const layoutKey = `${width}:${navigationWidth}`;
   const [measured, setMeasured] = useState<{
     key: string;
@@ -1045,7 +1070,7 @@ export function AppShell({
           onToggle={() => setMenuExpanded(!expanded)}
           onNavigate={navigate}
           onSwitchProfile={switchProfile}
-          subject={subject}
+          subject={role === "child" ? subject : undefined}
           grade={session.childGrade}
         />
       )}
@@ -1072,7 +1097,12 @@ export function AppShell({
             testID="page-scroll"
             aria-hidden={contentLoading}
             pointerEvents={contentLoading ? "none" : "auto"}
-            style={{ flex: 1, opacity: contentLoading ? 0 : 1 }}
+            style={{
+              flex: 1,
+              opacity: contentLoading ? 0 : 1,
+              backgroundColor:
+                role === "parent" && subject ? colors.surface : undefined,
+            }}
             contentContainerStyle={[
               styles.page,
               {

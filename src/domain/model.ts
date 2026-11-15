@@ -30,6 +30,7 @@ export type IconName =
   | "clock"
   | "home"
   | "users"
+  | "chevron-down"
   | "chevron-right"
   | "refresh"
   | "menu"

@@ -678,7 +678,7 @@ function ExercisesEditor({
                 onPress={() =>
                   router.navigate({
                     pathname: "/parent/subject/[id]",
-                    params: { id: subjectId },
+                    params: { id: subjectId, tab: "exercices" },
                   })
                 }
               >

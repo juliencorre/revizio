@@ -51,6 +51,7 @@ export const layout = {
   sectionGap: { compact: 20, medium: 23, expanded: 25 },
   rail: 96,
   drawer: 280,
+  parentDrawer: 224,
   topBar: 64,
   navigationBar: 76,
   maxContent: 1320,

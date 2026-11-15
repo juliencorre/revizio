@@ -4,17 +4,14 @@ import {
   ActionCard,
   AppIcon,
   AppText,
-  Badge,
   Button,
-  Card,
   EmptyState,
   PageHeading,
   useContentWidth,
 } from "@/components/ui";
 import { plural } from "@/domain/format";
-import type { IconName, Subject } from "@/domain/model";
-import { preparationStatus } from "@/domain/study-overview";
-import { vocabularyLanguages } from "@/domain/vocabulary";
+import type { IconName } from "@/domain/model";
+import { SubjectLibrary } from "./subject-library";
 import { useLearning } from "@/state/learning-store";
 import { colors, radius, spacing } from "@/theme";
 import { preparationHref } from "./subject-navigation";
@@ -175,122 +172,6 @@ export function ParentSubjectsScreen() {
   );
 }
 
-function SubjectMenu({ subject }: { subject: Subject }) {
-  const data = useLearning();
-  const router = useRouter();
-  const width = useContentWidth();
-  const params = { subjectId: subject.id };
-  const entries: {
-    title: string;
-    detail: string;
-    icon: IconName;
-    href: Href;
-  }[] = [
-    {
-      title: "Cours",
-      detail: "Ajouter ou relire une fiche",
-      icon: "book",
-      href: { pathname: "/parent/import", params },
-    },
-    {
-      title: "Exercices",
-      detail: "Préparer une série de questions",
-      icon: "pencil",
-      href: { pathname: "/parent/exercises", params },
-    },
-  ];
-  if (vocabularyLanguages.some((language) => language.id === subject.id)) {
-    entries.push({
-      title: "Vocabulaire",
-      detail: "Créer une liste de mots",
-      icon: "languages",
-      href: {
-        pathname: "/parent/vocabulary",
-        params: { language: subject.id },
-      },
-    });
-  }
-  if (subject.id === "english")
-    entries.push({
-      title: "Conjugaison",
-      detail: "Choisir les verbes et les temps",
-      icon: "file",
-      href: { pathname: "/parent/english", params: { section: "conjugaison" } },
-    });
-  const courses = data.courses.filter((c) => c.subjectId === subject.id);
-  const series = data.series.filter((s) => s.subjectId === subject.id);
-  return (
-    <>
-      <View style={{ gap: spacing.md }}>
-        <AppText variant="heading">Que souhaitez-vous préparer ?</AppText>
-        <View style={grid}>
-          {entries.map((entry) => (
-            <MenuCard
-              key={entry.title}
-              {...entry}
-              color={subject.color}
-              width={
-                width >= 430 ? Math.floor((width - spacing.lg) / 2) : width
-              }
-            />
-          ))}
-        </View>
-      </View>
-      {[
-        { title: "Cours de la matière", items: courses, type: "course" },
-        { title: "Séries d’exercices", items: series, type: "series" },
-      ].map(
-        ({ title, items, type }) =>
-          (items.length > 0 || type === "course") && (
-            <Card key={type} style={{ gap: spacing.sm }}>
-              <AppText variant="heading">{title}</AppText>
-              {!items.length && (
-                <AppText color={colors.muted}>
-                  Aucun cours pour le moment.
-                </AppText>
-              )}
-              {items.map((item) => (
-                <ActionCard
-                  key={item.id}
-                  accessibilityLabel={item.title}
-                  style={{
-                    ...row,
-                    minHeight: 48,
-                    padding: spacing.md,
-                    boxShadow: "none",
-                  }}
-                  onPress={() =>
-                    router.push(
-                      type === "course"
-                        ? {
-                            pathname: "/parent/review/[id]",
-                            params: { id: item.id },
-                          }
-                        : {
-                            pathname: "/parent/exercises",
-                            params: { ...params, draftId: item.id },
-                          },
-                    )
-                  }
-                >
-                  <AppText variant="label" style={{ flex: 1 }}>
-                    {item.title}
-                  </AppText>
-                  <Badge
-                    tone={item.status === "published" ? "green" : "orange"}
-                  >
-                    {preparationStatus(item)}
-                  </Badge>
-                  <AppIcon name="chevron-right" size={18} />
-                </ActionCard>
-              ))}
-            </Card>
-          ),
-      )}
-    </>
-  );
-}
-
 export function ParentSubjectScreen() {
   const data = useLearning();
   const router = useRouter();
@@ -300,7 +181,7 @@ export function ParentSubjectScreen() {
   return (
     <ParentLayout active="subjects" subjectId={subject?.id}>
       {subject ? (
-        <SubjectMenu subject={subject} />
+        <SubjectLibrary key={subject.id} subject={subject} />
       ) : (
         <EmptyState
           title="Matière introuvable"

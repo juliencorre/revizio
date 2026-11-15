@@ -23,6 +23,9 @@ import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import { ParentChildSelector } from "./child-selector";
 import { SourceThumbnail, SourceViewer } from "@/components/source-viewer";
+import { SubjectSelector } from "./subject-selector";
+import { subjectHref, type SubjectTab } from "./subject-navigation";
+
 export function ParentLayout({
   active,
   children,
@@ -57,6 +60,14 @@ export function ParentLayout({
 export function ParentWorkspace({ children }: { children: ReactNode }) {
   const active = usePathname().split("/")[2] || "dashboard";
   const router = useRouter();
+  const returnTab: SubjectTab =
+    active === "exercises"
+      ? "exercices"
+      : active === "vocabulary"
+        ? "vocabulaire"
+        : active === "english"
+          ? "conjugaison"
+          : "cours";
   const data = useLearning();
   const navigation: NavigationItem[] = [
     {
@@ -117,65 +128,60 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
             }}
           >
             {subject ? (
-              <Button
-                variant="ghost"
-                icon="arrow-left"
-                onPress={() => router.navigate("/parent/subjects")}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  flex: 1,
+                }}
               >
-                Toutes les matières
-              </Button>
+                <AppText variant="small" color={colors.muted}>
+                  Espace parent
+                </AppText>
+                <AppText color={colors.muted}>/</AppText>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Toutes les matières"
+                  style={{ minHeight: 44, minWidth: 44, justifyContent: "center" }}
+                  onPress={() => router.navigate("/parent/subjects")}
+                >
+                  <AppText variant="small" color={colors.muted}>
+                    Matières
+                  </AppText>
+                </Pressable>
+              </View>
             ) : (
-              <AppText variant="small" color={colors.muted}>
-                Enfant accompagné
-              </AppText>
+              <AppText variant="small" color={colors.muted}>Enfant accompagné</AppText>
             )}
             <ParentChildSelector />
           </View>
           {subject && (
-            <Card
-              testID="parent-subject-banner"
+            <View
               style={{
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+                paddingTop: 16,
                 flexDirection: "row",
-                alignItems: "center",
-                gap: 16,
                 flexWrap: "wrap",
-                backgroundColor: subject.color + "0E",
-                borderColor: subject.color + "44",
+                gap: 8,
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 12,
-                  backgroundColor: subject.color + "15",
-                }}
-              >
-                <AppIcon name={subject.icon} color={subject.color} size={24} />
-              </View>
-              <AppText
-                variant={active === "subject" ? "title" : "heading"}
-                style={{ flexGrow: 1, flexShrink: 1 }}
-              >
-                {subject.title}
-              </AppText>
+              <SubjectSelector key={subject.id} subject={subject} />
               {active !== "subject" && (
                 <Button
                   variant="ghost"
                   icon="arrow-left"
                   onPress={() =>
-                    router.navigate({
-                      pathname: "/parent/subject/[id]",
-                      params: { id: subject.id },
-                    })
+                    router.navigate(subjectHref(subject.id, returnTab))
                   }
                 >
                   Menu de la matière
                 </Button>
               )}
-            </Card>
+            </View>
           )}
         </>
       )}

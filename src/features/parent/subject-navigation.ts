@@ -11,3 +11,12 @@ export function preparationHref(
     params: { subjectId },
   };
 }
+
+export type SubjectTab = "cours" | "exercices" | "vocabulaire" | "conjugaison";
+
+export function subjectHref(id: string, tab: SubjectTab = "cours"): Href {
+  return {
+    pathname: "/parent/subject/[id]",
+    params: tab === "cours" ? { id } : { id, tab },
+  };
+}
