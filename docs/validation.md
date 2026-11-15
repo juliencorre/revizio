@@ -74,3 +74,13 @@ Les captures ont été examinées pour l’accueil enfant, la bibliothèque, le 
 - La revue Impeccable a validé les deux corrections demandées : accès au vocabulaire visible à 390 px et cohérence du répertoire anglais historique. Les cibles tactiles contrôlées font au moins 44 px. Les captures sont celles de données et de comptes fictifs.
 
 Ces vérifications utilisent les navigateurs de test et les formats d’iPad simulés ; elles ne remplacent pas une recette sur iPad physique.
+
+## Accès familial privé — 15 novembre 2026
+
+- `npm run typecheck`, `npm test` et l’export web/PWA réussissent : 163 tests pour la version publiée `e592bd7`, puis 179 tests après intégration des changements Anthropic déjà présents dans `main`. Le test IA réelle reste opt-in et n’a pas été exécuté pour cette modification d’accès.
+- Les contrôles serveur et Workers couvrent les deux parents, les deux enfants CM1/5e, l’ajout du conjoint avec confirmation du mot de passe, le refus d’un troisième compte, la confidentialité des profils avant connexion, l’isolation des données enfant et la restauration sans dépassement de capacité.
+- Les parcours navigateur vérifient l’invitation privée, la connexion par prénom et code, la connexion du conjoint, les anciennes adresses mémorisées, l’absence de configuration serveur sur le web et la désactivation de la démonstration familiale. Les contrôles de navigation en portrait/paysage ont aussi réussi sur Chromium et WebKit.
+- Publication de la correction d’accès `e592bd7` sur `cours.gofel.fr` et `revizo.jcorre.workers.dev` : version Cloudflare `582a83c9-1589-4579-a493-07c057666c82`, version PWA `1fda8ea86d182d43`. Le script `verify-cloud-deployment.mjs` confirme l’API et l’identité des 57 fichiers publics avec l’export local.
+- Vérification directe en production avec Chromium paysage et WebKit portrait : aucune configuration serveur ni démonstration, refus HTTP 401 pour les listes de profils et de parents sans session, invitation retirée de la barre d’adresse et zones tactiles d’au moins 44 px. Les vérifications n’ont créé aucun compte réel ; le propriétaire choisit ses accès dans le formulaire privé.
+
+La publication d’accès conserve l’IA Workers AI déjà en service. Le code Anthropic intégré séparément dans `main` nécessite encore son secret serveur, absent au moment de cette recette ; il n’a pas été activé par ce déploiement. La source exacte publiée est conservée dans la branche `feat/private-family-release`, et la branche `feat/private-family` contient aussi l’intégration des derniers changements IA. Aucun secret d’invitation n’est stocké dans le dépôt.
