@@ -4,9 +4,9 @@ L’application web complète utilise Workers pour l’interface et l’API, un 
 
 ## Adresse de l’application
 
-Révizo est accessible sur **https://cours.gofel.fr**. Le domaine personnalisé est déclaré dans `wrangler.jsonc` avec `custom_domain: true`. Cloudflare gère son enregistrement DNS et son certificat HTTPS ; l’interface et l’API `/api` partagent cette adresse. L’adresse `https://revizo.jcorre.workers.dev` reste également disponible.
+Révizo est accessible sur **https://cours.gofel.fr**. La route `cours.gofel.fr/*` est déclarée dans `wrangler.jsonc`, dans la zone `gofel.fr`. Elle conserve les enregistrements DNS A et AAAA existants, avec le proxy Cloudflare activé. Tous les chemins, dont l’interface et l’API `/api`, sont servis directement par le Worker. HTTPS utilise le certificat Cloudflare du domaine. L’adresse `https://revizo.jcorre.workers.dev` reste également disponible.
 
-Le domaine `gofel.fr` doit être actif dans le compte Cloudflare utilisé pour déployer. Pour une autre installation, remplacer `cours.gofel.fr` dans `routes` par son propre domaine actif, ou retirer `routes` pour utiliser uniquement l’adresse gratuite `workers.dev`. Voir la [documentation des domaines personnalisés Workers](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/).
+Le domaine `gofel.fr` doit être actif dans le compte Cloudflare utilisé pour déployer. Conserver le proxy DNS activé sur `cours.gofel.fr` pour que la route fonctionne. Pour une autre installation, adapter `pattern` et `zone_name` dans `routes` à son domaine actif et proxifié, ou retirer `routes` pour utiliser uniquement l’adresse gratuite `workers.dev`. Voir la [documentation des routes Workers](https://developers.cloudflare.com/workers/configuration/routing/routes/).
 
 Le changement d’adresse conserve les données de l’installation Cloudflare, mais demande une nouvelle connexion sur le nouveau domaine. Pour l’iPad, créer le raccourci d’écran d’accueil depuis `cours.gofel.fr`. Les données d’un ancien serveur local se transfèrent avec une sauvegarde, comme décrit ci-dessous.
 
