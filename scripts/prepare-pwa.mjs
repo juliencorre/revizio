@@ -64,14 +64,18 @@ const paths = (await files(output))
   )
   .sort();
 const hash = createHash("sha256");
+const cachePaths = [];
 for (const path of paths) {
-  hash.update(path);
+  // Cloudflare redirects /index.html to /. Safari needs a direct response for navigation.
+  const cachePath = path === "/index.html" ? "/" : path;
+  cachePaths.push(cachePath);
+  hash.update(cachePath);
   hash.update(await readFile(join(output, path)));
 }
 const version = hash.digest("hex").slice(0, 16);
 const worker = `/* Révizo: generated static shell only; no API or private document caching. */
 const CACHE = "revizio-shell-${version}";
-const FILES = ${JSON.stringify(paths)};
+const FILES = ${JSON.stringify(cachePaths)};
 const ALLOWED = new Set(FILES);
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
@@ -88,7 +92,7 @@ self.addEventListener("fetch", (event) => {
   // Use this worker's cache only. A waiting update has a separate cache and
   // must not supply HTML or assets to pages still running the active version.
   if (request.mode === "navigate") {
-    event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match("/index.html")) ?? fetch(request)));
+    event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match("/")) ?? fetch(request)));
   } else if (ALLOWED.has(url.pathname)) {
     event.respondWith(caches.open(CACHE).then(async (cache) => (await cache.match(url.pathname)) ?? fetch(request)));
   }

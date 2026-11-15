@@ -12,7 +12,7 @@ const expectedWorker = await readFile(resolve(output, "sw.js"));
 const paths = JSON.parse(
   expectedWorker.toString().match(/const FILES = (\[[^\n]+\]);/)?.[1] ?? "null",
 );
-if (!Array.isArray(paths) || !paths.includes("/index.html"))
+if (!Array.isArray(paths) || !paths.includes("/") || paths.includes("/index.html"))
   throw new Error("L’export PWA local est absent ou incomplet.");
 const digest = (body) => createHash("sha256").update(body).digest("hex");
 // Cloudflare JavaScript Detections adds a dynamic protection script to HTML.
@@ -39,6 +39,7 @@ async function fetchBody(path) {
   const url = new URL(path, origin);
   const response = await fetch(url, {
     headers,
+    redirect: path === "/" ? "error" : "follow",
     signal: AbortSignal.timeout(20000),
   });
   if (!response.ok) throw new Error(`${path} : HTTP ${response.status}`);
@@ -69,11 +70,12 @@ async function verify() {
           path.includes("..")
         )
           throw new Error("Chemin de fichier PWA invalide.");
-        const local = await readFile(resolve(output, "." + path));
+        const filePath = path === "/" ? "/index.html" : path;
+        const local = await readFile(resolve(output, "." + filePath));
         const remote = await fetchBody(path);
         if (
-          digest(comparableBody(path, local)) !==
-          digest(comparableBody(path, remote))
+          digest(comparableBody(filePath, local)) !==
+          digest(comparableBody(filePath, remote))
         )
           throw new Error(
             `${path} : le contenu publié diffère de l’export vérifié.`,

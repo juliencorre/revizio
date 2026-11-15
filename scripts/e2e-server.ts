@@ -18,6 +18,12 @@ async function main() {
   await app.ready();
   let resetting: Promise<void> | null = null;
   const server = createServer(async (request, response) => {
+    // Match the canonical HTML redirect used by Cloudflare in production.
+    if (request.url === "/index.html") {
+      response.writeHead(307, { Location: "/" });
+      response.end();
+      return;
+    }
     if (request.url === "/__test/reset" && request.method === "POST") {
       if (!resetting)
         resetting = (async () => {

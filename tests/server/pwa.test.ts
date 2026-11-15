@@ -74,7 +74,7 @@ describe("shell PWA privé par construction", () => {
         throw new Error("offline");
       });
     const cacheMatch = vi.fn(async (path: string) =>
-      path === "/index.html"
+      path === "/"
         ? new Response("cached shell")
         : path === "/assets/app.js"
           ? new Response("cached script")
@@ -108,7 +108,8 @@ describe("shell PWA privé par construction", () => {
     });
     await installing;
     const files = addAll.mock.calls[0][0] as string[];
-    expect(files).toContain("/index.html");
+    expect(files).toContain("/");
+    expect(files).not.toContain("/index.html");
     expect(files).toContain("/assets/app.js");
     expect(files.some((path) => /\/api\/|\/uploads\/|\.map$/.test(path))).toBe(
       false,

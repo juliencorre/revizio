@@ -35,12 +35,13 @@ test("reprendre et terminer une séance après rechargement hors ligne", async (
     )
     .toBe(true);
   const cachedShells = await page.evaluate(async () => {
-    const result: { name: string; urls: string[] }[] = [];
+    const result = [];
     for (const name of await caches.keys()) {
       if (!name.startsWith("revizio-shell-")) continue;
       const cache = await caches.open(name);
       result.push({
         name,
+        shellRedirected: (await cache.match("/"))?.redirected,
         urls: (await cache.keys()).map((request) => request.url),
       });
     }
@@ -48,9 +49,7 @@ test("reprendre et terminer une séance après rechargement hors ligne", async (
   });
   expect(cachedShells.length).toBeGreaterThan(0);
   for (const cache of cachedShells) {
-    expect(
-      cache.urls.some((url) => new URL(url).pathname === "/index.html"),
-    ).toBe(true);
+    expect(cache.shellRedirected).toBe(false);
     expect(
       cache.urls.some((url) => new URL(url).pathname.startsWith("/_expo/")),
     ).toBe(true);
