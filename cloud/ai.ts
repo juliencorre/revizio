@@ -47,15 +47,31 @@ export class CloudAi implements AiClient {
           }
         : { role: message.role, content: message.content },
     );
+    const exerciseOutput =
+      schema.properties &&
+      typeof schema.properties === "object" &&
+      "questions" in schema.properties;
+    if (exerciseOutput) {
+      // Large nested exercise schemas can stall constrained decoding. JSON mode
+      // remains machine-readable; the shared generator validates every question.
+      input.unshift({
+        role: "system",
+        content:
+          "Réponds uniquement avec un objet JSON valide conforme à ce schéma : " +
+          JSON.stringify(schema),
+      });
+    }
     try {
       const result = await this.binding.run(
         CLOUD_MODEL,
         {
           messages: input,
-          response_format: {
-            type: "json_schema",
-            json_schema: { name: "revision", schema, strict: true },
-          },
+          response_format: exerciseOutput
+            ? { type: "json_object" }
+            : {
+                type: "json_schema",
+                json_schema: { name: "revision", schema, strict: true },
+              },
           temperature: 0,
           max_completion_tokens: 10000,
           chat_template_kwargs: { enable_thinking: false },

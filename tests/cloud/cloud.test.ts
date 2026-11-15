@@ -420,4 +420,44 @@ describe("installation Cloudflare dans workerd", () => {
       truncated.json({ baseUrl: "", model: "" }, [], {}),
     ).rejects.toThrow(/résultat exploitable/);
   });
+  it("évite le décodage contraint bloquant des exercices et transmet leur schéma au modèle", async () => {
+    const schema = {
+      type: "object",
+      properties: { questions: { type: "array", minItems: 5, maxItems: 5 } },
+    };
+    const client = new CloudAi({
+      run: async (model, input) => {
+        expect(input.response_format).toEqual({ type: "json_object" });
+        expect(input.messages[0]).toMatchObject({
+          role: "system",
+          content: expect.stringContaining(JSON.stringify(schema)),
+        });
+        return {
+          id: "test",
+          object: "chat.completion",
+          created: 0,
+          model,
+          choices: [
+            {
+              index: 0,
+              logprobs: null,
+              finish_reason: "stop",
+              message: {
+                role: "assistant",
+                refusal: null,
+                content: '{"questions":[]}',
+              },
+            },
+          ],
+        };
+      },
+    });
+    await expect(
+      client.json(
+        { baseUrl: "", model: "" },
+        [{ role: "user", content: "Prépare les exercices." }],
+        schema,
+      ),
+    ).resolves.toEqual({ questions: [] });
+  });
 });
