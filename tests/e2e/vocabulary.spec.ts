@@ -233,9 +233,7 @@ test.describe("sur téléphone", () => {
     await page.addInitScript(() => localStorage.setItem("revizo.mode", "demo"));
     await page.goto("/parent/vocabulary?language=spanish");
     await expect(
-      page
-        .getByTestId("parent-subject-banner")
-        .getByRole("heading", { name: "Espagnol (LV2)" }),
+      page.getByRole("button", { name: "Changer de matière : Espagnol (LV2)" }),
     ).toBeInViewport();
     await page.getByTestId("add-vocabulary-list").click();
     await page.getByTestId("vocabulary-title").fill("Vocabulaire du quotidien");

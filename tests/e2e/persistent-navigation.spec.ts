@@ -74,7 +74,7 @@ test("garder le menu parent pendant le passage d’une matière à ses rubriques
     .click();
   await page.getByRole("button", { name: "Anglais", exact: true }).click();
   await remainsMounted(original);
-  await page.getByRole("button", { name: "Vocabulaire", exact: true }).click();
+  await page.getByRole("tab", { name: "Vocabulaire", exact: true }).click();
   await expect(page.getByTestId("parent-vocabulary")).toBeVisible();
   await expect(page.getByTestId("parent-subject-banner")).toContainText(
     "Anglais",

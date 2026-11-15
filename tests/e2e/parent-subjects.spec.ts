@@ -9,39 +9,78 @@ test("choisir la matière et retrouver ses rubriques en revenant d’un éditeur
 }, info) => {
   const button = (name: string) =>
     page.getByRole("button", { name, exact: true });
-  const banner = page.getByTestId("parent-subject-banner");
+  const tab = (name: string) => page.getByRole("tab", { name, exact: true });
+  const selector = page.getByTestId("parent-subject-banner");
+  const dialog = page.getByRole("dialog", { name: "Choisir une matière" });
+  async function changeSubject(name: string) {
+    await selector.click();
+    await dialog.getByRole("radio", { name, exact: true }).click();
+    await expect(selector).toHaveAccessibleName("Changer de matière : " + name);
+    await expect(tab("Cours")).toHaveAttribute("aria-selected", "true");
+  }
   await page.goto("/parent");
-  await expect(button("Anglais")).toBeInViewport();
   await button("Anglais").click();
-  await expect(banner).toContainText("Anglais");
-  await expect(button("Conjugaison")).toBeInViewport();
+  await expect(selector).toContainText("Anglais");
+  await expect(tab("Conjugaison")).toBeInViewport();
   await page.screenshot({ path: info.outputPath("anglais.png") });
-  await button("Conjugaison").click();
+  for (const control of [
+    selector,
+    ...(await page.getByRole("tab").all()),
+    button("Ajouter un cours"),
+  ]) {
+    const bounds = (await control.boundingBox())!;
+    expect(bounds.width).toBeGreaterThanOrEqual(44);
+    expect(bounds.height).toBeGreaterThanOrEqual(44);
+  }
+  await selector.click();
+  await expect(
+    dialog.getByRole("radio", { name: "Anglais", exact: true }),
+  ).toBeChecked();
+  await page.screenshot({ path: info.outputPath("selecteur.png") });
+  const englishOption = dialog.getByRole("radio", {
+    name: "Anglais",
+    exact: true,
+  });
+  await expect(englishOption).toBeFocused();
+  await englishOption.press("ArrowDown");
+  await expect(
+    dialog.getByRole("radio", { name: "Espagnol (LV2)" }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(selector).toBeFocused();
+  await tab("Cours").press("End");
+  await expect(tab("Conjugaison")).toHaveAttribute("aria-selected", "true");
+  await button("Préparer la conjugaison").click();
   await expect(page.getByTestId("english-verb-base")).toBeVisible();
   await expect(page.getByTestId("english-word-en")).toHaveCount(0);
   await button("Menu de la matière").click();
-  await button("Vocabulaire").click();
+  await expect(tab("Conjugaison")).toHaveAttribute("aria-selected", "true");
+  await tab("Vocabulaire").click();
+  await expect(page).toHaveURL(/tab=vocabulaire/);
+  await page.reload();
+  await expect(tab("Vocabulaire")).toHaveAttribute("aria-selected", "true");
   await button("Créer une liste").click();
-  await expect(banner).toContainText("Anglais");
-  await button("Toutes les matières").click();
-  await button("Mathématiques").click();
-  await expect(button("Vocabulaire")).toHaveCount(0);
-  await expect(button("Conjugaison")).toHaveCount(0);
-  await button("Exercices").click();
+  await expect(selector).toContainText("Anglais");
+  await changeSubject("Mathématiques");
+  await expect(tab("Vocabulaire")).toHaveCount(0);
+  await expect(tab("Conjugaison")).toHaveCount(0);
+  await tab("Exercices").click();
+  await button("Préparer des exercices").click();
   await expect(
     page.getByTestId("ai-exercise-course-maths-relative-numbers"),
   ).toBeVisible();
   await expect(
     page.getByTestId("ai-exercise-course-english-past-simple"),
   ).toHaveCount(0);
-  await button("Toutes les matières").click();
   for (const name of ["Espagnol (LV2)", "Latin (option)"]) {
-    await button(name).click();
-    await expect(button("Conjugaison")).toHaveCount(0);
-    await button("Vocabulaire").click();
-    await expect(banner).toContainText(name);
-    await button("Toutes les matières").click();
+    await changeSubject(name);
+    await expect(tab("Conjugaison")).toHaveCount(0);
+    await tab("Vocabulaire").click();
+    await expect(button("Créer une liste")).toBeVisible();
   }
+  await page.goto("/parent/subject/maths?tab=conjugaison");
+  await expect(tab("Cours")).toHaveAttribute("aria-selected", "true");
 });
 
 test("publier le premier cours d’une matière vide et préparer ses exercices", async ({
@@ -53,19 +92,19 @@ test("publier le premier cours d’une matière vide et préparer ses exercices"
   await page.goto("/parent");
   await button("Voir toutes les matières").click();
   await button("EPS").click();
-  await button("Exercices").click();
+  await page.getByRole("tab", { name: "Exercices" }).click();
   await expect(page.getByText("Publiez d’abord une fiche")).toBeVisible();
   await button("Ajouter un cours").click();
   await expect(banner).toContainText("EPS");
   await page.getByTestId("course-title").fill("Les relais");
   await button("Toutes les matières").click();
   await button("Anglais").click();
-  await button("Cours").click();
+  await button("Ajouter un cours").click();
   await expect(page.getByTestId("course-title")).toHaveValue("");
   await page.getByTestId("course-title").fill("My school");
   await button("Toutes les matières").click();
   await button("EPS").click();
-  await button("Cours").click();
+  await button("Ajouter un cours").click();
   await expect(page.getByTestId("course-title")).toHaveValue("Les relais");
   await page.reload();
   await expect(page.getByTestId("course-title")).toHaveValue("Les relais");
