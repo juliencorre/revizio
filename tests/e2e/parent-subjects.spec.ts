@@ -22,9 +22,22 @@ test("choisir la matière et retrouver ses rubriques en revenant d’un éditeur
   await button("Anglais").click();
   await expect(selector).toContainText("Anglais");
   await expect(tab("Conjugaison")).toBeInViewport();
+  const profile = page.getByTestId("parent-child-trigger");
+  const subjectBounds = (await selector.boundingBox())!;
+  const profileBounds = (await profile.boundingBox())!;
+  expect(subjectBounds.x + subjectBounds.width).toBeLessThan(profileBounds.x);
+  expect(
+    Math.abs(
+      subjectBounds.y +
+        subjectBounds.height / 2 -
+        (profileBounds.y + profileBounds.height / 2),
+    ),
+  ).toBeLessThan(2);
+  await expect(button("Toutes les matières")).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("anglais.png") });
   for (const control of [
     selector,
+    profile,
     ...(await page.getByRole("tab").all()),
     button("Ajouter un cours"),
   ]) {
@@ -97,12 +110,12 @@ test("publier le premier cours d’une matière vide et préparer ses exercices"
   await button("Ajouter un cours").click();
   await expect(banner).toContainText("EPS");
   await page.getByTestId("course-title").fill("Les relais");
-  await button("Toutes les matières").click();
+  await button("Matières").click();
   await button("Anglais").click();
   await button("Ajouter un cours").click();
   await expect(page.getByTestId("course-title")).toHaveValue("");
   await page.getByTestId("course-title").fill("My school");
-  await button("Toutes les matières").click();
+  await button("Matières").click();
   await button("EPS").click();
   await button("Ajouter un cours").click();
   await expect(page.getByTestId("course-title")).toHaveValue("Les relais");

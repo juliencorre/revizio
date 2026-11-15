@@ -16,7 +16,7 @@ import {
   Card,
   type NavigationItem,
 } from "@/components/ui";
-import { createThemedStyles, useTheme, fontFamily } from "@/theme";
+import { createThemedStyles, useTheme, fontFamily, spacing } from "@/theme";
 import { PageShell, PersistentAppShell } from "@/components/page-shell";
 import type { CourseSource } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
@@ -124,37 +124,11 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
               flexWrap: "wrap",
               alignItems: "center",
               justifyContent: "space-between",
-              gap: 8,
+              gap: spacing.sm,
             }}
           >
             {subject ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                  flex: 1,
-                }}
-              >
-                <AppText variant="small" color={colors.muted}>
-                  Espace parent
-                </AppText>
-                <AppText color={colors.muted}>/</AppText>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Toutes les matières"
-                  style={{
-                    minHeight: 44,
-                    minWidth: 44,
-                    justifyContent: "center",
-                  }}
-                  onPress={() => router.navigate("/parent/subjects")}
-                >
-                  <AppText variant="small" color={colors.muted}>
-                    Matières
-                  </AppText>
-                </Pressable>
-              </View>
+              <SubjectSelector key={subject.id} subject={subject} />
             ) : (
               <AppText variant="small" color={colors.muted}>
                 Enfant accompagné
@@ -162,32 +136,15 @@ export function ParentWorkspace({ children }: { children: ReactNode }) {
             )}
             <ParentChildSelector />
           </View>
-          {subject && (
-            <View
-              style={{
-                borderTopWidth: 1,
-                borderTopColor: colors.border,
-                paddingTop: 16,
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: 8,
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
+          {subject && active !== "subject" && (
+            <Button
+              variant="ghost"
+              icon="arrow-left"
+              style={{ alignSelf: "flex-end" }}
+              onPress={() => router.navigate(subjectHref(subject.id, returnTab))}
             >
-              <SubjectSelector key={subject.id} subject={subject} />
-              {active !== "subject" && (
-                <Button
-                  variant="ghost"
-                  icon="arrow-left"
-                  onPress={() =>
-                    router.navigate(subjectHref(subject.id, returnTab))
-                  }
-                >
-                  Menu de la matière
-                </Button>
-              )}
-            </View>
+              Menu de la matière
+            </Button>
           )}
         </>
       )}

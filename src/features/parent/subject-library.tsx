@@ -359,6 +359,8 @@ const useStyles = createThemedStyles(({ colors }) => ({
   tabs: {
     flexDirection: "row",
     flexWrap: "wrap",
+    borderTopWidth: 1,
+    paddingTop: spacing.sm,
     borderBottomWidth: 1,
     borderColor: colors.border,
     columnGap: spacing.sm,
