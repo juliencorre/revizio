@@ -45,6 +45,68 @@ describe("contenus de démonstration", () => {
   });
 });
 describe("publication relue", () => {
+  it("remplace une édition, garde les instantanés et redirige les séances et séries liées", () => {
+    const data = start();
+    const original = data.courses.find(
+      (item) => item.id === data.series[0].courseIds[0],
+    )!;
+    const revision = {
+      ...original,
+      id: "edition-deux",
+      originId: original.id,
+      status: "draft" as const,
+      title: "Correction",
+    };
+    data.courses.push(revision);
+    data.plans = [
+      {
+        id: "plan",
+        subjectId: original.subjectId,
+        title: "Contrôle",
+        status: "published",
+        examDate: "2027-01-01",
+        dailyMinutes: 10,
+        courseIds: [original.id],
+        steps: [
+          {
+            id: "step",
+            kind: "read",
+            date: "2027-01-01",
+            minutes: 5,
+            courseIds: [original.id],
+            title: "Lire",
+          },
+        ],
+      },
+    ];
+    data.readingRecords = [{ courseId: original.id, reviewedAt: NOW }];
+    data.reviewedCourseIds = [original.id];
+    data.spacedReviews = [
+      { courseId: original.id, dueDate: "2027-01-01", interval: 2 },
+    ];
+    const unchanged = publishCourseInData(data, revision.id, "inconnue");
+    expect(unchanged.result.ok).toBe(false);
+    expect(unchanged.data).toBe(data);
+    const result = publishCourseInData(data, revision.id, original.id);
+    expect(result.result.ok).toBe(true);
+    const next = parseLearningData(JSON.stringify(result.data));
+    expect(next.courses.find((item) => item.id === original.id)).toEqual({
+      ...original,
+      status: "archived",
+    });
+    expect(next.courses.find((item) => item.id === revision.id)).toMatchObject({
+      status: "published",
+      replacedCourseIds: [original.id],
+    });
+    expect(next.series[0].courseIds).toContain(revision.id);
+    expect(next.plans![0].courseIds).toEqual([revision.id]);
+    expect(next.plans![0].steps[0].courseIds).toEqual([revision.id]);
+    expect(next.attempts).toEqual(data.attempts);
+    expect(next.readingRecords).toEqual(data.readingRecords);
+    expect(next.reviewedCourseIds).not.toContain(revision.id);
+    expect(next.spacedReviews![0].courseId).toBe(revision.id);
+    expect(publishCourseInData(next, revision.id, original.id).data).toBe(next);
+  });
   it("refuse une fiche sans essentiel puis accepte une fiche complétée", () => {
     const data = clone(initialData);
     const course = data.courses.find((item) => item.status === "draft")!;

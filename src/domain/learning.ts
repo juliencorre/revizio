@@ -207,22 +207,108 @@ export function seriesPublicationError(
   }
   return null;
 }
+export function previousPublishedCourse(course: Course, courses: Course[]) {
+  const previousId = course.previousVersionId ?? course.originId;
+  return courses.find(
+    (item) =>
+      item.id === previousId &&
+      item.id !== course.id &&
+      item.status === "published" &&
+      item.subjectId === course.subjectId,
+  );
+}
 export function publishCourseInData(
   data: LearningData,
   courseId: string,
+  replaceId?: string,
 ): { data: LearningData; result: PublicationResult } {
   const course = data.courses.find((item) => item.id === courseId);
-  const error = course
-    ? coursePublicationError(course)
-    : "Ce cours est introuvable.";
+  if (!course || course.status === "archived")
+    return {
+      data,
+      result: { ok: false, error: "Cette fiche ne peut pas être publiée." },
+    };
+  const error = coursePublicationError(course);
   if (error) return { data, result: { ok: false, error } };
-  if (course!.status === "published") return { data, result: { ok: true } };
+  if (!replaceId) {
+    if (course.status === "published") return { data, result: { ok: true } };
+    return {
+      data: {
+        ...data,
+        courses: data.courses.map((item) =>
+          item.id === courseId ? { ...item, status: "published" } : item,
+        ),
+      },
+      result: { ok: true },
+    };
+  }
+  if (
+    course.status === "published" &&
+    course.replacedCourseIds?.includes(replaceId)
+  )
+    return { data, result: { ok: true } };
+  const previous = previousPublishedCourse(course, data.courses);
+  if (!previous || previous.id !== replaceId)
+    return {
+      data,
+      result: {
+        ok: false,
+        error:
+          "La fiche précédente a changé. Rouvrez sa version publiée avant de la remplacer.",
+      },
+    };
+  const redirect = (ids: string[]) =>
+    ids.includes(replaceId)
+      ? [...new Set(ids.map((id) => (id === replaceId ? courseId : id)))]
+      : ids;
   return {
     data: {
       ...data,
-      courses: data.courses.map((item) =>
-        item.id === courseId ? { ...item, status: "published" } : item,
+      courses: data.courses.map((item) => {
+        if (item.id === replaceId) return { ...item, status: "archived" };
+        if (item.id !== courseId) return item;
+        return {
+          ...item,
+          status: "published",
+          revision: Math.max(
+            course.revision ?? 1,
+            (previous.revision ?? 1) + 1,
+          ),
+          replacedCourseIds: [
+            ...new Set([
+              ...(previous.replacedCourseIds ?? []),
+              previous.id,
+              ...(course.replacedCourseIds ?? []),
+            ]),
+          ],
+        };
+      }),
+      series: data.series.map((item) => ({
+        ...item,
+        courseIds: redirect(item.courseIds),
+      })),
+      ...(data.plans && {
+        plans: data.plans.map((plan) => ({
+          ...plan,
+          courseIds: redirect(plan.courseIds),
+          steps: plan.steps.map((step) => ({
+            ...step,
+            courseIds: redirect(step.courseIds),
+          })),
+        })),
+      }),
+      // The corrected edition is unread. Older reading records and attempts stay intact.
+      reviewedCourseIds: data.reviewedCourseIds.filter(
+        (id) => id !== replaceId,
       ),
+      ...(data.spacedReviews && {
+        spacedReviews: data.spacedReviews.flatMap((review) => {
+          if (review.courseId !== replaceId) return [review];
+          return data.spacedReviews!.some((item) => item.courseId === courseId)
+            ? []
+            : [{ ...review, courseId }];
+        }),
+      }),
     },
     result: { ok: true },
   };
@@ -452,15 +538,23 @@ function isCourse(value: unknown): value is Course {
     !text(value.title) ||
     !text(value.description) ||
     !date(value.updatedAt) ||
-    !["draft", "published"].some((status) => status === value.status) ||
+    !["draft", "published", "archived"].some(
+      (status) => status === value.status,
+    ) ||
     !optionalText(value.sourceText) ||
     ![
       value.originId,
+      value.previousVersionId,
       value.profileId,
       value.generationJobId,
       value.generationAppliedJobId,
     ].every(optionalId) ||
     (value.revision !== undefined && !positiveInteger(value.revision)) ||
+    (value.replacedCourseIds !== undefined &&
+      (!Array.isArray(value.replacedCourseIds) ||
+        !value.replacedCourseIds.every(nonempty) ||
+        !unique(value.replacedCourseIds) ||
+        value.replacedCourseIds.includes(value.id))) ||
     !Array.isArray(value.sections) ||
     !Array.isArray(value.sources)
   )

@@ -77,14 +77,78 @@ export function SourceThumbnail({
 export function SourceViewer({
   source,
   onClose,
+  page,
+  excerpt,
+  inline = false,
 }: {
   source: CourseSource | null;
   onClose: () => void;
+  page?: number;
+  excerpt?: string;
+  inline?: boolean;
+}) {
+  if (!source) return null;
+  const content = (
+    <DocumentContent
+      key={source.id + ":" + (page ?? "")}
+      source={source}
+      onClose={onClose}
+      page={page}
+      excerpt={excerpt}
+    />
+  );
+  if (inline)
+    return (
+      <View
+        testID="reference-side-panel"
+        style={{ flex: 1, minWidth: 0, height: 610 }}
+      >
+        {content}
+      </View>
+    );
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View
+        style={{
+          flex: 1,
+          padding: 20,
+          backgroundColor: "#252D3DBB",
+          justifyContent: "center",
+        }}
+      >
+        {content}
+      </View>
+    </Modal>
+  );
+}
+function DocumentContent({
+  source,
+  onClose,
+  page,
+  excerpt,
+}: {
+  source: CourseSource;
+  onClose: () => void;
+  page?: number;
+  excerpt?: string;
 }) {
   const { colors } = useTheme();
-  const { uri, error } = useSourceUri(source);
+  const singlePage =
+    !!page &&
+    documentKind(source) === "pdf" &&
+    !!source.storageId &&
+    source.uri?.startsWith("/api/uploads/");
+  const displayedSource = singlePage
+    ? {
+        ...source,
+        storageId: source.storageId + ".pdf-page-" + page,
+        cachedUri: undefined,
+        uri: source.uri + "?page=" + page,
+      }
+    : source;
+  const { uri, error } = useSourceUri(displayedSource);
   const [zoom, setZoom] = useState(false);
-  const kind = source ? documentKind(source) : "other";
+  const kind = documentKind(source);
   const image = kind === "image";
   const [preview, setPreview] = useState("");
   useEffect(() => {
@@ -103,101 +167,90 @@ export function SourceViewer({
       active = false;
     };
   }, [uri, kind]);
-  useEffect(() => setZoom(false), [source?.id]);
   return (
-    <Modal
-      visible={!!source}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
+    <Card
+      style={{
+        flex: 1,
+        maxHeight: 1100,
+        maxWidth: 1200,
+        width: "100%",
+        alignSelf: "center",
+        gap: 16,
+      }}
     >
       <View
         style={{
-          flex: 1,
-          padding: 20,
-          backgroundColor: "#252D3DBB",
-          justifyContent: "center",
+          flexDirection: "row",
+          gap: 12,
+          alignItems: "center",
+          flexWrap: "wrap",
         }}
       >
-        <Card
-          style={{
-            flex: 1,
-            maxHeight: 1100,
-            maxWidth: 1200,
-            width: "100%",
-            alignSelf: "center",
-            gap: 16,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
+        <AppText variant="heading" style={{ flex: 1, minWidth: 120 }}>
+          {source.name}
+          {page ? " · page " + page : ""}
+        </AppText>
+        {image && (
+          <Button
+            variant="secondary"
+            icon="search"
+            onPress={() => setZoom(!zoom)}
           >
-            <AppText variant="heading" style={{ flex: 1, minWidth: 120 }}>
-              {source?.name}
-            </AppText>
-            {image && (
-              <Button
-                variant="secondary"
-                icon="search"
-                onPress={() => setZoom(!zoom)}
-              >
-                {zoom ? "Vue entière" : "Agrandir"}
-              </Button>
-            )}
-            <Button variant="secondary" icon="close" onPress={onClose}>
-              Fermer le document
-            </Button>
-          </View>
-          {error ? (
-            <AppText color={colors.danger}>{error}</AppText>
-          ) : !uri ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : image ? (
-            <ScrollView
-              style={{ flex: 1 }}
-              horizontal={zoom}
-              contentContainerStyle={{ flexGrow: 1 }}
-            >
-              <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={{ flexGrow: 1 }}
-              >
-                <Image
-                  accessibilityLabel={source?.name}
-                  source={{ uri, headers: apiAuthHeaders() }}
-                  resizeMode="contain"
-                  style={{
-                    width: zoom ? 1500 : "100%",
-                    minHeight: zoom ? 1800 : 500,
-                    flex: 1,
-                    transform: [
-                      {
-                        rotate: `${source?.storageId ? 0 : source?.rotation || 0}deg`,
-                      },
-                    ],
-                  }}
-                />
-              </ScrollView>
-            </ScrollView>
-          ) : kind === "pdf" ? (
-            <PdfDocument uri={uri} title={source?.name || "Mon document"} />
-          ) : kind === "text" ? (
-            <ScrollView style={{ flex: 1 }}>
-              <AppText>{preview || "Lecture du texte…"}</AppText>
-            </ScrollView>
-          ) : (
-            <AppText>
-              Fichier joint. Son texte pourra être consulté après l’import dans
-              l’espace familial.
-            </AppText>
-          )}
-        </Card>
+            {zoom ? "Vue entière" : "Agrandir"}
+          </Button>
+        )}
+        <Button variant="secondary" icon="close" onPress={onClose}>
+          Fermer le document
+        </Button>
       </View>
-    </Modal>
+      {!!excerpt && <AppText variant="small">{excerpt}</AppText>}
+      {(!source.uri && !source.cachedUri) || kind === "other" ? (
+        <ScrollView style={{ flex: 1 }}>
+          <AppText>
+            {source.extractedText || "Le document d’origine est indisponible."}
+          </AppText>
+        </ScrollView>
+      ) : error ? (
+        <AppText color={colors.danger}>{error}</AppText>
+      ) : !uri ? (
+        <ActivityIndicator color={colors.primary} />
+      ) : image ? (
+        <ScrollView
+          style={{ flex: 1 }}
+          horizontal={zoom}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            <Image
+              accessibilityLabel={source.name}
+              source={{ uri, headers: apiAuthHeaders() }}
+              resizeMode="contain"
+              style={{
+                width: zoom ? 1500 : "100%",
+                minHeight: zoom ? 1800 : 500,
+                flex: 1,
+                transform: [
+                  {
+                    rotate: `${source.storageId ? 0 : source.rotation || 0}deg`,
+                  },
+                ],
+              }}
+            />
+          </ScrollView>
+        </ScrollView>
+      ) : kind === "pdf" ? (
+        <PdfDocument
+          uri={page && !singlePage ? uri + "#page=" + page : uri}
+          title={source.name}
+        />
+      ) : (
+        <ScrollView style={{ flex: 1 }}>
+          <AppText>{preview || "Lecture du texte…"}</AppText>
+        </ScrollView>
+      )}
+    </Card>
   );
 }

@@ -1,26 +1,66 @@
 import { View } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import {
   AppIcon,
   AppText,
-  Badge,
   Button,
   Card,
   PageHeading,
   useWindowClass,
 } from "@/components/ui";
 import { plural } from "@/domain/format";
-import { createThemedStyles, useTheme, spacing } from "@/theme";
+import { useTheme, spacing } from "@/theme";
 import { useLearning } from "@/state/learning-store";
 import { dateOnly, stepIsLate } from "@/domain/planning";
-import { learningOverview, preparationStatus } from "@/domain/study-overview";
+import { learningOverview } from "@/domain/study-overview";
 import { LoadingParent, Notice, ParentLayout } from "./shared";
 import { usePreparationJobs } from "./preparations";
 import { ParentSubjectGrid } from "./subjects";
 
+function resumableDraft(
+  data: ReturnType<typeof useLearning>,
+): { title: string; label: string; href: Href; testID?: string } | undefined {
+  const course = data.courses
+    .filter((item) => item.status === "draft")
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  if (course)
+    return {
+      title: course.title,
+      label: "Reprendre la fiche",
+      href: { pathname: "/parent/review/[id]", params: { id: course.id } },
+      testID: "review-course-" + course.id,
+    };
+  const series = data.series.findLast((item) => item.status === "draft");
+  if (series)
+    return {
+      title: series.title,
+      label: "Reprendre les exercices",
+      href: {
+        pathname: "/parent/exercises",
+        params: { draftId: series.id, subjectId: series.subjectId },
+      },
+    };
+  const list = data.vocabularyLists.findLast((item) => item.status === "draft");
+  if (list)
+    return {
+      title: list.title,
+      label: "Reprendre la liste",
+      href: {
+        pathname: "/parent/vocabulary/[id]",
+        params: { id: list.id, language: list.language },
+      },
+    };
+  const plan = data.plans.findLast((item) => item.status === "draft");
+  if (plan)
+    return {
+      title: plan.title,
+      label: "Reprendre le contrôle",
+      href: { pathname: "/parent/controls", params: { id: plan.id } },
+    };
+}
+
 export function ParentDashboard() {
   const { colors } = useTheme();
-  const styles = useStyles();
   const router = useRouter();
   const data = useLearning();
   const compact = useWindowClass() === "compact";
@@ -30,8 +70,7 @@ export function ParentDashboard() {
     data.serverAvailable,
   );
   if (!data.isReady) return <LoadingParent />;
-  const drafts = data.courses.filter((course) => course.status === "draft");
-  const draftSeries = data.series.filter((series) => series.status === "draft");
+  const resume = resumableDraft(data);
   const overview = learningOverview({ ...data, version: 1 });
   const upcoming = data.plans
     .filter(
@@ -46,6 +85,21 @@ export function ParentDashboard() {
   return (
     <ParentLayout active="dashboard">
       <View testID="parent-dashboard" style={{ gap: spacing.xl }}>
+        {resume && (
+          <Card style={{ gap: spacing.md }}>
+            <AppText variant="label" color={colors.primaryDark}>
+              Reprendre un brouillon
+            </AppText>
+            <AppText variant="heading">{resume.title}</AppText>
+            <Button
+              icon="pencil"
+              testID={resume.testID}
+              onPress={() => router.push(resume.href)}
+            >
+              {resume.label}
+            </Button>
+          </Card>
+        )}
         <PageHeading
           title="Choisir une matière"
           description={`Quelle matière souhaitez-vous préparer pour ${data.childName} ?`}
@@ -59,93 +113,6 @@ export function ParentDashboard() {
         >
           Voir toutes les matières
         </Button>
-        <Card style={{ gap: spacing.lg }}>
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 12,
-              alignItems: "center",
-            }}
-          >
-            <AppIcon name="pencil" />
-            <AppText variant="heading" style={{ flex: 1 }}>
-              Reprendre un brouillon
-            </AppText>
-            <Badge tone="orange">{drafts.length + draftSeries.length}</Badge>
-          </View>
-          <AppText color={colors.muted}>
-            Les brouillons restent privés. Relisez les fiches, les questions et
-            leurs corrections avant de les publier.
-          </AppText>
-          {drafts.slice(0, 3).map((course) => (
-            <View key={course.id} style={styles.draftRow}>
-              <View style={styles.draftTitle}>
-                <AppText variant="label">{course.title}</AppText>
-                <AppText variant="small" color={colors.muted}>
-                  {
-                    data.subjects.find((s) => s.id === course.subjectId)
-                      ?.shortLabel
-                  }{" "}
-                  · Fiche · {preparationStatus(course)}
-                </AppText>
-              </View>
-              <Button
-                testID={`review-course-${course.id}`}
-                variant="secondary"
-                icon="file"
-                accessibilityLabel={`Vérifier la fiche ${course.title}`}
-                onPress={() => router.push(`/parent/review/${course.id}`)}
-              >
-                Reprendre la fiche
-              </Button>
-            </View>
-          ))}
-          {draftSeries
-            .slice(0, Math.max(0, 3 - drafts.length))
-            .map((series) => (
-              <View key={series.id} style={styles.draftRow}>
-                <View style={styles.draftTitle}>
-                  <AppText variant="label">{series.title}</AppText>
-                  <AppText variant="small" color={colors.muted}>
-                    {
-                      data.subjects.find((s) => s.id === series.subjectId)
-                        ?.shortLabel
-                    }{" "}
-                    · Exercices · {preparationStatus(series)}
-                  </AppText>
-                </View>
-                <Button
-                  variant="secondary"
-                  icon="pencil"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/parent/exercises",
-                      params: {
-                        draftId: series.id,
-                        subjectId: series.subjectId,
-                      },
-                    })
-                  }
-                >
-                  Reprendre les exercices
-                </Button>
-              </View>
-            ))}
-          {!drafts.length && !draftSeries.length && (
-            <AppText>
-              Aucun brouillon en attente. Vos contenus publiés restent
-              accessibles dans la bibliothèque.
-            </AppText>
-          )}
-          <Button
-            variant="ghost"
-            icon="arrow-right"
-            onPress={() => router.push("/parent/library?status=review")}
-          >
-            Voir tous les contenus à vérifier
-          </Button>
-        </Card>
         <Button
           variant="ghost"
           icon="book"
@@ -269,15 +236,3 @@ export function ParentDashboard() {
     </ParentLayout>
   );
 }
-const useStyles = createThemedStyles(({ colors }) => ({
-  draftRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.lg,
-  },
-  draftTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 240, gap: spacing.xs },
-}));

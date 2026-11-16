@@ -67,7 +67,7 @@ export function ImportCourseScreen() {
   if (!data.isReady) return <LoadingParent active="import" />;
   const initial = data.courses.find((c) => c.id === params.courseId);
   if (
-    (params.courseId && !initial) ||
+    (params.courseId && (!initial || initial.status === "archived")) ||
     (params.subjectId && !data.subjects.some((s) => s.id === params.subjectId))
   )
     return <Redirect href="/parent/subjects" />;
@@ -94,7 +94,7 @@ function ImportEditor({
   const data = useLearning();
   const initial = data.courses.find((course) => course.id === courseId);
   const availableCourses = data.courses.filter(
-    (c) => !scope || c.subjectId === scope,
+    (c) => c.status !== "archived" && (!scope || c.subjectId === scope),
   );
   const prefix = `revizo.import.${data.activeProfileId || "demo"}.`;
   async function readImport(key: string) {
@@ -207,6 +207,7 @@ function ImportEditor({
                 description: existing.description,
                 sections: existing.sections,
                 originId: existing.originId || existing.id,
+                previousVersionId: existing.id,
                 revision: (existing.revision ?? 1) + 1,
               }
             : {}),

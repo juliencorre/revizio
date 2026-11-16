@@ -574,7 +574,8 @@ export async function configureServerRoutes(
   app.get("/api/uploads/:id", async (request, reply) => {
     const { user } = auth(request);
     const upload = uploadFor(user, (request.params as { id: string }).id);
-    const original = (request.query as { original?: string }).original === "1";
+    const query = request.query as { original?: string; page?: string };
+    const original = query.original === "1";
     if (original && user.role !== "parent")
       throw new HttpError(403, "L’original est réservé au parent.");
     reply
@@ -589,9 +590,31 @@ export async function configureServerRoutes(
         "Content-Disposition",
         `${original ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(upload.name)}`,
       );
-    return reply.send(
-      await database.files.read(original ? upload.originalPath : upload.path),
+    const bytes = await database.files.read(
+      original ? upload.originalPath : upload.path,
     );
+    if (query.page === undefined) return reply.send(bytes);
+    const page = Number(query.page);
+    if (
+      original ||
+      upload.mimeType !== "application/pdf" ||
+      !Number.isSafeInteger(page) ||
+      page < 1
+    )
+      throw new HttpError(400, "Choisissez une page valide du PDF.");
+    const { getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(Uint8Array.from(bytes));
+    try {
+      if (page > pdf.numPages)
+        throw new HttpError(404, "Cette page est introuvable.");
+      // Send only the cited page. Embedded PDF viewers on iPad can ignore URL fragments.
+      const result = await pdf.extractPages([
+        { document: null, includePages: [page - 1] },
+      ]);
+      return reply.send(Buffer.from(result));
+    } finally {
+      await pdf.loadingTask.destroy();
+    }
   });
   app.patch("/api/uploads/:id", async (request) => {
     const { user } = auth(request, true);

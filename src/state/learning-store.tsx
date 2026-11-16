@@ -110,7 +110,7 @@ export interface LearningContextValue extends Omit<
   resolveSyncConflict(strategy: "local" | "server", path?: string): Promise<void>;
   addCourse(input: CourseDraftInput): string;
   updateCourse(id: string, updates: Partial<Omit<Course, "id">>): void;
-  publishCourse(id: string): PublicationResult;
+  publishCourse(id: string, replaceId?: string): PublicationResult;
   deleteCourse(id: string): PublicationResult;
   addSeries(input: SeriesDraftInput): string;
   updateSeries(id: string, updates: Partial<Omit<ExerciseSeries, "id">>): void;
@@ -386,7 +386,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     (id: string, updates: Partial<Omit<Course, "id">>) => {
       assertParent();
       const course = dataRef.current.courses.find((item) => item.id === id);
-      if (!course || course.status === "published") return;
+      if (!course || course.status !== "draft") return;
       commit({
         ...dataRef.current,
         courses: dataRef.current.courses.map((item) =>
@@ -405,9 +405,9 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     [assertParent, commit],
   );
   const publishCourse = useCallback(
-    (id: string) => {
+    (id: string, replaceId?: string) => {
       assertParent();
-      const outcome = publishCourseInData(dataRef.current, id);
+      const outcome = publishCourseInData(dataRef.current, id, replaceId);
       commit(outcome.data);
       return outcome.result;
     },
@@ -1176,6 +1176,9 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           title: course.title ?? "Cours à relire",
           description: course.description,
           sections: course.sections,
+          originId: course.originId,
+          previousVersionId: course.previousVersionId,
+          revision: course.revision,
           sources: course.sources,
           sourceText: course.sourceText,
           generationJobId: job.id,

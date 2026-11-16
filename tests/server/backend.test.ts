@@ -3,6 +3,8 @@ import { mkdtemp, rm, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
+import { extractText } from "unpdf";
+import { textPdf } from "../fixtures/text-pdf";
 import type { FastifyInstance } from "fastify";
 import type { AiClient, AiMessage, AiSettings } from "../../server/types";
 import { createApp } from "../../server/app";
@@ -591,6 +593,31 @@ describe("contenus publiés, réponses et concurrence", () => {
 });
 
 describe("fichiers privés et sauvegarde", () => {
+  it("sert uniquement la page PDF citée, en respectant les droits du document", async () => {
+    const { token, profiles } = await setup();
+    const document = await upload(
+      token,
+      profiles[0].id,
+      "deux-pages.pdf",
+      textPdf(["Premiere page", "Deuxieme page"]),
+      "application/pdf",
+    );
+    expect(document.statusCode, document.body).toBe(200);
+    const uri = document.json().uri;
+    const selected = await app.inject({
+      url: uri + "?page=2",
+      headers: bearer(token),
+    });
+    expect(selected.statusCode, selected.body).toBe(200);
+    expect(
+      await extractText(Uint8Array.from(selected.rawPayload)),
+    ).toMatchObject({ totalPages: 1, text: ["Deuxieme page"] });
+    expect(
+      (await app.inject({ url: uri + "?page=3", headers: bearer(token) }))
+        .statusCode,
+    ).toBe(404);
+    expect((await app.inject({ url: uri + "?page=2" })).statusCode).toBe(401);
+  });
   it("transmet le texte du DOCX au modèle et conserve l’original privé après restauration", async () => {
     const { token, profiles } = await setup();
     const headers = bearer(token),

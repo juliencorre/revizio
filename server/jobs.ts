@@ -370,11 +370,15 @@ export class JobQueue {
           ...(old?.status === "published"
             ? {
                 originId: old.originId ?? old.id,
+                previousVersionId: old.id,
                 revision: (old.revision ?? 1) + 1,
               }
             : old
               ? {
                   ...(old.originId ? { originId: old.originId } : {}),
+                  ...(old.previousVersionId
+                    ? { previousVersionId: old.previousVersionId }
+                    : {}),
                   revision: old.revision ?? 1,
                 }
               : {}),

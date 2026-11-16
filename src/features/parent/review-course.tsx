@@ -8,14 +8,18 @@ import {
   Button,
   Card,
   PageHeading,
+  useContentWidth,
 } from "@/components/ui";
 import { useTheme } from "@/theme";
 import type {
   AiJob,
   CourseSource,
   RevisionSection,
+  SourceReference,
   LearningDiagram as Diagram,
 } from "@/domain/model";
+import { SourceViewer } from "@/components/source-viewer";
+import { previousPublishedCourse } from "@/domain/learning";
 import { subjectHref } from "./subject-navigation";
 import { useLearning } from "@/state/learning-store";
 import { DiagramEditor } from "./diagram-editor";
@@ -78,7 +82,15 @@ export function ReviewCourseScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const contentWidth = useContentWidth();
+  const sideBySide = width > height && contentWidth >= 650;
+  const [reference, setReference] = useState<{
+    courseId: string;
+    sectionId: string;
+    source: CourseSource;
+    ref: SourceReference;
+  } | null>(null);
   const data = useLearning();
   const course = data.courses.find((item) => item.id === id);
   const sections = useMemo(
@@ -100,7 +112,37 @@ export function ReviewCourseScreen() {
   if (!data.isReady) return <LoadingParent active="import" />;
   if (!course) return <ParentNotFound />;
   const subject = data.subjects.find((item) => item.id === course.subjectId);
-  const readOnly = course.status === "published";
+  const archived = course.status === "archived";
+  const readOnly = course.status !== "draft";
+  const previous = previousPublishedCourse(course, data.courses);
+  const affectedPlans = previous
+    ? data.plans.filter((plan) => plan.courseIds.includes(previous.id))
+    : [];
+  const selectedReference = reference?.courseId === id ? reference : null;
+  const latest = archived
+    ? data.courses.find(
+        (item) =>
+          item.status === "published" && item.replacedCourseIds?.includes(id),
+      )
+    : undefined;
+  function sourceOf(ref: SourceReference): CourseSource {
+    const sources = course!.sources.filter(
+      (source) =>
+        source.storageId === ref.sourceId || source.id === ref.sourceId,
+    );
+    return (
+      sources.find((source) => (source.page ?? 1) === (ref.page ?? 1)) ??
+      sources[0] ?? {
+        id: ref.sourceId,
+        name:
+          ref.sourceId === "texte-saisi"
+            ? "Texte du cours"
+            : "Source de la fiche",
+        extractedText:
+          ref.sourceId === "texte-saisi" ? course!.sourceText : undefined,
+      }
+    );
+  }
   const disabled = busy || readOnly;
   function change(update: Parameters<typeof data.updateCourse>[1]) {
     if (disabled) return;
@@ -164,7 +206,7 @@ export function ReviewCourseScreen() {
       );
     }
   }
-  function publish() {
+  function publish(replaceId?: string) {
     if (hasPendingDiagrams) {
       setError(
         "Appliquez ou annulez les modifications des schémas avant de publier.",
@@ -179,7 +221,7 @@ export function ReviewCourseScreen() {
       );
       return;
     }
-    if (!confirmed) {
+    if (!confirmed && !readOnly) {
       setError("Confirmez la relecture avant de publier la fiche.");
       return;
     }
@@ -194,7 +236,7 @@ export function ReviewCourseScreen() {
           example: section.example?.trim(),
         })),
     });
-    const result = data.publishCourse(id);
+    const result = data.publishCourse(id, replaceId);
     if (!result.ok)
       setError(result.error ?? "La fiche ne peut pas encore être publiée.");
     else {
@@ -205,7 +247,7 @@ export function ReviewCourseScreen() {
   function duplicate() {
     const nextId = data.addCourse({
       subjectId: course!.subjectId,
-      title: course!.title + " — nouvelle version",
+      title: course!.title,
       description: course!.description,
       sections: course!.sections.map((section) => ({
         ...section,
@@ -214,6 +256,7 @@ export function ReviewCourseScreen() {
       sources: course!.sources,
       sourceText: course!.sourceText,
       originId: course!.originId || course!.id,
+      previousVersionId: course!.id,
       revision: (course!.revision ?? 1) + 1,
     });
     setConfirmed(false);
@@ -272,17 +315,27 @@ export function ReviewCourseScreen() {
       <View testID="parent-review" style={{ gap: 26 }}>
         <PageHeading
           eyebrow={subject?.title}
-          title={readOnly ? "La fiche publiée" : "Préparer la fiche"}
+          title={
+            archived
+              ? "Version archivée"
+              : readOnly
+                ? "La fiche publiée"
+                : "Préparer la fiche"
+          }
           description={
-            readOnly
-              ? `Voici le contenu disponible dans l’espace de ${data.childName}.`
-              : "Vérifiez les documents, puis corrigez la fiche avant de la publier."
+            archived
+              ? "Cette édition est conservée dans l’historique parent."
+              : readOnly
+                ? `Voici le contenu disponible dans l’espace de ${data.childName}.`
+                : "Vérifiez les documents, puis corrigez la fiche avant de la publier."
           }
           action={
             <Badge tone={readOnly ? "green" : "orange"}>
-              {readOnly
-                ? `Publiée pour ${data.childName}`
-                : "Brouillon · visible par vous"}
+              {archived
+                ? "Archive"
+                : readOnly
+                  ? `Publiée pour ${data.childName}`
+                  : "Brouillon · visible par vous"}
             </Badge>
           }
         />
@@ -406,7 +459,7 @@ export function ReviewCourseScreen() {
             )}
           </Card>
         )}
-        {readOnly && (
+        {readOnly && !archived && (
           <Notice>
             Pour modifier cette fiche, créez une nouvelle version en brouillon.
             La version publiée reste disponible pendant sa préparation.
@@ -416,7 +469,8 @@ export function ReviewCourseScreen() {
           style={[
             s.grid,
             {
-              flexDirection: width >= 1200 ? "row" : "column",
+              flexDirection:
+                width >= 1200 && !selectedReference ? "row" : "column",
               alignItems: "flex-start",
             },
           ]}
@@ -440,92 +494,128 @@ export function ReviewCourseScreen() {
                 maxLength={300}
               />
               <AppText variant="small" color={colors.muted}>
-                {readOnly
-                  ? "Fiche publiée"
-                  : "Vos corrections sont enregistrées dans le brouillon au fil de la saisie."}
+                {archived
+                  ? "Version archivée"
+                  : readOnly
+                    ? "Fiche publiée"
+                    : "Vos corrections sont enregistrées dans le brouillon au fil de la saisie."}
                 {course.revision ? ` · Version ${course.revision}` : ""}
               </AppText>
             </Card>
             {sections
               .filter((section) => !readOnly || section.content.trim())
               .map((section) => (
-                <Card key={section.id} style={s.section}>
-                  <View style={s.row}>
-                    <AppIcon
-                      name={
+                <View
+                  key={section.id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 12,
+                  }}
+                >
+                  <Card style={[s.section, { flex: 1, minWidth: 0 }]}>
+                    <View style={s.row}>
+                      <AppIcon
+                        name={
+                          section.kind === "essential"
+                            ? "sparkles"
+                            : section.kind === "vocabulary"
+                              ? "book"
+                              : section.kind === "warning"
+                                ? "lightbulb"
+                                : "pencil"
+                        }
+                        color={
+                          section.kind === "warning"
+                            ? colors.orange
+                            : colors.primary
+                        }
+                      />
+                      <AppText variant="heading">{section.title}</AppText>
+                      {section.kind !== "essential" && (
+                        <Badge tone="muted">Facultatif</Badge>
+                      )}
+                    </View>
+                    <Field
+                      label={"Contenu — " + section.title}
+                      testID={
                         section.kind === "essential"
-                          ? "sparkles"
-                          : section.kind === "vocabulary"
-                            ? "book"
-                            : section.kind === "warning"
-                              ? "lightbulb"
-                              : "pencil"
+                          ? "course-content"
+                          : "course-content-" + section.id
                       }
-                      color={
-                        section.kind === "warning"
-                          ? colors.orange
-                          : colors.primary
+                      multiline
+                      placeholder={
+                        definitions.find(
+                          (definition) => definition.kind === section.kind,
+                        )?.placeholder
+                      }
+                      value={section.content}
+                      onChangeText={(value) =>
+                        changeSection(section.id, "content", value)
+                      }
+                      editable={!disabled}
+                      maxLength={12000}
+                    />
+                    <Field
+                      label={"Exemple — " + section.title}
+                      optional
+                      value={section.example ?? ""}
+                      onChangeText={(value) =>
+                        changeSection(section.id, "example", value)
+                      }
+                      editable={!disabled}
+                      multiline
+                      maxLength={4000}
+                    />
+                    <DiagramEditor
+                      value={section.diagram}
+                      storageKey={`revizo.diagram-editor.${data.activeProfileId}.${id}.${section.id}`}
+                      testID={"diagram-editor-" + section.kind}
+                      disabled={busy}
+                      readOnly={readOnly}
+                      onChange={(diagram) => changeDiagram(section.id, diagram)}
+                      onPendingChange={(pending) =>
+                        pendingDiagram(section.id, pending)
                       }
                     />
-                    <AppText variant="heading">{section.title}</AppText>
-                    {section.kind !== "essential" && (
-                      <Badge tone="muted">Facultatif</Badge>
+                    {!!section.sourceRefs?.length && (
+                      <View style={s.row}>
+                        {section.sourceRefs.map((ref, index) => {
+                          const source = sourceOf(ref);
+                          return (
+                            <Button
+                              key={index}
+                              variant="secondary"
+                              icon="file"
+                              testID={`section-reference-${section.id}-${index}`}
+                              onPress={() =>
+                                setReference({
+                                  courseId: id,
+                                  sectionId: section.id,
+                                  source,
+                                  ref,
+                                })
+                              }
+                            >
+                              {source.name}
+                              {ref.page ? ` · page ${ref.page}` : ""}
+                            </Button>
+                          );
+                        })}
+                      </View>
                     )}
-                  </View>
-                  <Field
-                    label={"Contenu — " + section.title}
-                    testID={
-                      section.kind === "essential"
-                        ? "course-content"
-                        : "course-content-" + section.id
-                    }
-                    multiline
-                    placeholder={
-                      definitions.find(
-                        (definition) => definition.kind === section.kind,
-                      )?.placeholder
-                    }
-                    value={section.content}
-                    onChangeText={(value) =>
-                      changeSection(section.id, "content", value)
-                    }
-                    editable={!disabled}
-                    maxLength={12000}
-                  />
-                  <Field
-                    label={"Exemple — " + section.title}
-                    optional
-                    value={section.example ?? ""}
-                    onChangeText={(value) =>
-                      changeSection(section.id, "example", value)
-                    }
-                    editable={!disabled}
-                    multiline
-                    maxLength={4000}
-                  />
-                  <DiagramEditor
-                    value={section.diagram}
-                    storageKey={`revizo.diagram-editor.${data.activeProfileId}.${id}.${section.id}`}
-                    testID={"diagram-editor-" + section.kind}
-                    disabled={busy}
-                    readOnly={readOnly}
-                    onChange={(diagram) => changeDiagram(section.id, diagram)}
-                    onPendingChange={(pending) =>
-                      pendingDiagram(section.id, pending)
-                    }
-                  />
-                  {!!section.sourceRefs?.length && (
-                    <AppText variant="small" color={colors.muted}>
-                      Sources :{" "}
-                      {section.sourceRefs
-                        .map(
-                          (ref) =>
-                            `${course.sources.findIndex((source) => source.id === ref.sourceId) + 1}${ref.page ? `, page ${ref.page}` : ""}`,
-                        )
-                        .join(" · ")}
-                    </AppText>
-                  )}
-                </Card>
+                  </Card>
+                  {sideBySide &&
+                    selectedReference?.sectionId === section.id && (
+                      <SourceViewer
+                        inline
+                        source={selectedReference.source}
+                        page={selectedReference.ref.page}
+                        excerpt={selectedReference.ref.excerpt}
+                        onClose={() => setReference(null)}
+                      />
+                    )}
+                </View>
               ))}
           </View>
           <Card style={[s.column, { alignSelf: "stretch" }]}>
@@ -596,23 +686,41 @@ export function ReviewCourseScreen() {
                 </AppText>
               </Card>
             )}
-            <Button
-              variant="secondary"
-              icon="plus"
-              disabled={busy}
-              onPress={() =>
-                router.push({
-                  pathname: "/parent/import",
-                  params: { courseId: id },
-                })
-              }
-            >
-              Ajouter ou organiser les documents
-            </Button>
+            {!archived && (
+              <Button
+                variant="secondary"
+                icon="plus"
+                disabled={busy}
+                onPress={() =>
+                  router.push({
+                    pathname: "/parent/import",
+                    params: { courseId: id },
+                  })
+                }
+              >
+                Ajouter ou organiser les documents
+              </Button>
+            )}
           </Card>
         </View>
         <Card style={{ gap: 18 }}>
-          {readOnly ? (
+          {archived ? (
+            latest ? (
+              <Button
+                icon="book"
+                onPress={() =>
+                  router.replace({
+                    pathname: "/parent/review/[id]",
+                    params: { id: latest.id },
+                  })
+                }
+              >
+                Ouvrir la version publiée
+              </Button>
+            ) : (
+              <AppText>Version conservée dans l’historique.</AppText>
+            )
+          ) : readOnly ? (
             <>
               <AppText variant="heading">Une version prête à réviser</AppText>
               <View style={s.row}>
@@ -687,7 +795,8 @@ export function ReviewCourseScreen() {
                 </Button>
                 <Button
                   icon="check"
-                  onPress={publish}
+                  variant={previous ? "secondary" : "primary"}
+                  onPress={() => publish()}
                   disabled={
                     busy ||
                     hasPendingDiagrams ||
@@ -696,12 +805,55 @@ export function ReviewCourseScreen() {
                   }
                   testID="publish-course"
                 >
-                  Publier pour {data.childName}
+                  {previous
+                    ? "Publier comme fiche distincte"
+                    : `Publier pour ${data.childName}`}
                 </Button>
               </View>
             </>
           )}
+          {!!previous &&
+            !archived &&
+            !course.replacedCourseIds?.includes(previous.id) && (
+              <>
+                <AppText variant="heading">
+                  Remplacer la version précédente
+                </AppText>
+                <AppText>
+                  « {previous.title} » sera archivée. Les exercices et les liens
+                  vers cette fiche ouvriront la nouvelle édition.
+                </AppText>
+                {affectedPlans.length > 0 && (
+                  <AppText>
+                    Contrôles concernés ·{" "}
+                    {affectedPlans.map((plan) => plan.title).join(" · ")}
+                  </AppText>
+                )}
+                <Button
+                  icon="check"
+                  disabled={
+                    busy ||
+                    (!readOnly &&
+                      (!confirmed ||
+                        hasPendingDiagrams ||
+                        !course.title.trim()))
+                  }
+                  testID="replace-published-course"
+                  onPress={() => publish(previous.id)}
+                >
+                  Remplacer la fiche publiée
+                </Button>
+              </>
+            )}
         </Card>
+        {!sideBySide && selectedReference && (
+          <SourceViewer
+            source={selectedReference.source}
+            page={selectedReference.ref.page}
+            excerpt={selectedReference.ref.excerpt}
+            onClose={() => setReference(null)}
+          />
+        )}
       </View>
     </ParentLayout>
   );

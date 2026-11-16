@@ -163,10 +163,14 @@ export function StudentCourseScreen() {
   const data = useChildData();
   const router = useRouter();
   const width = useContentWidth();
-  const course = data.publishedCourses.find((c) => c.id === id);
+  const course =
+    data.publishedCourses.find((c) => c.id === id) ??
+    data.publishedCourses.find((c) => c.replacedCourseIds?.includes(id));
   const subject = subjectFor(data.subjects, course?.subjectId ?? "");
-  const series = data.publishedSeries.filter((s) => s.courseIds.includes(id));
-  const reviewed = data.reviewedCourseIds.includes(id);
+  const series = data.publishedSeries.filter(
+    (s) => course && s.courseIds.includes(course.id),
+  );
+  const reviewed = !!course && data.reviewedCourseIds.includes(course.id);
   const [source, setSource] = useState<CourseSource | null>(null);
   const [downloadState, setDownloadState] = useState("");
   const [downloading, setDownloading] = useState(false);

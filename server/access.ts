@@ -181,9 +181,22 @@ export function mergeChildData(
     )
   )
     throw new HttpError(403, "Ce plan n’est pas disponible.");
+  const readingIds = new Set(
+    view.courses.flatMap((course) => [
+      course.id,
+      ...(course.replacedCourseIds ?? []),
+    ]),
+  );
   const readingRecords = [...(current.readingRecords ?? [])];
   for (const record of incoming.readingRecords ?? []) {
-    if (!publishedIds.has(record.courseId))
+    if (
+      !readingIds.has(record.courseId) &&
+      !readingRecords.some(
+        (existing) =>
+          existing.courseId === record.courseId &&
+          existing.reviewedAt === record.reviewedAt,
+      )
+    )
       throw new HttpError(
         403,
         "Cette lecture ne correspond pas à une fiche publiée.",

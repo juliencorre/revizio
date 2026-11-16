@@ -34,7 +34,8 @@ export function latestAttempts(
 /** Display-only preparation stages; publication still requires explicit parent review. */
 export function preparationStatus(
   content: Course | ExerciseSeries,
-): "Brouillon" | "À vérifier" | "Publié" {
+): "Brouillon" | "À vérifier" | "Publié" | "Archivée" {
+  if (content.status === "archived") return "Archivée";
   if (content.status === "published") return "Publié";
   const hasContent =
     "sections" in content

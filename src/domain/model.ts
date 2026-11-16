@@ -92,12 +92,14 @@ export interface Course {
   subjectId: string;
   title: string;
   description: string;
-  status: PublicationStatus;
+  status: PublicationStatus | "archived";
   updatedAt: string;
   sections: RevisionSection[];
   sources: CourseSource[];
   sourceText?: string;
   originId?: string;
+  previousVersionId?: string;
+  replacedCourseIds?: string[];
   revision?: number;
   profileId?: string;
   generationJobId?: string;
@@ -183,6 +185,7 @@ export interface CourseDraftInput {
   sources?: CourseSource[];
   sourceText?: string;
   originId?: string;
+  previousVersionId?: string;
   revision?: number;
   generationJobId?: string;
   generationAppliedJobId?: string;
