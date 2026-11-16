@@ -1,10 +1,11 @@
+import { sourceCacheKey } from "./source-cache-key";
 import { documentKind } from "@/domain/document-kind";
 import { Directory, File, Paths } from "expo-file-system";
 import type { CourseSource } from "@/domain/model";
 import { absoluteApiUri, apiAuthHeaders } from "./api";
 const directory = () => new Directory(Paths.document, "revizo-courses");
 function target(source: CourseSource) {
-  const id = (source.storageId || source.id).replace(/[^a-zA-Z0-9_-]/g, "_");
+  const id = sourceCacheKey(source).replace(/[^a-zA-Z0-9_-]/g, "_");
   const kind = documentKind(source);
   // Keep existing offline photos under their historical cache name.
   const ext =
@@ -36,7 +37,8 @@ export async function resolveSourceUri(source: CourseSource): Promise<string> {
   const file = target(source);
   return file.exists
     ? file.uri
-    : source.cachedUri || absoluteApiUri(source.uri || "");
+    : (!source.cacheRevision && source.cachedUri) ||
+        absoluteApiUri(source.uri || "");
 }
 export async function clearSourceCache() {
   const folder = directory();

@@ -59,6 +59,7 @@ export interface CourseSource {
   uri?: string;
   mimeType?: string;
   storageId?: string;
+  cacheRevision?: string;
   page?: number;
   rotation?: number;
   extractedText?: string;

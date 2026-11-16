@@ -1,3 +1,4 @@
+import { sourceCacheKey } from "./source-cache-key";
 import { documentKind } from "@/domain/document-kind";
 import type { CourseSource } from "@/domain/model";
 import { absoluteApiUri, apiAuthHeaders } from "./api";
@@ -47,7 +48,7 @@ async function saveBlob(id: string, blob: Blob) {
   });
 }
 export async function cacheSource(source: CourseSource): Promise<CourseSource> {
-  const key = source.storageId || source.id;
+  const key = sourceCacheKey(source);
   if (await cachedBlob(key))
     return { ...source, cachedUri: "revizo-cache://" + key };
   if (!source.uri) return source;
@@ -73,10 +74,10 @@ export async function cacheSource(source: CourseSource): Promise<CourseSource> {
   return { ...source, cachedUri: "revizo-cache://" + key };
 }
 export async function resolveSourceUri(source: CourseSource): Promise<string> {
-  const key =
-    source.cachedUri?.replace("revizo-cache://", "") ||
-    source.storageId ||
-    source.id;
+  const key = source.cacheRevision
+    ? sourceCacheKey(source)
+    : source.cachedUri?.replace("revizo-cache://", "") ||
+      sourceCacheKey(source);
   if (objectUrls.has(key)) return objectUrls.get(key)!;
   const blob = await cachedBlob(key).catch(() => undefined);
   if (blob) {

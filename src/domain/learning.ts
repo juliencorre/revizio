@@ -587,6 +587,7 @@ function isCourse(value: unknown): value is Course {
           source.extractedText,
         ].every(optionalText) &&
         optionalId(source.storageId) &&
+        optionalId(source.cacheRevision) &&
         (source.page === undefined || positiveInteger(source.page)) &&
         (source.rotation === undefined ||
           [0, 90, 180, 270].some((rotation) => rotation === source.rotation)) &&

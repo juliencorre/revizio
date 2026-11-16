@@ -41,7 +41,13 @@ export function useSourceUri(source?: CourseSource | null) {
     return () => {
       active = false;
     };
-  }, [source?.id, source?.uri, source?.rotation, source?.cachedUri]);
+  }, [
+    source?.id,
+    source?.uri,
+    source?.rotation,
+    source?.cachedUri,
+    source?.cacheRevision,
+  ]);
   return { uri, error };
 }
 export function SourceThumbnail({
