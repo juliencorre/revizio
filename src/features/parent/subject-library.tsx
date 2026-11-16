@@ -285,7 +285,11 @@ export function SubjectLibrary({ subject }: { subject: Subject }) {
               " sur " +
               progress.length +
               (review ? " · " + review + " à revoir" : ""),
-            status: list.status === "published" ? "Publiée" : "Brouillon",
+            status: list.archived
+              ? "Archivée"
+              : list.status === "published"
+                ? "Publiée"
+                : "Brouillon",
             icon: "languages",
             href: {
               pathname: "/parent/vocabulary/[id]",

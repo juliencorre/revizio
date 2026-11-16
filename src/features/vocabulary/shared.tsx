@@ -71,13 +71,16 @@ export function MasteryRule() {
 export function WordProgressList({
   language,
   progress,
+  paginate = false,
 }: {
+  paginate?: boolean;
   language: VocabularyLanguage;
   progress: VocabularyWordProgress[];
 }) {
   const { colors } = useTheme();
   const vocabularyStyles = useVocabularyStyles();
   const [filter, setFilter] = useState<"all" | "review" | "known">("all");
+  const [limit, setLimit] = useState(25);
   const visible = progress.filter(
     (item) =>
       filter === "all" ||
@@ -98,7 +101,10 @@ export function WordProgressList({
             selected={filter === id}
             variant={filter === id ? "primary" : "secondary"}
             testID={`vocabulary-filter-${id}`}
-            onPress={() => setFilter(id)}
+            onPress={() => {
+              setFilter(id);
+              setLimit(25);
+            }}
           >
             {label}
           </Button>
@@ -116,7 +122,7 @@ export function WordProgressList({
           </AppText>
         </View>
       ) : (
-        visible.map((item) => (
+        (paginate ? visible.slice(0, limit) : visible).map((item) => (
           <View
             key={item.word.id}
             testID={`vocabulary-word-${item.word.id}`}
@@ -131,6 +137,9 @@ export function WordProgressList({
               <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
                 <AppText variant="label">{item.word.term}</AppText>
                 <AppText color={colors.muted}>{item.word.translation}</AppText>
+                {item.word.context && (
+                  <AppText variant="small">{item.word.context}</AppText>
+                )}
               </View>
               <Badge
                 tone={
@@ -161,6 +170,11 @@ export function WordProgressList({
             </View>
           </View>
         ))
+      )}
+      {paginate && visible.length > limit && (
+        <Button variant="secondary" onPress={() => setLimit(limit + 25)}>
+          Afficher plus de mots
+        </Button>
       )}
     </View>
   );

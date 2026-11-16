@@ -31,7 +31,10 @@ export function SubjectGrid() {
             !latestAttempt(data.attempts, series.id)?.completedAt,
         ).length;
         const lists = data.vocabularyLists.filter(
-          (list) => list.language === subject.id && list.status === "published",
+          (list) =>
+            list.language === subject.id &&
+            list.status === "published" &&
+            !list.archived,
         ).length;
         const accent = subjectAccent(subject.color);
         return (

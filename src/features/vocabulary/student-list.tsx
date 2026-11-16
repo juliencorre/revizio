@@ -32,13 +32,16 @@ export function StudentVocabularyList() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const list = data.vocabularyLists.find(
-    (list) => list.id === id && list.status === "published",
+    (list) => list.id === id && list.status === "published" && !list.archived,
   );
   const [mode, setMode] = useState<VocabularyMode>("both");
   const [error, setError] = useState("");
   const pending = [...data.vocabularySessions]
     .reverse()
-    .find((session) => session.listId === id && !session.completedAt);
+    .find(
+      (session) =>
+        !session.source && session.listId === id && !session.completedAt,
+    );
   const progress = list
     ? vocabularyProgress(list, data.vocabularySessions)
     : [];

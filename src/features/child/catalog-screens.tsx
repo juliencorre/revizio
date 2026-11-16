@@ -87,7 +87,7 @@ export function StudentSubjectScreen() {
                   })
                 }
               >
-                Mes listes de vocabulaire
+                Mon vocabulaire
               </Button>
             )}
             {subject.id === "english" && (

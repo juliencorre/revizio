@@ -1,5 +1,5 @@
 import { subjectHref } from "@/features/parent/subject-navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, type ScrollViewInstance } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -23,6 +23,10 @@ import {
   vocabularyListError,
   vocabularyProgress,
 } from "@/domain/vocabulary";
+import {
+  publicationPreview,
+  vocabularyRepertoire,
+} from "@/domain/vocabulary-repertoire";
 import { Field, Notice, ParentLayout, localId } from "@/features/parent/shared";
 import { useLocalDraft } from "@/features/planning/use-local-draft";
 import { spacing } from "@/theme";
@@ -86,6 +90,7 @@ function VocabularyEditor() {
   const [message, setMessage] = useState("");
   const [bulk, setBulk] = useState(false);
   const [bulkText, setBulkText] = useState("");
+  const [editingContexts, setEditingContexts] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => {
     if (!draft.ready || id !== legacyEnglishListId) return;
@@ -111,6 +116,18 @@ function VocabularyEditor() {
     data.english.words,
     setList,
   ]);
+  const repertoire = useMemo(
+    () =>
+      vocabularyRepertoire(
+        {
+          vocabularyLists: data.vocabularyLists,
+          vocabularyRetainedWords: data.vocabularyRetainedWords,
+        },
+        language,
+      ),
+    [data.vocabularyLists, data.vocabularyRetainedWords, language],
+  );
+  const preview = publicationPreview(list, repertoire);
   const progress = vocabularyProgress(saved ?? list, data.vocabularySessions);
   function change(next: VocabularyList) {
     setList(next);
@@ -119,7 +136,11 @@ function VocabularyEditor() {
   }
   function save(status: VocabularyList["status"]) {
     try {
-      const next = normalizeVocabularyList({ ...list, status });
+      const next = normalizeVocabularyList({
+        ...list,
+        archived: false,
+        status,
+      });
       const issue =
         status === "published"
           ? vocabularyListError(next)
@@ -136,7 +157,7 @@ function VocabularyEditor() {
       setError("");
       setMessage(
         status === "published"
-          ? `La liste est publiée pour ${data.childName}. Les exercices sont disponibles dans sa matière.`
+          ? `La liste est publiée pour ${data.childName}. ${preview.added} ${preview.added === 1 ? "nouveau mot" : "nouveaux mots"} et ${preview.existing} déjà dans le répertoire.`
           : "Le brouillon est enregistré dans l’espace parent.",
       );
       scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -210,9 +231,11 @@ function VocabularyEditor() {
               <View style={vocabularyStyles.row}>
                 <AppText variant="heading">Les mots à apprendre</AppText>
                 <Badge tone={saved?.status === "published" ? "green" : "muted"}>
-                  {saved?.status === "published"
-                    ? "Liste publiée"
-                    : "Brouillon privé"}
+                  {saved?.archived
+                    ? "Liste archivée"
+                    : saved?.status === "published"
+                      ? "Liste publiée"
+                      : "Brouillon privé"}
                 </Badge>
               </View>
               <Field
@@ -321,6 +344,40 @@ function VocabularyEditor() {
                       />
                     </View>
                   </View>
+                  {preview.otherSenses.has(word.id) && (
+                    <AppText variant="small">
+                      Traduction déjà présente dans le répertoire ·{" "}
+                      {preview.otherSenses.get(word.id)!.join(" / ")}. Ajoutez
+                      un indice pour distinguer le nouveau sens.
+                    </AppText>
+                  )}
+                  {word.context ||
+                  editingContexts.includes(word.id) ||
+                  preview.otherSenses.has(word.id) ? (
+                    <Field
+                      label={`Indice de contexte ${index + 1}`}
+                      value={word.context ?? ""}
+                      maxLength={160}
+                      placeholder="Par exemple, au bord de l’eau"
+                      onChangeText={(context) =>
+                        change({
+                          ...list,
+                          words: list.words.map((item) =>
+                            item.id === word.id ? { ...item, context } : item,
+                          ),
+                        })
+                      }
+                    />
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      onPress={() =>
+                        setEditingContexts([...editingContexts, word.id])
+                      }
+                    >
+                      Ajouter un indice de contexte
+                    </Button>
+                  )}
                 </View>
               ))}
               <View style={vocabularyStyles.row}>
@@ -370,6 +427,16 @@ function VocabularyEditor() {
                   </Button>
                 </View>
               )}
+              {preview.added + preview.existing > 0 && (
+                <AppText
+                  variant="label"
+                  testID="vocabulary-publication-preview"
+                >
+                  {preview.added}{" "}
+                  {preview.added === 1 ? "nouveau mot" : "nouveaux mots"} ·{" "}
+                  {preview.existing} déjà dans le répertoire
+                </AppText>
+              )}
               <AppText variant="small">
                 Le brouillon de cet écran est conservé sur cet appareil. Publiez
                 la liste pour rendre ses mots et exercices accessibles à
@@ -389,9 +456,11 @@ function VocabularyEditor() {
                   testID="publish-vocabulary-list"
                   onPress={() => save("published")}
                 >
-                  {saved?.status === "published"
-                    ? "Publier les modifications"
-                    : `Publier pour ${data.childName}`}
+                  {saved?.archived
+                    ? "Republier la liste"
+                    : saved?.status === "published"
+                      ? "Publier les modifications"
+                      : `Publier pour ${data.childName}`}
                 </Button>
               </View>
             </Card>
@@ -407,6 +476,31 @@ function VocabularyEditor() {
             )}
             {saved && (
               <View style={{ gap: spacing.md }}>
+                {saved.status === "published" && !saved.archived && (
+                  <>
+                    <AppText>
+                      Une liste archivée quitte les listes à apprendre. Ses mots
+                      restent dans le répertoire et les révisions.
+                    </AppText>
+                    <Button
+                      variant="secondary"
+                      onPress={() => {
+                        try {
+                          data.saveVocabularyList({ ...saved, archived: true });
+                          router.replace(subjectHref(language, "vocabulaire"));
+                        } catch (cause) {
+                          setError(
+                            cause instanceof Error
+                              ? cause.message
+                              : "Archivage impossible.",
+                          );
+                        }
+                      }}
+                    >
+                      Archiver la liste publiée
+                    </Button>
+                  </>
+                )}
                 <Button
                   icon="trash"
                   variant="danger"
@@ -418,8 +512,9 @@ function VocabularyEditor() {
                 {confirmDelete && (
                   <View style={{ gap: spacing.md }}>
                     <AppText>
-                      La liste sera retirée. Les réponses déjà données seront
-                      conservées dans l’historique de ses séances.
+                      La liste sera supprimée. Ses mots publiés resteront dans
+                      le répertoire et les réponses déjà données dans
+                      l’historique.
                     </AppText>
                     <Button
                       variant="danger"

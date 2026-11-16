@@ -361,3 +361,93 @@ test("modifier et supprimer le vocabulaire migré actualise les anciennes cartes
     "castle",
   );
 });
+
+test("répertoire général sur iPad : archiver, chercher, réviser et reprendre", async ({
+  page,
+}, info) => {
+  const { initialData } = await import("../../src/domain/fixtures");
+  const seed = {
+    ...initialData,
+    vocabularyLists: [
+      {
+        id: "home",
+        language: "english",
+        title: "La maison",
+        status: "published",
+        words: [{ id: "w", term: "window", translation: "fenêtre" }],
+      },
+      {
+        id: "school",
+        language: "english",
+        title: "À l’école",
+        status: "published",
+        words: [
+          { id: "another", term: "window", translation: "fenêtre" },
+          { id: "d", term: "desk", translation: "bureau" },
+          { id: "c", term: "chair", translation: "chaise" },
+        ],
+      },
+    ],
+  };
+  await page.addInitScript(
+    ({ seed, key }) => {
+      localStorage.setItem("revizo.mode", "demo");
+      if (!localStorage.getItem(key))
+        localStorage.setItem(key, JSON.stringify(seed));
+    },
+    { seed, key: storageKey },
+  );
+  await page.goto("/parent/vocabulary/home");
+  await expect(
+    page.getByTestId("vocabulary-publication-preview"),
+  ).toContainText("1 déjà");
+  await page.getByRole("button", { name: "Archiver la liste publiée" }).click();
+  await expect
+    .poll(
+      async () =>
+        (await saved(page)).vocabularyLists?.find((l) => l.id === "home")
+          ?.archived,
+    )
+    .toBe(true);
+  await page.goto("/student/subject/english");
+  await page.getByTestId("subject-vocabulary").click();
+  await expect(page.getByTestId("vocabulary-list-home")).toHaveCount(0);
+  await expect(page.getByTestId("vocabulary-list-school")).toBeVisible();
+  await capture(page, info, "accueil-repertoire");
+  await page
+    .getByRole("button", { name: "Tous mes mots", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Chercher un mot ou une traduction" })
+    .fill("fenêtre");
+  await expect(page.getByText("window", { exact: true })).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Mon vocabulaire", exact: true })
+    .click();
+  await page.getByTestId("general-vocabulary-review").click();
+  const first = await page.getByTestId("vocabulary-prompt").innerText();
+  await answer(page, "erreur");
+  await page
+    .getByRole("button", { name: "Quitter et garder ma place" })
+    .click();
+  await expect(page).toHaveURL(/\/student\/vocabulary\?language=english/);
+  await page.reload();
+  await page.getByRole("button", { name: "Reprendre ma révision" }).click();
+  const translations: Record<string, string> = {
+    window: "fenêtre",
+    desk: "bureau",
+    chair: "chaise",
+  };
+  for (let i = 0; i < 3; i++) {
+    const word = await page.getByTestId("vocabulary-prompt").innerText();
+    if (i === 2) expect(word).toBe(first);
+    await answer(page, translations[word]);
+  }
+  await expect(page.getByTestId("vocabulary-score")).toHaveText("3 / 4");
+  await page.getByTestId("vocabulary-back-to-list").click();
+  await page
+    .getByRole("button", { name: "Tous mes mots", exact: true })
+    .click();
+  await expect(page.getByText("À revoir", { exact: true })).toHaveCount(1);
+  await capture(page, info, "suivi-repertoire");
+});

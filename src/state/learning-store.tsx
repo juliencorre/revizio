@@ -26,6 +26,7 @@ import {
   englishValidation,
   normalizeEnglish,
 } from "../domain/english";
+import { createGeneralReview } from "../domain/vocabulary-repertoire";
 import { dateOnly, planValidation, reschedulePlan } from "../domain/planning";
 import {
   answerVocabularySession,
@@ -34,6 +35,7 @@ import {
   legacyEnglishListId,
   legacyEnglishVocabulary,
   normalizeVocabularyList,
+  retainRemovedVocabulary,
   vocabularyListError,
   vocabularyListsFor,
 } from "../domain/vocabulary";
@@ -50,6 +52,7 @@ import type {
   QuestionType,
   RevisionPlan,
   SeriesDraftInput,
+  VocabularyLanguage,
   VocabularyList,
   VocabularyMode,
   VocabularySession,
@@ -128,6 +131,7 @@ export interface LearningContextValue extends Omit<
   updateEnglish(settings: EnglishSettings): void;
   saveVocabularyList(list: VocabularyList): void;
   deleteVocabularyList(id: string): void;
+  startGeneralReview(language: VocabularyLanguage): string | null;
   startVocabularySession(
     listId: string,
     mode: VocabularyMode,
@@ -720,50 +724,66 @@ export function LearningProvider({ children }: { children: ReactNode }) {
             ? 0
             : 1),
       };
+      const previousList = vocabularyListsFor(current).find(
+        (list) => list.id === legacyEnglishListId,
+      );
       const material = buildEnglishMaterial(english);
-      commit({
-        ...current,
-        english,
-        vocabularyLists: [
-          ...vocabularyListsFor(current).filter(
-            (list) => list.id !== legacyEnglishListId,
-          ),
-          ...legacyEnglishVocabulary(english).map((list) => ({
-            ...list,
-            title:
-              vocabularyListsFor(current).find(
-                (previous) => previous.id === list.id,
-              )?.title ?? list.title,
-          })),
-        ],
-        courses: material
-          ? [
-              ...current.courses.filter((c) => c.id !== material.course.id),
-              material.course,
-            ]
-          : current.courses.map((c) =>
-              c.id === "english-repertoire-course"
-                ? { ...c, status: "draft" }
-                : c,
+      commit(
+        retainRemovedVocabulary(current, {
+          ...current,
+          english,
+          vocabularyLists: [
+            ...vocabularyListsFor(current).filter(
+              (list) => list.id !== legacyEnglishListId,
             ),
-        series: material
-          ? [
-              ...current.series.filter((s) => s.id !== material.series.id),
-              material.series,
-            ]
-          : current.series.map((s) =>
-              s.id === "english-repertoire-practice"
-                ? { ...s, status: "draft" }
-                : s,
-            ),
-        plans: material
-          ? current.plans
-          : (current.plans ?? []).map((p) =>
-              p.courseIds.includes("english-repertoire-course")
-                ? { ...p, status: "draft" }
-                : p,
-            ),
-      });
+            ...legacyEnglishVocabulary(english).map((list) => ({
+              ...list,
+              title: previousList?.title ?? list.title,
+              ...(previousList?.archived && list.status === "published"
+                ? { archived: true }
+                : {}),
+              words: list.words.map((word) => {
+                const previous = previousList?.words.find(
+                  (item) =>
+                    item.id === word.id &&
+                    item.term === word.term &&
+                    item.translation === word.translation,
+                );
+                return previous?.context
+                  ? { ...word, context: previous.context }
+                  : word;
+              }),
+            })),
+          ],
+          courses: material
+            ? [
+                ...current.courses.filter((c) => c.id !== material.course.id),
+                material.course,
+              ]
+            : current.courses.map((c) =>
+                c.id === "english-repertoire-course"
+                  ? { ...c, status: "draft" }
+                  : c,
+              ),
+          series: material
+            ? [
+                ...current.series.filter((s) => s.id !== material.series.id),
+                material.series,
+              ]
+            : current.series.map((s) =>
+                s.id === "english-repertoire-practice"
+                  ? { ...s, status: "draft" }
+                  : s,
+              ),
+          plans: material
+            ? current.plans
+            : (current.plans ?? []).map((p) =>
+                p.courseIds.includes("english-repertoire-course")
+                  ? { ...p, status: "draft" }
+                  : p,
+              ),
+        }),
+      );
     },
     [assertParent, commit],
   );
@@ -797,13 +817,15 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         });
         list.englishWordsRevision = dataRef.current.english?.wordsRevision ?? 0;
       }
-      commit({
-        ...dataRef.current,
-        vocabularyLists: [
-          ...lists.filter((item) => item.id !== list.id),
-          clone(list),
-        ],
-      });
+      commit(
+        retainRemovedVocabulary(current, {
+          ...dataRef.current,
+          vocabularyLists: [
+            ...lists.filter((item) => item.id !== list.id),
+            clone(list),
+          ],
+        }),
+      );
     },
     [assertParent, commit, updateEnglish],
   );
@@ -815,15 +837,45 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           ...(dataRef.current.english ?? clone(emptyEnglishSettings)),
           words: [],
         });
-      commit({
-        ...dataRef.current,
-        vocabularyLists: vocabularyListsFor(dataRef.current).filter(
-          (list) => list.id !== id,
-        ),
-      });
+      commit(
+        retainRemovedVocabulary(dataRef.current, {
+          ...dataRef.current,
+          vocabularyLists: vocabularyListsFor(dataRef.current).filter(
+            (list) => list.id !== id,
+          ),
+        }),
+      );
     },
     [assertParent, commit, updateEnglish],
   );
+  const startGeneralReview = useCallback(
+    (language: VocabularyLanguage) => {
+      assertReady();
+      const current = dataRef.current;
+      const sessions = current.vocabularySessions ?? [];
+      const pending = [...sessions]
+        .reverse()
+        .find(
+          (session) =>
+            session.source === "repertoire" &&
+            session.language === language &&
+            !session.completedAt,
+        );
+      if (pending) return pending.id;
+      const session = createGeneralReview(
+        current,
+        sessions,
+        language,
+        newId("vocabulary-session"),
+        now(),
+      );
+      if (!session) return null;
+      commit({ ...current, vocabularySessions: [...sessions, session] });
+      return session.id;
+    },
+    [assertReady, commit],
+  );
+
   const startVocabularySession = useCallback(
     (
       listId: string,
@@ -834,7 +886,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       assertReady();
       const current = dataRef.current;
       const list = vocabularyListsFor(current).find(
-        (list) => list.id === listId && list.status === "published",
+        (list) =>
+          list.id === listId && list.status === "published" && !list.archived,
       );
       if (!list) return null;
       const sessions = current.vocabularySessions ?? [];
@@ -842,6 +895,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         .reverse()
         .find(
           (session) =>
+            !session.source &&
             session.listId === listId &&
             session.mode === mode &&
             session.scope === scope &&
@@ -1136,6 +1190,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       updateEnglish,
       saveVocabularyList,
       deleteVocabularyList,
+      startGeneralReview,
       startVocabularySession,
       answerVocabulary,
       completeVocabulary,
@@ -1178,6 +1233,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       updateEnglish,
       saveVocabularyList,
       deleteVocabularyList,
+      startGeneralReview,
       startVocabularySession,
       answerVocabulary,
       completeVocabulary,

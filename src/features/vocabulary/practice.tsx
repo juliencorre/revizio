@@ -62,7 +62,11 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
     (session) => session.id === initial.id,
   )!;
   const list = data.vocabularyLists.find(
-    (list) => list.id === session.listId && list.status === "published",
+    (list) =>
+      !session.source &&
+      list.id === session.listId &&
+      list.status === "published" &&
+      !list.archived,
   );
   const question = session.questions[index];
   const answer = session.answers.find(
@@ -147,8 +151,9 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
                 {session.questions.length}
               </AppText>
               <AppText>
-                Chaque réponse fait avancer le suivi de tes mots dans le sens
-                travaillé.
+                {session.source
+                  ? "Les mots à revoir reviendront dans une prochaine révision."
+                  : "Chaque réponse fait avancer le suivi de tes mots dans le sens travaillé."}
               </AppText>
               {list && (
                 <VocabularySummary
@@ -160,7 +165,9 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
                 testID="vocabulary-back-to-list"
                 onPress={back}
               >
-                Retrouver mes mots et mon suivi
+                {session.source
+                  ? "Mon vocabulaire"
+                  : "Retrouver mes mots et mon suivi"}
               </Button>
               {list && (
                 <Button
@@ -206,6 +213,7 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
                       </Badge>
                     </View>
                     <AppText variant="small">
+                      {question.context && question.context + " · "}
                       {directionLabel(session.language, question.direction)} ·
                       Ta réponse : {answer.response ?? answer.choiceId}
                     </AppText>
@@ -241,6 +249,9 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
             />
             <Card style={{ gap: spacing.xl }}>
               <AppText>Écris la traduction en {target}.</AppText>
+              {question.context && (
+                <AppText variant="small">Contexte · {question.context}</AppText>
+              )}
               <AppText variant="title" testID="vocabulary-prompt">
                 {question.prompt}
               </AppText>
