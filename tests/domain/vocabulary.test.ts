@@ -201,6 +201,9 @@ describe("consignes et formes écrites du vocabulaire", () => {
     expect(
       questions("spanish", "hablas", "tu parles")[1].expectedAnswers,
     ).toEqual(["hablas", "tú hablas"]);
+    expect(
+      questions("spanish", "Yo hablo.", "Je parle.")[1].expectedAnswers,
+    ).toContain("hablo.");
     expect(questions("latin", "amo", "j’aime")[1].expectedAnswers).toEqual([
       "amo",
       "ego amo",
@@ -223,6 +226,12 @@ describe("consignes et formes écrites du vocabulaire", () => {
     }
     expect(
       questions("english", "to see him", "le voir")[0].expectedAnswers,
+    ).toEqual(["le voir"]);
+  });
+
+  it("préserve un pronom complément dans une traduction à l’infinitif", () => {
+    expect(
+      questions("english", "see him", "le voir")[0].expectedAnswers,
     ).toEqual(["le voir"]);
   });
 

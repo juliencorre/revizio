@@ -121,6 +121,7 @@ function subjectForm(
   if (!subject) return fullForm;
   // An impersonal “il” has no corresponding él/is to insert.
   if (
+    !written &&
     /^il (?:y |(?:ne |n')?(?:pleu|neig|faut|fall|s'agit|fait |(?:est|était|sera) (?:tôt|tard|nécessaire|possible|temps|midi|minuit|\d)))/u.test(
       french,
     )
@@ -134,7 +135,7 @@ function subjectForm(
     target === "latin"
       ? /^(?:non )?(\p{L}+)(?: |$)/u
       : /^(?:(?:no|me|te|se|nos|os|lo|la|los|las|le|les) )*(\p{L}+)(?: |$)/u;
-  const predicate = normalizeAnswer(body);
+  const predicate = normalizeAnswer(body).replace(/[.!?]$/u, "");
   const match = predicate.match(verbPattern);
   if (!match || (!written && match[0].trim() !== predicate)) return fullForm;
   const verb = match[1];
@@ -191,6 +192,8 @@ function nounForm(
       frenchSubject.test(normalizeAnswer(source)) ||
       englishSubject.test(normalizeAnswer(source)) ||
       /^(?:to |se |s['’])/iu.test(source) ||
+      (sourceLang === "english" &&
+        /\b(?:me|him|her|it|us|them)$/iu.test(source)) ||
       (sourceLang === "spanish" && /[aei]r(?:l[oa]s?|le)$/iu.test(source)))
   )
     return;
