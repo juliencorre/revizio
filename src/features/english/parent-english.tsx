@@ -1,3 +1,4 @@
+import { ParentConjugation } from "./parent-conjugation";
 import { legacyEnglishListId } from "@/domain/vocabulary";
 import { subjectHref } from "@/features/parent/subject-navigation";
 import { useEffect, useRef, useState } from "react";
@@ -94,7 +95,11 @@ function mergeExtracted(
   };
 }
 export function ParentEnglishScreen() {
-  const { section } = useLocalSearchParams<{ section?: string }>();
+  const { section, verb, tense } = useLocalSearchParams<{
+    section?: string;
+    verb?: string;
+    tense?: string;
+  }>();
   const data = useLearning();
   if (!data.isReady)
     return (
@@ -102,14 +107,17 @@ export function ParentEnglishScreen() {
         <AppText>Chargement de l’anglais…</AppText>
       </StudyWorkspace>
     );
-  return (
-    <EnglishEditor
-      key={JSON.stringify([data.activeProfileId, section])}
-      conjugation={section === "conjugaison"}
-    />
-  );
+  if (section === "conjugaison")
+    return (
+      <ParentConjugation
+        key={JSON.stringify([data.activeProfileId, verb, tense])}
+        initialVerb={verb}
+        initialTense={tense}
+      />
+    );
+  return <EnglishEditor key={data.activeProfileId} />;
 }
-function EnglishEditor({ conjugation }: { conjugation: boolean }) {
+function EnglishEditor() {
   const { colors } = useTheme();
   const common = useParentStyles();
   const router = useRouter();
@@ -160,23 +168,17 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
   const showToolInput = toolInput ?? settings.toolWords.join(", ");
   const liveToolInput = useRef(showToolInput);
   liveToolInput.current = showToolInput;
-  const effective: EnglishSettings = conjugation
-    ? {
-        ...data.english,
-        verbs: settings.verbs,
-        tenses: settings.tenses,
-      }
-    : {
-        ...settings,
-        toolWords: showToolInput
-          .split(/[,;\n]/)
-          .map((word) => word.trim())
-          .filter(Boolean),
-      };
+  const effective: EnglishSettings = {
+    ...settings,
+    toolWords: showToolInput
+      .split(/[,;\n]/)
+      .map((word) => word.trim())
+      .filter(Boolean),
+  };
   let sample: ReturnType<typeof generateBoundedQuiz> = [];
   try {
     sample = generateBoundedQuiz(
-      conjugation ? { ...effective, words: [] } : effective,
+      effective,
       5,
       data.vocabularyLists.find((list) => list.id === legacyEnglishListId)
         ?.requireArticles,
@@ -239,41 +241,22 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
     setError("");
     setMessage("");
     const result = await data.extractEnglish(sources);
-    if (conjugation && !result.verbs.length && !result.tenses.length)
-      throw new Error(
-        "Aucun verbe irrégulier ni temps trouvé. Vérifiez les documents sélectionnés.",
-      );
-    if (conjugation) {
-      setSettings((current) => {
-        const merged = mergeExtracted(current, result);
-        return { ...current, verbs: merged.verbs, tenses: merged.tenses };
-      });
-    } else {
-      const toolWords = liveToolInput.current
-        .split(/[,;\n]/)
-        .map((word) => word.trim())
-        .filter(Boolean);
-      setSettings((current) =>
-        mergeExtracted({ ...current, toolWords }, result),
-      );
-      setToolInput(null);
-    }
+    const toolWords = liveToolInput.current
+      .split(/[,;\n]/)
+      .map((word) => word.trim())
+      .filter(Boolean);
+    setSettings((current) => mergeExtracted({ ...current, toolWords }, result));
+    setToolInput(null);
     setPreview(false);
     setConfirmed(false);
     setMessage(
-      conjugation
-        ? "Les verbes et les temps lus sont prêts à relire."
-        : "Les éléments lus ont été ajoutés au brouillon. Vérifiez-les avant de les partager.",
+      "Les éléments lus ont été ajoutés au brouillon. Vérifiez-les avant de les partager.",
     );
   }
   function openPreview() {
     const issue = englishValidation(effective);
     if (issue) {
       setError(issue);
-      return;
-    }
-    if (conjugation && !effective.verbs.length) {
-      setError("Ajoutez au moins un verbe à réviser.");
       return;
     }
     if (!effective.words.length && !effective.verbs.length) {
@@ -309,16 +292,8 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
     try {
       const normalized = normalizeEnglish(effective);
       data.updateEnglish(normalized);
-      if (conjugation) {
-        setSettings((current) => ({
-          ...current,
-          verbs: normalized.verbs,
-          tenses: normalized.tenses,
-        }));
-      } else {
-        setSettings(normalized);
-        setToolInput(normalized.toolWords.join(", "));
-      }
+      setSettings(normalized);
+      setToolInput(normalized.toolWords.join(", "));
       setMessage(
         "Le répertoire est enregistré pour votre enfant. Ses cartes et exercices sont disponibles dans « Mon anglais ».",
       );
@@ -345,23 +320,15 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
       <View testID="parent-english" style={{ gap: 26 }}>
         <PageHeading
           eyebrow="Au plus près de sa classe"
-          title={conjugation ? "Conjugaison" : "Son répertoire d’anglais"}
-          description={
-            conjugation
-              ? "Préparez les verbes et les temps étudiés en classe."
-              : "Les exercices utiliseront les mots, les verbes et les temps que vous avez vérifiés."
-          }
+          title="Son répertoire d’anglais"
+          description="Les exercices utiliseront les mots, les verbes et les temps que vous avez vérifiés."
         />
-        {!conjugation && (
-          <Button
-            icon="languages"
-            onPress={() =>
-              router.navigate(subjectHref("english", "vocabulaire"))
-            }
-          >
-            Gérer mes listes de vocabulaire et leur suivi
-          </Button>
-        )}
+        <Button
+          icon="languages"
+          onPress={() => router.navigate(subjectHref("english", "vocabulaire"))}
+        >
+          Gérer mes listes de vocabulaire et leur suivi
+        </Button>
         {draft.error && <Notice error>{draft.error}</Notice>}
         {error && <Notice error>{error}</Notice>}
         {message && <Notice success>{message}</Notice>}
@@ -373,97 +340,91 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
             onBusyChange={setBusy}
           />
         </Card>
-        {!conjugation && (
-          <>
-            <Card style={{ gap: 18 }}>
-              <View style={[common.row, { justifyContent: "space-between" }]}>
-                <AppText variant="heading">Les mots à connaître</AppText>
-                <Badge>{settings.words.length} mots</Badge>
+        <Card style={{ gap: 18 }}>
+          <View style={[common.row, { justifyContent: "space-between" }]}>
+            <AppText variant="heading">Les mots à connaître</AppText>
+            <Badge>{settings.words.length} mots</Badge>
+          </View>
+          <View style={common.row}>
+            <View style={{ flex: 1, minWidth: 180 }}>
+              <Field
+                label="Nouveau mot anglais"
+                value={wordEn}
+                onChangeText={setWordEn}
+                autoCapitalize="none"
+                testID="english-word-en"
+                placeholder="castle"
+                maxLength={100}
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 180 }}>
+              <Field
+                label="Traduction du nouveau mot"
+                value={wordFr}
+                onChangeText={setWordFr}
+                testID="english-word-fr"
+                placeholder="château"
+                maxLength={150}
+              />
+            </View>
+            <Button icon="plus" onPress={addWord} testID="add-english-word">
+              Ajouter le mot
+            </Button>
+          </View>
+          {settings.words.length === 0 && (
+            <AppText color={colors.muted}>
+              Commencez par les mots de son dernier cours.
+            </AppText>
+          )}
+          {settings.words.map((word, index) => (
+            <View key={word.id} style={common.row}>
+              <View style={{ flex: 1, minWidth: 160 }}>
+                <Field
+                  label={"Mot anglais " + (index + 1)}
+                  value={word.en}
+                  onChangeText={(en) =>
+                    change({
+                      ...settings,
+                      words: settings.words.map((item) =>
+                        item.id === word.id ? { ...item, en } : item,
+                      ),
+                    })
+                  }
+                  autoCapitalize="none"
+                  maxLength={100}
+                />
               </View>
-              <View style={common.row}>
-                <View style={{ flex: 1, minWidth: 180 }}>
-                  <Field
-                    label="Nouveau mot anglais"
-                    value={wordEn}
-                    onChangeText={setWordEn}
-                    autoCapitalize="none"
-                    testID="english-word-en"
-                    placeholder="castle"
-                    maxLength={100}
-                  />
-                </View>
-                <View style={{ flex: 1, minWidth: 180 }}>
-                  <Field
-                    label="Traduction du nouveau mot"
-                    value={wordFr}
-                    onChangeText={setWordFr}
-                    testID="english-word-fr"
-                    placeholder="château"
-                    maxLength={150}
-                  />
-                </View>
-                <Button icon="plus" onPress={addWord} testID="add-english-word">
-                  Ajouter le mot
-                </Button>
+              <View style={{ flex: 1, minWidth: 160 }}>
+                <Field
+                  label={"Traduction du mot " + (index + 1)}
+                  value={word.fr}
+                  onChangeText={(fr) =>
+                    change({
+                      ...settings,
+                      words: settings.words.map((item) =>
+                        item.id === word.id ? { ...item, fr } : item,
+                      ),
+                    })
+                  }
+                  maxLength={150}
+                />
               </View>
-              {settings.words.length === 0 && (
-                <AppText color={colors.muted}>
-                  Commencez par les mots de son dernier cours.
-                </AppText>
-              )}
-              {settings.words.map((word, index) => (
-                <View key={word.id} style={common.row}>
-                  <View style={{ flex: 1, minWidth: 160 }}>
-                    <Field
-                      label={"Mot anglais " + (index + 1)}
-                      value={word.en}
-                      onChangeText={(en) =>
-                        change({
-                          ...settings,
-                          words: settings.words.map((item) =>
-                            item.id === word.id ? { ...item, en } : item,
-                          ),
-                        })
-                      }
-                      autoCapitalize="none"
-                      maxLength={100}
-                    />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 160 }}>
-                    <Field
-                      label={"Traduction du mot " + (index + 1)}
-                      value={word.fr}
-                      onChangeText={(fr) =>
-                        change({
-                          ...settings,
-                          words: settings.words.map((item) =>
-                            item.id === word.id ? { ...item, fr } : item,
-                          ),
-                        })
-                      }
-                      maxLength={150}
-                    />
-                  </View>
-                  <Button
-                    icon="trash"
-                    variant="danger"
-                    accessibilityLabel={"Retirer le mot " + word.en}
-                    onPress={() =>
-                      change({
-                        ...settings,
-                        words: settings.words.filter(
-                          (item) => item.id !== word.id,
-                        ),
-                      })
-                    }
-                  >
-                    Retirer
-                  </Button>
-                </View>
-              ))}
-            </Card>
-          </>
-        )}
+              <Button
+                icon="trash"
+                variant="danger"
+                accessibilityLabel={"Retirer le mot " + word.en}
+                onPress={() =>
+                  change({
+                    ...settings,
+                    words: settings.words.filter((item) => item.id !== word.id),
+                  })
+                }
+              >
+                Retirer
+              </Button>
+            </View>
+          ))}
+        </Card>
         <Card style={{ gap: 18 }}>
           <View style={[common.row, { justifyContent: "space-between" }]}>
             <AppText variant="heading">Les verbes étudiés</AppText>
@@ -610,50 +571,48 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
             })}
           </View>
         </Card>
-        {!conjugation && (
-          <Card style={{ gap: 16 }}>
-            <AppText variant="heading">Les mots outils autorisés</AppText>
-            <AppText color={colors.muted}>
-              Articles, pronoms et auxiliaires servent à former les phrases.
-              Définissez ceux que l’enfant connaît ; les mots ciblés restent
-              ceux des listes ci-dessus.
-            </AppText>
-            <Field
-              label="Mots outils, séparés par des virgules"
-              value={showToolInput}
-              multiline
-              onChangeText={(value) => {
-                setToolInput(value);
-                setPreview(false);
-                setConfirmed(false);
-              }}
-              placeholder="I, you, the, a, to…"
-              maxLength={2000}
-            />
-            <Button
-              variant="secondary"
-              icon="plus"
-              onPress={() => {
-                setToolInput(
-                  [
-                    ...new Map(
-                      [...effective.toolWords, ...defaultToolWords].map(
-                        (word) => [word.toLocaleLowerCase("en"), word],
-                      ),
-                    ).values(),
-                  ].join(", "),
-                );
-                setConfirmed(false);
-                setPreview(false);
-              }}
-            >
-              Proposer les mots outils courants
-            </Button>
-          </Card>
-        )}
+        <Card style={{ gap: 16 }}>
+          <AppText variant="heading">Les mots outils autorisés</AppText>
+          <AppText color={colors.muted}>
+            Articles, pronoms et auxiliaires servent à former les phrases.
+            Définissez ceux que l’enfant connaît ; les mots ciblés restent ceux
+            des listes ci-dessus.
+          </AppText>
+          <Field
+            label="Mots outils, séparés par des virgules"
+            value={showToolInput}
+            multiline
+            onChangeText={(value) => {
+              setToolInput(value);
+              setPreview(false);
+              setConfirmed(false);
+            }}
+            placeholder="I, you, the, a, to…"
+            maxLength={2000}
+          />
+          <Button
+            variant="secondary"
+            icon="plus"
+            onPress={() => {
+              setToolInput(
+                [
+                  ...new Map(
+                    [...effective.toolWords, ...defaultToolWords].map(
+                      (word) => [word.toLocaleLowerCase("en"), word],
+                    ),
+                  ).values(),
+                ].join(", "),
+              );
+              setConfirmed(false);
+              setPreview(false);
+            }}
+          >
+            Proposer les mots outils courants
+          </Button>
+        </Card>
         <Card style={{ gap: 18 }}>
           <View style={common.row}>
-            {!conjugation && <Badge>{settings.words.length} mots</Badge>}
+            <Badge>{settings.words.length} mots</Badge>
             <Badge>{settings.verbs.length} verbes</Badge>
             <Badge>{settings.tenses.length} temps</Badge>
           </View>
@@ -719,15 +678,6 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
             </View>
           )}
         </Card>
-        {conjugation && (
-          <Button
-            icon="book"
-            variant="ghost"
-            onPress={() => router.push("/parent/english")}
-          >
-            Ouvrir le répertoire complet d’anglais
-          </Button>
-        )}
       </View>
     </StudyWorkspace>
   );
