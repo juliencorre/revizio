@@ -17,16 +17,27 @@ import {
 } from "@/services/source-cache";
 import { apiAuthHeaders } from "@/services/api";
 import { useTheme } from "@/theme";
-export function useSourceUri(source?: CourseSource | null) {
+export function useSourceUri(
+  source?: CourseSource | null,
+  original?: CourseSource,
+) {
+  const [usingOriginal, setUsingOriginal] = useState(false);
   const [uri, setUri] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
     setUri("");
     setError("");
+    setUsingOriginal(false);
     if (source?.uri || source?.cachedUri) {
       cacheSource(source)
-        .catch(() => source)
+        .catch(() => {
+          if (original && active) {
+            setUsingOriginal(true);
+            return original;
+          }
+          return source;
+        })
         .then(resolveSourceUri)
         .then((value) => {
           if (active) setUri(value);
@@ -47,8 +58,11 @@ export function useSourceUri(source?: CourseSource | null) {
     source?.rotation,
     source?.cachedUri,
     source?.cacheRevision,
+    original?.uri,
+    original?.cachedUri,
+    original?.cacheRevision,
   ]);
-  return { uri, error };
+  return { uri, error, usingOriginal };
 }
 export function SourceThumbnail({
   source,
@@ -152,7 +166,10 @@ function DocumentContent({
         uri: source.uri + "?page=" + page,
       }
     : source;
-  const { uri, error } = useSourceUri(displayedSource);
+  const { uri, error, usingOriginal } = useSourceUri(
+    displayedSource,
+    singlePage ? source : undefined,
+  );
   const [zoom, setZoom] = useState(false);
   const kind = documentKind(source);
   const image = kind === "image";
@@ -210,6 +227,11 @@ function DocumentContent({
         </Button>
       </View>
       {!!excerpt && <AppText variant="small">{excerpt}</AppText>}
+      {usingOriginal && (
+        <AppText variant="small">
+          Document complet · retrouver la page {page}.
+        </AppText>
+      )}
       {(!source.uri && !source.cachedUri) || kind === "other" ? (
         <ScrollView style={{ flex: 1 }}>
           <AppText>
@@ -249,7 +271,9 @@ function DocumentContent({
         </ScrollView>
       ) : kind === "pdf" ? (
         <PdfDocument
-          uri={page && !singlePage ? uri + "#page=" + page : uri}
+          uri={
+            page && (!singlePage || usingOriginal) ? uri + "#page=" + page : uri
+          }
           title={source.name}
         />
       ) : (
