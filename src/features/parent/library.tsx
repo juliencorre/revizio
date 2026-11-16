@@ -18,12 +18,13 @@ import { useTheme } from "@/theme";
 import { preparationHref } from "./subject-navigation";
 import { Field, LoadingParent, ParentLayout } from "./shared";
 
-type Filter = "all" | "draft" | "review" | "published";
+type Filter = "all" | "draft" | "review" | "published" | "archived";
 const statuses = [
   { id: "all", label: "Tous les statuts" },
   { id: "draft", label: "Brouillon" },
   { id: "review", label: "À vérifier" },
   { id: "published", label: "Publié" },
+  { id: "archived", label: "Archivée" },
 ] as const;
 const matchesStatus = (status: string, filter: Filter) =>
   filter === "all" ||
@@ -321,7 +322,7 @@ export function ParentLibraryScreen() {
                           })
                     }
                   >
-                    {item.status === "Publié"
+                    {item.status === "Publié" || item.status === "Archivée"
                       ? "Consulter"
                       : "Reprendre et vérifier"}
                   </Button>
