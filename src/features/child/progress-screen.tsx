@@ -12,6 +12,7 @@ import {
   ProgressBar,
   useWindowClass,
 } from "@/components/ui";
+import { VocabularyActivityCard } from "@/features/vocabulary/activity-card";
 import { useTheme } from "@/theme";
 import {
   ChildShell,
@@ -177,7 +178,10 @@ export function StudentProgressScreen() {
             avec indice sont incluses. Une fiche marquée relue indique une
             activité de lecture.
           </AppText>
-          {activity.length === 0 && reviewed.length === 0 ? (
+          <VocabularyActivityCard sessions={data.vocabularySessions} />
+          {activity.length === 0 &&
+          reviewed.length === 0 &&
+          data.vocabularySessions.length === 0 ? (
             <EmptyState
               icon="chart"
               title="Ton parcours commence ici"

@@ -10,6 +10,7 @@ import {
   PageHeading,
 } from "@/components/ui";
 import { learningOverview, latestAttempts } from "@/domain/study-overview";
+import { VocabularyActivityCard } from "@/features/vocabulary/activity-card";
 import { expectedAnswerLabel } from "@/domain/answers";
 import { dateOnly, stepIsLate } from "@/domain/planning";
 import { useLearning } from "@/state/learning-store";
@@ -87,6 +88,7 @@ export function ParentProgressScreen() {
           exercices réalisés ; ils ne suffisent pas à établir la maîtrise d’une
           notion.
         </AppText>
+        <VocabularyActivityCard sessions={data.vocabularySessions} />
         <Card style={{ gap: 18 }}>
           <AppText variant="heading">Les notions à revoir</AppText>
           <AppText color={colors.muted}>

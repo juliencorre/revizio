@@ -4,7 +4,9 @@ import type {
   ExerciseSeries,
   LearningData,
   Question,
+  VocabularySession,
 } from "./model";
+import { vocabularyLanguages, wordKey } from "./vocabulary";
 import { dateOnly } from "./planning";
 
 export function latestAttempts(
@@ -90,13 +92,37 @@ export function nextStudySession(
     subjectId: item.subjectId,
     destination: `/student/exercise/${encodeURIComponent(item.id)}${attempt ? `?attemptId=${encodeURIComponent(attempt.id)}${attempt.mode === "exam" ? "&mode=exam" : ""}` : ""}`,
   });
+  const lastActivity = (session: Attempt | VocabularySession) =>
+    session.answers.at(-1)?.answeredAt ?? session.startedAt;
   const unfinished = attempts
     .filter(
       (attempt) =>
         !attempt.completedAt &&
         series.some((item) => item.id === attempt.seriesId),
     )
-    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+    .sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)))[0];
+  const vocabulary = (data.vocabularySessions ?? [])
+    .filter((session) => !session.completedAt && session.questions.length)
+    .sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)))[0];
+  if (
+    vocabulary &&
+    (!unfinished || lastActivity(vocabulary) > lastActivity(unfinished))
+  ) {
+    return {
+      title: vocabulary.listTitle,
+      reason: "Reprends tes traductions là où tu t’es arrêté.",
+      minutes: Math.max(
+        1,
+        Math.ceil(
+          (vocabulary.questions.length - vocabulary.answers.length) / 2,
+        ),
+      ),
+      estimated: true,
+      resume: true,
+      subjectId: vocabulary.language,
+      destination: `/student/vocabulary/practice/${encodeURIComponent(vocabulary.id)}`,
+    };
+  }
   if (unfinished) {
     const session = exerciseSession(
       series.find((item) => item.id === unfinished.seriesId)!,
@@ -248,4 +274,32 @@ export function learningOverview(data: LearningData) {
     correct: answers.filter((answer) => answer.isCorrect).length,
     concepts: [...concepts.values()].sort((a, b) => b.errors - a.errors),
   };
+}
+
+/** Count a term and its translation once per language, including resumed sessions. */
+export function vocabularyActivity(sessions: VocabularySession[]) {
+  return vocabularyLanguages.flatMap(({ id, label }) => {
+    const matching = sessions.filter((session) => session.language === id);
+    if (!matching.length) return [];
+    const words = new Set<string>();
+    let completed = 0;
+    for (const session of matching) {
+      if (session.completedAt) completed++;
+      const answered = new Set(
+        session.answers.map((answer) => answer.questionId),
+      );
+      for (const question of session.questions) {
+        if (answered.has(question.id)) words.add(wordKey(question));
+      }
+    }
+    return [
+      {
+        language: id,
+        label,
+        words: words.size,
+        completed,
+        pending: matching.length - completed,
+      },
+    ];
+  });
 }

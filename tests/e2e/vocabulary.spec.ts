@@ -120,12 +120,20 @@ for (const language of [
       language.translation,
     );
     await capture(page, info, "enfant-correction-vocabulaire");
-    await page.reload();
+    await page.goto("/student");
+    await expect(page.getByTestId("start-next-session")).toHaveText("Reprendre ma séance");
+    await page.getByTestId("start-next-session").click();
     await expect(page.getByTestId("vocabulary-prompt")).toHaveText(
       language.translation,
     );
     await answer(page, language.term);
     await expect(page.getByTestId("vocabulary-score")).toHaveText("1 / 2");
+    const summaryUrl = page.url();
+    for (const route of ["/parent/progress", "/student/progress"]) {
+      await page.goto(route);
+      await expect(page.getByTestId("vocabulary-activity")).toContainText("1 mot travaillé");
+    }
+    await page.goto(summaryUrl);
     await page.getByTestId("vocabulary-back-to-list").click();
     await expect(word).toContainText("À revoir");
     for (let round = 0; round < 2; round++) {
