@@ -497,6 +497,8 @@ export async function configureServerRoutes(
           data: user.role === "child" ? childData(current.data) : current.data,
         },
       );
+    if (data.answerReviews === undefined && current.data.answerReviews)
+      data.answerReviews = current.data.answerReviews;
     data = preserveVocabularyForLegacyClient(
       current.data,
       data,

@@ -163,11 +163,18 @@ export interface Attempt {
   planId?: string;
   stepId?: string;
 }
+export interface AnswerReview {
+  id: string;
+  attemptId: string;
+  questionId: string;
+  status: "pending" | "accepted" | "declined";
+}
 export interface LearningData {
   version: 1;
   courses: Course[];
   series: ExerciseSeries[];
   attempts: Attempt[];
+  answerReviews?: AnswerReview[];
   reviewedCourseIds: string[];
   plans?: RevisionPlan[];
   english?: EnglishSettings;

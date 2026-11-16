@@ -4,6 +4,10 @@ import { evaluateAnswer } from "../src/domain/answers";
 import { clone } from "../src/domain/learning";
 import { HttpError } from "./types";
 import { vocabularyListsFor } from "../src/domain/vocabulary";
+import {
+  matchesPublishedQuestions,
+  mergeChildReviews,
+} from "../src/domain/answer-reviews";
 import { mergeVocabularySessions } from "./vocabulary";
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -68,7 +72,15 @@ export function mergeChildData(
     );
     if (!existing && !series)
       throw new HttpError(403, "Cette série n’est pas disponible.");
-    const questions = existing?.questions ?? series!.questions;
+    if (
+      !existing &&
+      !matchesPublishedQuestions(current, series!, supplied.questions)
+    )
+      throw new HttpError(
+        403,
+        "Cette tentative doit utiliser les questions publiées.",
+      );
+    const questions = existing?.questions ?? supplied.questions;
     if (
       !same(supplied.questions, questions) ||
       supplied.subjectId !== (existing?.subjectId ?? series!.subjectId) ||
@@ -138,6 +150,19 @@ export function mergeChildData(
     const index = attempts.findIndex((a) => a.id === next.id);
     if (index >= 0) attempts[index] = next;
     else attempts.push(next);
+  }
+  let answerReviews;
+  try {
+    answerReviews = mergeChildReviews(
+      current.answerReviews,
+      incoming.answerReviews,
+      attempts,
+    );
+  } catch {
+    throw new HttpError(
+      403,
+      "Seul un parent peut décider d’une demande de vérification.",
+    );
   }
   const publishedIds = new Set(view.courses.map((c) => c.id));
   if (incoming.reviewedCourseIds.some((id) => !publishedIds.has(id)))
@@ -225,6 +250,7 @@ export function mergeChildData(
   return parseLearningData(
     JSON.stringify({
       ...current,
+      ...(answerReviews ? { answerReviews } : {}),
       vocabularySessions: mergeVocabularySessions(current, incoming),
       attempts,
       reviewedCourseIds: [

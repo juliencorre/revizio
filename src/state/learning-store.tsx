@@ -11,6 +11,10 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import {
+  decideAnswerReview,
+  requestAnswerReview,
+} from "../domain/answer-reviews";
 import { initialData, subjects } from "../domain/fixtures";
 import {
   answerQuestionInData,
@@ -67,7 +71,8 @@ import type {
 import { createLearningPersistence, STORAGE_KEY } from "./persistence";
 import { useSession } from "./session";
 import { FamilySync, type SyncStatus } from "./family-sync";
-import { apiFetch, uploadCourseSource, waitForJob } from "@/services/api";
+import { runPreparation } from "@/services/preparations";
+import { apiFetch, uploadCourseSource } from "@/services/api";
 import { cacheSource } from "@/services/source-cache";
 
 export interface AttemptOptions {
@@ -128,6 +133,8 @@ export interface LearningContextValue extends Omit<
   ): void;
   completeAttempt(attemptId: string): void;
   submitAttempt(attemptId: string): void;
+  reportAnswer(attemptId: string, questionId: string): void;
+  reviewAnswer(id: string, decision: "accepted" | "declined"): void;
   markReviewed(courseId: string): void;
   resetDemo(): void;
   addPlan(input: PlanDraftInput): string;
@@ -211,26 +218,29 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     dataRef.current = next;
     setData(next);
   }, []);
-  const prepareRemote = useCallback(async (snapshot: LearningData) => {
-    const next = clone(snapshot);
-    if (sessionRef.current.user?.role === "parent")
-      for (const course of next.courses) {
-        for (let index = 0; index < course.sources.length; index++) {
-          const source = course.sources[index];
-          if (
-            source.uri &&
-            !source.storageId &&
-            !source.uri.startsWith("/api/")
-          )
-            course.sources[index] = await uploadCourseSource(
-              source,
-              sessionRef.current.activeProfileId,
-            );
-          delete course.sources[index].cachedUri;
+  const prepareRemote = useCallback(
+    async (snapshot: LearningData, profileId: string, isParent: boolean) => {
+      const next = clone(snapshot);
+      if (isParent)
+        for (const course of next.courses) {
+          for (let index = 0; index < course.sources.length; index++) {
+            const source = course.sources[index];
+            if (
+              source.uri &&
+              !source.storageId &&
+              !source.uri.startsWith("/api/")
+            )
+              course.sources[index] = await uploadCourseSource(
+                source,
+                profileId,
+              );
+            delete course.sources[index].cachedUri;
+          }
         }
-      }
-    return next;
-  }, []);
+      return next;
+    },
+    [],
+  );
   useEffect(() => {
     if (!session.ready) return;
     let active = true;
@@ -251,8 +261,15 @@ export function LearningProvider({ children }: { children: ReactNode }) {
             if (active) apply(next);
           },
           request: apiFetch,
-          prepare: prepareRemote,
-          conflicts: fields => { if (active) setSyncConflicts(fields); },
+          prepare: (snapshot) =>
+            prepareRemote(
+              snapshot,
+              session.activeProfileId,
+              session.user?.role === "parent",
+            ),
+          conflicts: (fields) => {
+            if (active) setSyncConflicts(fields);
+          },
           status: (status) => {
             if (active) setStatus(status);
           },
@@ -440,7 +457,15 @@ export function LearningProvider({ children }: { children: ReactNode }) {
   const addSeries = useCallback(
     (input: SeriesDraftInput) => {
       assertParent();
-      const id = newId("series");
+      const previous =
+        input.generationJobId &&
+        dataRef.current.series.find(
+          (series) => series.generationJobId === input.generationJobId,
+        );
+      if (previous) return previous.id;
+      const id = input.generationJobId
+        ? "series-job-" + input.generationJobId
+        : newId("series");
       commit({
         ...dataRef.current,
         series: [
@@ -499,6 +524,20 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           ),
         })),
       });
+    },
+    [assertParent, commit],
+  );
+  const reportAnswer = useCallback(
+    (attemptId: string, questionId: string) => {
+      assertReady();
+      commit(requestAnswerReview(dataRef.current, attemptId, questionId));
+    },
+    [assertReady, commit],
+  );
+  const reviewAnswer = useCallback(
+    (id: string, decision: "accepted" | "declined") => {
+      assertParent();
+      commit(decideAnswerReview(dataRef.current, id, decision));
     },
     [assertParent, commit],
   );
@@ -989,50 +1028,65 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     },
     [assertReady, commit],
   );
+  const activeWorkspace = useCallback(() => {
+    assertParent();
+    const origin = sessionRef.current;
+    const sync = syncRef.current;
+    return {
+      profileId: origin.activeProfileId,
+      check() {
+        if (
+          !readyRef.current ||
+          origin.activeProfileId !== sessionRef.current.activeProfileId ||
+          origin.user?.id !== sessionRef.current.user?.id ||
+          sync !== syncRef.current
+        )
+          throw new Error(
+            "Le profil a changé. Retrouvez la préparation déjà lancée dans l’espace de l’enfant concerné.",
+          );
+      },
+    };
+  }, [assertParent]);
   const storeSources = useCallback(
     async (sources: CourseSource[]) => {
-      assertParent();
+      const owner = activeWorkspace();
       const stored: CourseSource[] = [];
       for (const source of sources) {
         const cached = await cacheSource(source);
+        owner.check();
         stored.push(
           sessionRef.current.mode === "family" &&
             sessionRef.current.serverAvailable
-            ? await uploadCourseSource(
-                cached,
-                sessionRef.current.activeProfileId,
-              )
+            ? await uploadCourseSource(cached, owner.profileId)
             : cached,
         );
       }
+      owner.check();
       return stored;
     },
-    [assertParent],
+    [activeWorkspace],
   );
   const requireAi = useCallback(async () => {
-    assertParent();
+    const owner = activeWorkspace();
     if (sessionRef.current.mode !== "family")
       throw new Error(
         "Connectez-vous à votre espace familial pour utiliser la génération IA.",
       );
     await syncRef.current?.sync();
+    owner.check();
     if (statusRef.current !== "synced")
       throw new Error(
         "Synchronisez les cours avant de lancer une génération IA.",
       );
-  }, [assertParent]);
+    return owner;
+  }, [activeWorkspace]);
   const extractEnglish = useCallback(
     async (sources: CourseSource[]): Promise<EnglishSettings> => {
-      await requireAi();
+      const owner = await requireAi();
       const stored = await storeSources(sources);
-      const { job } = await apiFetch<{ job: AiJob }>("/ai/english", {
-        method: "POST",
-        body: JSON.stringify({
-          profileId: sessionRef.current.activeProfileId,
-          sourceIds: stored.map((source) => source.storageId || source.id),
-        }),
+      const done = await runPreparation(owner, "english", {
+        sourceIds: stored.map((source) => source.storageId || source.id),
       });
-      const done = await waitForJob(job.id);
       return {
         words: done.result?.words ?? [],
         verbs: done.result?.verbs ?? [],
@@ -1044,17 +1098,18 @@ export function LearningProvider({ children }: { children: ReactNode }) {
   );
   const generateCourse = useCallback(
     async (id: string, onProgress?: (job: AiJob) => void) => {
-      await requireAi();
+      const owner = await requireAi();
       const course = dataRef.current.courses.find((c) => c.id === id);
       if (!course || course.status !== "draft")
         throw new Error("Ouvrez un brouillon pour préparer la fiche.");
       const sources = await storeSources(course.sources);
+      owner.check();
       updateCourse(id, { sources });
       await syncRef.current?.sync();
-      const { job } = await apiFetch<{ job: AiJob }>("/ai/course", {
-        method: "POST",
-        body: JSON.stringify({
-          profileId: sessionRef.current.activeProfileId,
+      const done = await runPreparation(
+        owner,
+        "course",
+        {
           subjectId: course.subjectId,
           title: course.title,
           existingCourseId: id,
@@ -1062,34 +1117,40 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           sourceIds: [
             ...new Set(sources.map((source) => source.storageId || source.id)),
           ],
-        }),
-      });
-      updateCourse(id, { generationJobId: job.id });
-      const done = await waitForJob(job.id, onProgress);
+        },
+        onProgress,
+        (queued) => updateCourse(id, { generationJobId: queued.id }),
+      );
       if (!done.result?.course)
         throw new Error("La génération n’a pas produit de fiche à relire.");
+      const current = dataRef.current.courses.find((item) => item.id === id);
+      if (
+        current?.generationJobId !== done.id ||
+        current.generationAppliedJobId === done.id
+      )
+        return;
       updateCourse(id, {
         ...done.result.course,
-        generationJobId: job.id,
-        generationAppliedJobId: job.id,
+        generationJobId: done.id,
+        generationAppliedJobId: done.id,
       });
     },
     [requireAi, storeSources, updateCourse],
   );
   const generateExercises = useCallback(
     async (input: GenerateSeriesInput, onProgress?: (job: AiJob) => void) => {
-      await requireAi();
-      const { job } = await apiFetch<{ job: AiJob }>("/ai/exercises", {
-        method: "POST",
-        body: JSON.stringify({
+      const owner = await requireAi();
+      const done = await runPreparation(
+        owner,
+        "exercises",
+        {
           ...input,
-          profileId: sessionRef.current.activeProfileId,
           ...(input.subjectId === "english"
             ? { english: dataRef.current.english }
             : {}),
-        }),
-      });
-      const done = await waitForJob(job.id, onProgress);
+        },
+        onProgress,
+      );
       if (!done.result?.questions?.length)
         throw new Error("La génération n’a pas produit de questions.");
       return addSeries({
@@ -1099,7 +1160,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         level: input.level,
         dueDate: input.dueDate,
         questions: done.result.questions,
-        generationJobId: job.id,
+        generationJobId: done.id,
       });
     },
     [requireAi, addSeries],
@@ -1222,6 +1283,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       answerQuestion,
       completeAttempt,
       submitAttempt,
+      reportAnswer,
+      reviewAnswer,
       markReviewed,
       resetDemo,
       addPlan,
@@ -1267,6 +1330,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       answerQuestion,
       completeAttempt,
       submitAttempt,
+      reportAnswer,
+      reviewAnswer,
       markReviewed,
       resetDemo,
       addPlan,

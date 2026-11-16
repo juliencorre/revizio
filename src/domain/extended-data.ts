@@ -1,3 +1,4 @@
+import { validateAnswerReviews } from "./answer-reviews";
 import type { Course, ExerciseSeries, LearningData } from "./model";
 import {
   legacyEnglishVocabulary,
@@ -26,6 +27,10 @@ export function validateExtendedData(
   series: ExerciseSeries[],
 ): void {
   validateVocabularyData(data);
+  validateAnswerReviews(
+    data.answerReviews,
+    data.attempts as LearningData["attempts"],
+  );
   if (data.plans !== undefined) {
     if (
       !Array.isArray(data.plans) ||
@@ -138,6 +143,7 @@ export function validateExtendedData(
 
 export function extendedDataFields(data: LearningData): Partial<LearningData> {
   return {
+    ...(data.answerReviews ? { answerReviews: data.answerReviews } : {}),
     ...(data.plans ? { plans: data.plans } : {}),
     ...(data.english ? { english: data.english } : {}),
     ...(data.readingRecords ? { readingRecords: data.readingRecords } : {}),

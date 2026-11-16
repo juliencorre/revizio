@@ -9,7 +9,15 @@ import type { FastifyInstance } from "fastify";
 import type { AiClient, AiMessage, AiSettings } from "../../server/types";
 import { createApp } from "../../server/app";
 import { initialData } from "../../src/domain/fixtures";
-import { clone, startAttemptInData } from "../../src/domain/learning";
+import {
+  answerQuestionInData,
+  clone,
+  startAttemptInData,
+} from "../../src/domain/learning";
+import {
+  decideAnswerReview,
+  requestAnswerReview,
+} from "../../src/domain/answer-reviews";
 import type { Course, LearningData } from "../../src/domain/model";
 
 class FixtureAi implements AiClient {
@@ -286,6 +294,48 @@ describe("compte et sessions serveur", () => {
       ).statusCode,
     ).toBe(401);
   });
+  it("prépare le même document pour la classe du profil du travail", async () => {
+    const { token, profiles } = await setup();
+    const second = await app.inject({
+      method: "POST",
+      url: "/api/profiles",
+      headers: bearer(token),
+      payload: { name: "Lou", grade: "CM1", pin: "579246" },
+    });
+    expect(second.statusCode, second.body).toBe(200);
+    const children = [profiles[0], second.json().profile];
+    const source =
+      "Un nombre relatif est positif, négatif ou nul. Pour additionner deux nombres de même signe, on additionne les distances à zéro et on garde le signe.";
+    const call = vi.spyOn(ai, "json");
+    for (const profile of children) {
+      const started = await app.inject({
+        method: "POST",
+        url: "/api/ai/course",
+        headers: bearer(token),
+        payload: {
+          profileId: profile.id,
+          title: "Les nombres",
+          subjectId: "maths",
+          sourceText: source,
+        },
+      });
+      expect(started.statusCode, started.body).toBe(200);
+      const result = await job(token, started.json().job.id);
+      expect(result.profileId).toBe(profile.id);
+      expect(result.status).toBe("succeeded");
+      const messages = call.mock.calls.at(-1)![1];
+      const input = JSON.parse(
+        messages.find((message) => message.role === "user")!.content,
+      );
+      expect(input.grade).toBe(profile.grade);
+      expect(input.sourceText).toBe(source);
+      expect(messages[0].content).not.toContain("pour un collégien");
+    }
+    expect(children.map((profile) => profile.grade).sort()).toEqual([
+      "5e",
+      "CM1",
+    ]);
+  });
   it("retrouve la famille et les sessions après redémarrage du serveur", async () => {
     const session = await setup();
     await app.close();
@@ -462,6 +512,95 @@ describe("contenus publiés, réponses et concurrence", () => {
     expect(
       (await save(token, childView.data, childView.revision)).statusCode,
     ).toBe(403);
+  });
+  it("réserve la décision sur une réponse au parent de ce profil", async () => {
+    const { token: parent, profiles } = await setup();
+    const owner = profiles[0].id;
+    const sibling = (
+      await app.inject({
+        method: "POST",
+        url: "/api/profiles",
+        headers: bearer(parent),
+        payload: { name: "Luc", grade: "CM1", pin: "8642" },
+      })
+    ).json().profile.id;
+    const seed = clone(initialData);
+    const series = seed.series.find((item) => item.status === "published")!;
+    const original = series.questions[0];
+    series.questions = [
+      {
+        ...original,
+        type: "short-answer",
+        choices: [],
+        correctChoiceId: "",
+        expectedAnswers: ["un demi"],
+      },
+    ];
+    expect((await save(parent, seed, 0, owner)).statusCode).toBe(200);
+    expect((await save(parent, seed, 0, sibling)).statusCode).toBe(200);
+    const token = await child(owner);
+    const state = await envelope(token, owner);
+    const now = new Date().toISOString();
+    const started = startAttemptInData(
+      state.data,
+      series.id,
+      "essai",
+      now,
+      true,
+      { profileId: owner },
+    ).data;
+    const answered = answerQuestionInData(
+      started,
+      "essai",
+      original.id,
+      "une moitié",
+      false,
+      now,
+    );
+    const requested = requestAnswerReview(answered, "essai", original.id);
+    expect(
+      (await save(token, requested, state.revision, owner)).statusCode,
+    ).toBe(200);
+    const pending = await envelope(token, owner);
+    const [review] = pending.data.answerReviews!;
+    const decided = decideAnswerReview(pending.data, review.id, "accepted");
+    expect(
+      (await save(token, decided, pending.revision, owner)).statusCode,
+    ).toBe(403);
+    const parentView = await envelope(parent, owner);
+    const valid = decideAnswerReview(parentView.data, review.id, "accepted");
+    expect(
+      (await save(parent, valid, parentView.revision, owner)).statusCode,
+    ).toBe(200);
+    const childView = await envelope(token, owner);
+    const next = startAttemptInData(
+      childView.data,
+      series.id,
+      "nouvel-essai",
+      now,
+      true,
+      { profileId: owner },
+    ).data;
+    const updated = answerQuestionInData(
+      next,
+      "nouvel-essai",
+      original.id,
+      "une moitié",
+      false,
+      now,
+    );
+    const saved = await save(token, updated, childView.revision, owner);
+    expect(saved.statusCode, saved.body).toBe(200);
+    const answers = saved
+      .json()
+      .data.attempts.map(
+        (attempt: { answers: { isCorrect: boolean }[] }) =>
+          attempt.answers[0].isCorrect,
+      );
+    expect(answers).toEqual([false, true]);
+    expect((await envelope(parent, sibling)).data.answerReviews ?? []).toEqual(
+      [],
+    );
   });
   it("recalcule les corrections côté serveur et protège le snapshot d’une tentative", async () => {
     const session = await setup();

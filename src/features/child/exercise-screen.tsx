@@ -18,6 +18,7 @@ import {
   useWindowClass,
 } from "@/components/ui";
 import { useTheme, fontFamily } from "@/theme";
+import { answerReviewId } from "@/domain/answer-reviews";
 import { expectedAnswerLabel } from "@/domain/answers";
 import type { Answer, Attempt, Question } from "@/domain/model";
 import {
@@ -206,6 +207,12 @@ export function StudentExerciseScreen() {
   const written =
     !!question?.type &&
     !["single-choice", "true-false"].includes(question.type);
+  const review =
+    attempt && question
+      ? data.answerReviews?.find(
+          (item) => item.id === answerReviewId(attempt.id, question.id),
+        )
+      : undefined;
   function verify() {
     if (!attempt || !question || !selectedChoice?.trim() || answer) return;
     data.answerQuestion(
@@ -565,7 +572,31 @@ export function StudentExerciseScreen() {
               </View>
             )}
             {answer && reveal && (
-              <AnswerFeedback question={question} answer={answer} />
+              <>
+                <AnswerFeedback question={question} answer={answer} />
+                {written &&
+                  !answer.isCorrect &&
+                  !!answer.choiceId.trim() &&
+                  (review ? (
+                    <View accessibilityLiveRegion="polite">
+                      <AppText>
+                        {review.status === "pending"
+                          ? "Vérification demandée à ton parent."
+                          : review.status === "accepted"
+                            ? "Ton parent a accepté cette variante pour tes prochaines séances."
+                            : "Ton parent a confirmé la correction."}
+                      </AppText>
+                    </View>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      icon="users"
+                      onPress={() => data.reportAnswer(attempt.id, question.id)}
+                    >
+                      Faire vérifier ma réponse
+                    </Button>
+                  ))}
+              </>
             )}
             <View
               style={[

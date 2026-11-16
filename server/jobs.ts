@@ -254,6 +254,7 @@ export class JobQueue {
       return { source: sources[0], sources, vocabulary };
     }
     const data = this.database.data(job.profileId).data;
+    const grade = this.database.profile(job.profileId)?.grade;
     const old =
       job.kind === "course" && typeof payload.existingCourseId === "string"
         ? data.courses.find((course) => course.id === payload.existingCourseId)
@@ -356,6 +357,7 @@ export class JobQueue {
         this.client,
         settings,
         {
+          grade,
           title: String(payload.title ?? old?.title ?? "Nouveau cours"),
           subjectId: String(payload.subjectId ?? old?.subjectId ?? ""),
           sourceText,
@@ -440,6 +442,7 @@ export class JobQueue {
             this.client,
             settings,
             {
+              grade,
               courses: [courses[index]],
               types,
               level: String(payload.level ?? "practice"),

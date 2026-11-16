@@ -9,6 +9,7 @@ import type {
 } from "./model";
 import { subjects } from "./fixtures";
 import { evaluateAnswer } from "./answers";
+import { questionsForNewAttempt } from "./answer-reviews";
 import { extendedDataFields, validateExtendedData } from "./extended-data";
 export type PublicationResult = { ok: boolean; error?: string };
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -381,7 +382,7 @@ export function startAttemptInData(
     seriesId,
     startedAt: now,
     answers: [],
-    questions: clone(series.questions),
+    questions: clone(questionsForNewAttempt(data, series)),
     seriesTitle: series.title,
     subjectId: series.subjectId,
     mode: attemptMode,

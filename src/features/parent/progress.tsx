@@ -16,6 +16,7 @@ import { dateOnly, stepIsLate } from "@/domain/planning";
 import { useLearning } from "@/state/learning-store";
 import { plural } from "@/domain/format";
 import { useTheme } from "@/theme";
+import { AnswerReviewList } from "./answer-reviews";
 import { LoadingParent, ParentLayout } from "./shared";
 
 export function ParentProgressScreen() {
@@ -88,6 +89,7 @@ export function ParentProgressScreen() {
           exercices réalisés ; ils ne suffisent pas à établir la maîtrise d’une
           notion.
         </AppText>
+        <AnswerReviewList />
         <VocabularyActivityCard sessions={data.vocabularySessions} />
         <Card style={{ gap: 18 }}>
           <AppText variant="heading">Les notions à revoir</AppText>
