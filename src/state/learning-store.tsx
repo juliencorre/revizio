@@ -27,7 +27,12 @@ import {
   normalizeEnglish,
 } from "../domain/english";
 import { createGeneralReview } from "../domain/vocabulary-repertoire";
-import { dateOnly, planValidation, reschedulePlan } from "../domain/planning";
+import {
+  dateOnly,
+  moveRevisionStep,
+  planValidation,
+  reschedulePlan,
+} from "../domain/planning";
 import {
   answerVocabularySession,
   createVocabularySession,
@@ -124,6 +129,7 @@ export interface LearningContextValue extends Omit<
   resetDemo(): void;
   addPlan(input: PlanDraftInput): string;
   updatePlan(id: string, updates: Partial<Omit<RevisionPlan, "id">>): void;
+  movePlanStep(planId: string, stepId: string, date: string): void;
   deletePlan(id: string): void;
   publishPlan(id: string): PublicationResult;
   completePlanStep(planId: string, stepId: string): void;
@@ -630,6 +636,21 @@ export function LearningProvider({ children }: { children: ReactNode }) {
             ? { ...plan, ...clone(updates), id, status: "draft" }
             : plan,
         ),
+      });
+    },
+    [assertParent, commit],
+  );
+  const movePlanStep = useCallback(
+    (planId: string, stepId: string, date: string) => {
+      assertParent();
+      const current = dataRef.current;
+      const plans = current.plans ?? [];
+      const plan = plans.find((item) => item.id === planId);
+      if (!plan) throw new Error("Ce contrôle a été supprimé.");
+      const moved = moveRevisionStep(plan, stepId, date);
+      commit({
+        ...current,
+        plans: plans.map((item) => (item.id === planId ? moved : item)),
       });
     },
     [assertParent, commit],
@@ -1188,6 +1209,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       resetDemo,
       addPlan,
       updatePlan,
+      movePlanStep,
       deletePlan,
       publishPlan,
       completePlanStep,
@@ -1231,6 +1253,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       resetDemo,
       addPlan,
       updatePlan,
+      movePlanStep,
       deletePlan,
       publishPlan,
       completePlanStep,

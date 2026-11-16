@@ -20,6 +20,7 @@ import {
   planStepLabels,
   stepIsLate,
 } from "@/domain/planning";
+import { RevisionWeek } from "./week";
 import { StudyWorkspace } from "./shared";
 
 function formattedDate(value: string) {
@@ -88,12 +89,20 @@ export function StudentPlansScreen() {
             title="Un plan arrivera ici"
             description="Un parent peut préparer ton prochain contrôle et partager des séances courtes avec toi."
           >
-            <Button icon="book" onPress={() => router.push("/student/subjects")}>
+            <Button
+              icon="book"
+              onPress={() => router.push("/student/subjects")}
+            >
               Retrouver mes cours
             </Button>
           </EmptyState>
         ) : (
           <>
+            <RevisionWeek
+              key={data.activeProfileId}
+              plans={plans}
+              subjects={data.subjects}
+            />
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
               {plans.map((plan) => (
                 <Button

@@ -7,6 +7,9 @@ import {
   reschedulePlan,
   stepIsLate,
   validPlanDate,
+  weekDates,
+  weeklyWorkload,
+  moveRevisionStep,
 } from "../../src/domain/planning";
 import type { RevisionPlan } from "../../src/domain/model";
 
@@ -178,5 +181,42 @@ describe("édition et report", () => {
     value.steps[1].date = value.steps[0].date;
     expect(planValidation(value, initialData.courses)).toContain("total");
     expect(() => reschedulePlan(value, "2026-11-07", "2026-11-08")).toThrow();
+  });
+});
+
+describe("semaine de révision", () => {
+  it("additionne les matières et déplace la séance sans toucher aux séances terminées", () => {
+    const first = plan();
+    const step = { ...first.steps[0], date: "2026-11-09", minutes: 20 };
+    first.steps = [step];
+    first.status = "published";
+    const other = {
+      ...first,
+      id: "histoire",
+      subjectId: "history",
+      steps: [{ ...step, id: "lecture" }],
+    };
+    const day = weeklyWorkload([first, other], "2026-11-12")[0];
+    expect(day.minutes).toBe(40);
+    const moved = moveRevisionStep(first, step.id, "2026-11-10", "2026-11-08");
+    expect(moved.status).toBe("published");
+    expect(
+      weeklyWorkload([moved, other], "2026-11-12")
+        .slice(0, 2)
+        .map((d) => d.minutes),
+    ).toEqual([20, 20]);
+    expect(first.steps[0].date).toBe("2026-11-09");
+    expect(() =>
+      moveRevisionStep(first, step.id, "2026-11-13", "2026-11-08"),
+    ).toThrow();
+    const done = {
+      ...first,
+      steps: [{ ...step, completedAt: "2026-11-09T10:00:00Z" }],
+    };
+    expect(() =>
+      moveRevisionStep(done, step.id, "2026-11-10", "2026-11-08"),
+    ).toThrow();
+    expect(weekDates("2027-01-01")[0]).toBe("2026-12-28");
+    expect(weekDates("2027-03-28", 1)[0]).toBe("2027-03-29");
   });
 });

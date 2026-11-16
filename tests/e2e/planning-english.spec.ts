@@ -330,3 +330,71 @@ test("conserver le brouillon anglais, relire les listes puis apprendre avec cart
   );
   await capture(page, testInfo, "enfant-bilan-anglais");
 });
+
+test("la semaine cumule les matières et déplace une séance publiée", async ({
+  page,
+}) => {
+  const { initialData } = await import("../../src/domain/fixtures");
+  const { dateOnly, weekDates } = await import("../../src/domain/planning");
+  const days = weekDates(dateOnly(), 1);
+  const makePlan = (id: string, subjectId: string, courseId: string) => ({
+    id,
+    subjectId,
+    title: "Contrôle " + subjectId,
+    status: "published" as const,
+    examDate: days[4],
+    dailyMinutes: 20,
+    courseIds: [courseId],
+    steps: [
+      {
+        id: "lecture",
+        title: "Lecture " + subjectId,
+        kind: "read" as const,
+        date: days[0],
+        minutes: 20,
+        courseIds: [courseId],
+      },
+    ],
+  });
+  const state: LearningData = {
+    ...initialData,
+    plans: ["maths", "french"].map((id) =>
+      makePlan(
+        "plan-" + id,
+        id,
+        initialData.courses.find(
+          (c) => c.subjectId === id && c.status === "published",
+        )!.id,
+      ),
+    ),
+  };
+  await page.addInitScript(
+    ({ key, state }) => {
+      if (!localStorage.getItem(key))
+        localStorage.setItem(key, JSON.stringify(state));
+    },
+    { key: storageKey, state },
+  );
+  await page.goto("/parent/controls");
+  const week = page.getByTestId("revision-week");
+  await week.getByRole("button", { name: "Semaine suivante" }).click();
+  await expect(week).toContainText("40 min au total");
+  await week
+    .getByRole("button", {
+      name: "Déplacer Lecture maths du contrôle Contrôle maths",
+    })
+    .click();
+  await week.getByRole("button", { name: /mar\./ }).click();
+  await expect(week.getByText("20 min au total", { exact: true })).toHaveCount(
+    2,
+  );
+  await expect
+    .poll(async () => (await saved(page)).plans?.[0].steps[0].date)
+    .toBe(days[1]);
+  await page.goto("/student/plans");
+  await week.getByRole("button", { name: "Semaine suivante" }).click();
+  await expect(week.getByText("20 min au total", { exact: true })).toHaveCount(
+    2,
+  );
+  await expect(week.getByRole("button", { name: /Déplacer/ })).toHaveCount(0);
+});

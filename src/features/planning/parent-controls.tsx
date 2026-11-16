@@ -31,6 +31,7 @@ import {
   localId,
   useParentStyles,
 } from "@/features/parent/shared";
+import { RevisionWeek } from "./week";
 import { StudyWorkspace } from "./shared";
 import { useLocalDraft } from "./use-local-draft";
 
@@ -420,6 +421,23 @@ export function ParentControlsScreen() {
         {message && <Notice success>{message}</Notice>}
         {!!plans.length && (
           <View style={{ gap: 14 }}>
+            <RevisionWeek
+              key={data.activeProfileId}
+              plans={plans}
+              subjects={data.subjects}
+              onMove={(plan, step, date) => {
+                data.movePlanStep(plan.id, step.id, date);
+                if (editor.id === plan.id) {
+                  setEditor((current) => ({
+                    ...current,
+                    steps: current.steps.map((item) =>
+                      item.id === step.id ? { ...item, date } : item,
+                    ),
+                  }));
+                  setConfirmedKey(null);
+                }
+              }}
+            />
             <AppText variant="heading">Les contrôles préparés</AppText>
             <View style={common.grid}>
               {[...plans]

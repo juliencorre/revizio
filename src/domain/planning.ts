@@ -334,3 +334,51 @@ export function reschedulePlan(
 export function stepIsLate(step: PlanStep, today = dateOnly()): boolean {
   return !step.completedAt && step.date < today;
 }
+
+/** Monday to Sunday, across month, year and daylight-saving boundaries. */
+export function weekDates(anchor: string, offset = 0): string[] {
+  const weekday = new Date(anchor + "T12:00:00Z").getUTCDay();
+  const monday = dayNumber(anchor) - ((weekday + 6) % 7) + offset * 7;
+  return Array.from({ length: 7 }, (_, index) => dayString(monday + index));
+}
+
+export function weeklyWorkload(plans: RevisionPlan[], anchor: string) {
+  return weekDates(anchor).map((date) => {
+    const sessions = plans.flatMap((plan) =>
+      plan.steps
+        .filter((step) => step.date === date)
+        .map((step) => ({ plan, step })),
+    );
+    return {
+      date,
+      sessions,
+      minutes: sessions.reduce((total, { step }) => total + step.minutes, 0),
+    };
+  });
+}
+
+export function moveRevisionStep(
+  plan: RevisionPlan,
+  stepId: string,
+  date: string,
+  today = dateOnly(),
+): RevisionPlan {
+  const step = plan.steps.find((item) => item.id === stepId);
+  if (!step || step.completedAt)
+    throw new Error("Cette séance est terminée ou a été supprimée.");
+  if (!validPlanDate(date) || date < today || date > plan.examDate)
+    throw new Error("Choisissez un jour entre aujourd’hui et le contrôle.");
+  const minutes = plan.steps
+    .filter((item) => item.id !== step.id && item.date === date)
+    .reduce((total, item) => total + item.minutes, step.minutes);
+  if (minutes > plan.dailyMinutes)
+    throw new Error(
+      `Ce jour dépasserait les ${plan.dailyMinutes} minutes prévues pour ce contrôle.`,
+    );
+  return {
+    ...plan,
+    steps: plan.steps.map((item) =>
+      item.id === stepId ? { ...item, date } : item,
+    ),
+  };
+}
