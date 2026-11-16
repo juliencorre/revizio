@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import { type Pressable, View } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Speech from "expo-speech";
 import {
   AppText,
@@ -22,6 +22,7 @@ import {
   conjugationTitle,
 } from "@/domain/conjugation-practice";
 import type { Attempt } from "@/domain/model";
+import { conjugationDestination } from "@/domain/study-overview";
 import { ChildShell, Loading } from "@/features/child/shared";
 import { Field } from "@/features/parent/shared";
 import { speechSupported } from "@/services/speech-supported";
@@ -39,12 +40,19 @@ const actions = {
 export function StudentConjugationScreen() {
   const data = useLearning();
   const router = useRouter();
-  const [selection, setSelection] = useState("");
+  const { verb, tense, mode, attemptId } = useLocalSearchParams<{
+    verb?: string;
+    tense?: string;
+    mode?: string;
+    attemptId?: string;
+  }>();
   const [choosing, setChoosing] = useState(false);
-  const sheet =
-    data.conjugationSheets.find(
-      (item) => conjugationSeriesId(item) === selection,
-    ) ?? data.conjugationSheets[0];
+  const targeted = verb !== undefined || tense !== undefined;
+  const sheet = targeted
+    ? data.conjugationSheets.find(
+        (item) => item.verb === verb && item.tense === tense,
+      )
+    : data.conjugationSheets[0];
   return (
     <ChildShell active="courses">
       <View style={{ gap: spacing.xl }} testID="student-conjugation">
@@ -66,9 +74,26 @@ export function StudentConjugationScreen() {
         ) : !sheet ? (
           <EmptyState
             icon="book"
-            title="Tes fiches de conjugaison arriveront ici"
-            description="Un parent peut choisir un verbe et un temps, puis ajouter la fiche à ta révision."
-          />
+            title={
+              targeted
+                ? "Cette fiche est indisponible"
+                : "Tes fiches de conjugaison arriveront ici"
+            }
+            description={
+              targeted
+                ? "Retrouve les verbes et les temps publiés pour toi dans tes fiches."
+                : "Un parent peut choisir un verbe et un temps, puis ajouter la fiche à ta révision."
+            }
+          >
+            {targeted && data.conjugationSheets.length > 0 && (
+              <Button
+                icon="book"
+                onPress={() => router.replace("/student/conjugation")}
+              >
+                Mes fiches
+              </Button>
+            )}
+          </EmptyState>
         ) : (
           <>
             {data.conjugationSheets.length > 1 && (
@@ -90,7 +115,7 @@ export function StudentConjugationScreen() {
                         variant={item === sheet ? "primary" : "secondary"}
                         selected={item === sheet}
                         onPress={() => {
-                          setSelection(conjugationSeriesId(item));
+                          router.replace(conjugationDestination(item));
                           setChoosing(false);
                         }}
                       >
@@ -104,6 +129,8 @@ export function StudentConjugationScreen() {
             <ConjugationLesson
               key={data.activeProfileId + conjugationSeriesId(sheet)}
               sheet={sheet}
+              practicing={mode === "practice"}
+              attemptId={attemptId}
             />
           </>
         )}
@@ -112,31 +139,43 @@ export function StudentConjugationScreen() {
   );
 }
 
-function ConjugationLesson({ sheet }: { sheet: ConjugationSheet }) {
+function ConjugationLesson({
+  sheet,
+  practicing,
+  attemptId,
+}: {
+  sheet: ConjugationSheet;
+  practicing: boolean;
+  attemptId?: string;
+}) {
   const { colors } = useTheme();
   const data = useLearning();
-  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const router = useRouter();
   const [error, setError] = useState("");
   const seriesId = conjugationSeriesId(sheet);
   const attempt = data.attempts.find(
-    (item) => item.id === attemptId && item.seriesId === seriesId,
+    (item) => practicing && item.id === attemptId && item.seriesId === seriesId,
   );
   const pending = data.attempts.some(
     (item) => item.seriesId === seriesId && !item.completedAt,
   );
   const verb = conjugationVerbs.find((item) => item.base === sheet.verb);
-  function practice() {
+  const start = data.startConjugationAttempt;
+  const practice = useCallback(() => {
     try {
-      const id = data.startConjugationAttempt(sheet);
+      const id = start(sheet);
       if (!id) throw new Error("Cette fiche est indisponible.");
-      setAttemptId(id);
+      router.replace(conjugationDestination(sheet, id));
       setError("");
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "La séance est indisponible.",
       );
     }
-  }
+  }, [router, sheet, start]);
+  useEffect(() => {
+    if (practicing && !attemptId) practice();
+  }, [attemptId, practice, practicing]);
   return (
     <Card style={{ gap: spacing.lg }}>
       <View style={{ gap: spacing.xs }}>
@@ -146,11 +185,11 @@ function ConjugationLesson({ sheet }: { sheet: ConjugationSheet }) {
       <View style={actions}>
         <Button
           icon="book"
-          selected={!attempt}
-          variant={attempt ? "secondary" : "primary"}
+          selected={!practicing}
+          variant={practicing ? "secondary" : "primary"}
           testID="conjugation-learn"
           onPress={() => {
-            setAttemptId(null);
+            router.replace(conjugationDestination(sheet));
             setError("");
           }}
         >
@@ -158,10 +197,12 @@ function ConjugationLesson({ sheet }: { sheet: ConjugationSheet }) {
         </Button>
         <Button
           icon="pencil"
-          selected={!!attempt}
-          variant={attempt ? "primary" : "secondary"}
+          selected={practicing}
+          variant={practicing ? "primary" : "secondary"}
           testID="conjugation-practice"
-          onPress={practice}
+          onPress={() => {
+            if (!attempt || attempt.completedAt) practice();
+          }}
         >
           {pending && !attempt
             ? "Reprendre l’entraînement"
@@ -173,6 +214,12 @@ function ConjugationLesson({ sheet }: { sheet: ConjugationSheet }) {
       {!!error && <AppText color={colors.danger}>{error}</AppText>}
       {attempt ? (
         <ConjugationPractice key={attempt.id} attempt={attempt} />
+      ) : practicing ? (
+        <AppText color={colors.muted}>
+          {attemptId
+            ? "Cette tentative est indisponible."
+            : "Ouverture de la séance…"}
+        </AppText>
       ) : (
         <SpokenTable sheet={sheet} />
       )}

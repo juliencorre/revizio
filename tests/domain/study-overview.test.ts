@@ -67,6 +67,43 @@ describe("prochaine séance", () => {
       `/student/exercise/${state.series[0].id}?attemptId=attempt&mode=exam&planId=plan&stepId=step`,
     );
   });
+  it("ouvre la fiche de conjugaison publiée et reprend la bonne tentative", () => {
+    const be = { verb: "be", tense: "present-simple" };
+    const have = { verb: "have", tense: "past-simple" };
+    const state: LearningData = {
+      version: 1,
+      courses: [],
+      series: [],
+      reviewedCourseIds: [],
+      attempts: [],
+      conjugationSheets: [be, have],
+    };
+    expect(nextStudySession(state, today)).toMatchObject({
+      subjectId: "english",
+      resume: false,
+      title: "be · Présent simple",
+      destination:
+        "/student/conjugation?verb=be&tense=present-simple&mode=learn",
+    });
+    state.attempts = [
+      attempt({
+        id: "essai 2",
+        seriesId: "conjugation:have:past-simple",
+        subjectId: "english",
+      }),
+    ];
+    expect(nextStudySession(state, today)).toMatchObject({
+      resume: true,
+      destination:
+        "/student/conjugation?verb=have&tense=past-simple&mode=practice&attemptId=essai%202",
+    });
+    state.conjugationSheets = [be];
+    expect(nextStudySession(state, today)?.destination).toBe(
+      "/student/conjugation?verb=be&tense=present-simple&mode=learn",
+    );
+    state.conjugationSheets = [];
+    expect(nextStudySession(state, today)).toBeNull();
+  });
   it("ouvre la séance due avec son contexte et sa durée de contrôle blanc", () => {
     const state = data();
     state.plans = [plan()];

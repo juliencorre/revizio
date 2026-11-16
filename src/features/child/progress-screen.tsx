@@ -15,6 +15,11 @@ import {
 import { VocabularyActivityCard } from "@/features/vocabulary/activity-card";
 import { useTheme } from "@/theme";
 import {
+  conjugationSeriesId,
+  isConjugationSeries,
+} from "@/domain/conjugation-practice";
+import { conjugationDestination } from "@/domain/study-overview";
+import {
   ChildShell,
   Loading,
   formatDate,
@@ -65,7 +70,20 @@ export function StudentProgressScreen() {
   );
   const activity = [...data.attempts]
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-    .slice(0, 8);
+    .slice(0, 8)
+    .map((attempt) => {
+      const sheet = data.conjugationSheets.find(
+        (item) => conjugationSeriesId(item) === attempt.seriesId,
+      );
+      const destination =
+        !attempt.completedAt && sheet
+          ? conjugationDestination(sheet, attempt.id)
+          : attempt.completedAt ||
+              data.publishedSeries.some((item) => item.id === attempt.seriesId)
+            ? (`/student/exercise/${encodeURIComponent(attempt.seriesId)}?attemptId=${encodeURIComponent(attempt.id)}` as const)
+            : null;
+      return { ...attempt, destination };
+    });
   const split = width >= 850;
   const compact = useWindowClass() === "compact";
   return (
@@ -250,9 +268,10 @@ export function StudentProgressScreen() {
                         <AppText variant="small" color={colors.muted}>
                           {item.seriesTitle}
                         </AppText>
-                        {data.publishedSeries.some(
-                          (s) => s.id === item.seriesId,
-                        ) && (
+                        {(isConjugationSeries(item.seriesId) ||
+                          data.publishedSeries.some(
+                            (s) => s.id === item.seriesId,
+                          )) && (
                           <Button
                             variant="ghost"
                             icon="arrow-right"
@@ -325,18 +344,11 @@ export function StudentProgressScreen() {
                           ? ` · ${a.answers.filter((answer) => answer.usedHint).length} avec indice`
                           : ""}
                       </AppText>
-                      {(a.completedAt ||
-                        data.publishedSeries.some(
-                          (s) => s.id === a.seriesId,
-                        )) && (
+                      {a.destination && (
                         <Button
                           variant="secondary"
                           icon="play"
-                          onPress={() =>
-                            router.push(
-                              `/student/exercise/${a.seriesId}?attemptId=${a.id}`,
-                            )
-                          }
+                          onPress={() => router.push(a.destination!)}
                         >
                           {a.completedAt ? "Revoir ce bilan" : "Reprendre"}
                         </Button>

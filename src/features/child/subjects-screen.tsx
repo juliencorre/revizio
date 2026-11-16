@@ -10,7 +10,13 @@ import {
   useContentWidth,
 } from "@/components/ui";
 import { useTheme, radius, spacing } from "@/theme";
-import { ChildShell, Loading, latestAttempt, useChildData } from "./shared";
+import {
+  ChildShell,
+  Loading,
+  latestAttempt,
+  plural,
+  useChildData,
+} from "./shared";
 
 export function SubjectGrid() {
   const { colors, subjectAccent } = useTheme();
@@ -36,6 +42,8 @@ export function SubjectGrid() {
             list.status === "published" &&
             !list.archived,
         ).length;
+        const sheets =
+          subject.id === "english" ? data.conjugationSheets.length : 0;
         const accent = subjectAccent(subject.color);
         return (
           <ActionCard
@@ -59,6 +67,13 @@ export function SubjectGrid() {
               <AppText variant="small" color={colors.muted}>
                 {[
                   count ? `${count} cours` : "",
+                  sheets
+                    ? plural(
+                        sheets,
+                        "fiche de conjugaison",
+                        "fiches de conjugaison",
+                      )
+                    : "",
                   lists
                     ? `${lists} ${lists === 1 ? "liste de vocabulaire" : "listes de vocabulaire"}`
                     : "",

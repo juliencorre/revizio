@@ -8,6 +8,8 @@ import type {
 } from "./model";
 import { vocabularyLanguages, wordKey } from "./vocabulary";
 import { dateOnly } from "./planning";
+import type { ConjugationSheet } from "./conjugation";
+import { conjugationSeriesId, conjugationTitle } from "./conjugation-practice";
 
 export function latestAttempts(
   attempts: Attempt[],
@@ -54,6 +56,39 @@ export interface NextSession {
   destination: string;
 }
 
+export function conjugationDestination(
+  sheet: ConjugationSheet,
+  attemptId?: string,
+) {
+  const target = `verb=${encodeURIComponent(sheet.verb)}&tense=${encodeURIComponent(sheet.tense)}`;
+  const mode = attemptId
+    ? `practice&attemptId=${encodeURIComponent(attemptId)}`
+    : "learn";
+  return `/student/conjugation?${target}&mode=${mode}` as const;
+}
+
+function conjugationSession(
+  sheet: ConjugationSheet,
+  attempt?: Attempt,
+): NextSession {
+  return {
+    title: attempt?.seriesTitle ?? conjugationTitle(sheet),
+    reason: attempt
+      ? "Continue avec la prochaine personne à conjuguer."
+      : "Découvre la conjugaison de ce verbe.",
+    minutes: attempt
+      ? Math.max(
+          1,
+          Math.ceil((attempt.questions.length - attempt.answers.length) / 2),
+        )
+      : 4,
+    estimated: true,
+    resume: !!attempt,
+    subjectId: "english",
+    destination: conjugationDestination(sheet, attempt?.id),
+  };
+}
+
 /** A deterministic recommendation using only published content, never an AI claim. */
 export function nextStudySession(
   data: LearningData,
@@ -68,6 +103,12 @@ export function nextStudySession(
       item.status === "published" &&
       item.questions.length > 0 &&
       item.courseIds.every((id) => courseIds.has(id)),
+  );
+  const sheets = new Map(
+    (data.conjugationSheets ?? []).map((sheet) => [
+      conjugationSeriesId(sheet),
+      sheet,
+    ]),
   );
   const attempts = latestAttempts(data.attempts);
   const exerciseSession = (
@@ -99,7 +140,8 @@ export function nextStudySession(
     .filter(
       (attempt) =>
         !attempt.completedAt &&
-        series.some((item) => item.id === attempt.seriesId),
+        (series.some((item) => item.id === attempt.seriesId) ||
+          sheets.has(attempt.seriesId)),
     )
     .sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)))[0];
   const vocabulary = (data.vocabularySessions ?? [])
@@ -125,6 +167,8 @@ export function nextStudySession(
     };
   }
   if (unfinished) {
+    const sheet = sheets.get(unfinished.seriesId);
+    if (sheet) return conjugationSession(sheet, unfinished);
     const session = exerciseSession(
       series.find((item) => item.id === unfinished.seriesId)!,
       unfinished,
@@ -197,6 +241,10 @@ export function nextStudySession(
         ),
     );
   if (pending) return exerciseSession(pending);
+  for (const [id, sheet] of sheets) {
+    if (!attempts.some((item) => item.seriesId === id && item.completedAt))
+      return conjugationSession(sheet);
+  }
   const unread = courses.find(
     (course) => !data.reviewedCourseIds.includes(course.id),
   );
