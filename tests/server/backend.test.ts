@@ -12,12 +12,15 @@ import { initialData } from "../../src/domain/fixtures";
 import {
   answerQuestionInData,
   clone,
+  completeAttemptInData,
+  publishCourseInData,
   startAttemptInData,
 } from "../../src/domain/learning";
 import {
   decideAnswerReview,
   requestAnswerReview,
 } from "../../src/domain/answer-reviews";
+import { mergeLearningData } from "../../src/domain/sync";
 import type { Course, LearningData } from "../../src/domain/model";
 
 class FixtureAi implements AiClient {
@@ -601,6 +604,155 @@ describe("contenus publiés, réponses et concurrence", () => {
     expect((await envelope(parent, sibling)).data.answerReviews ?? []).toEqual(
       [],
     );
+  });
+  it("synchronise une lecture hors ligne sur une édition remplacée sans marquer sa remplaçante relue", async () => {
+    const { token: parent, profiles } = await setup();
+    const id = profiles[0].id;
+    const token = await child(id);
+    const first = initialData.courses[0];
+    const review = {
+      courseId: first.id,
+      dueDate: "2026-11-20",
+      interval: 2,
+      lastReviewedAt: "2026-11-18T16:00:00.000Z",
+    };
+    const firstRead = {
+      courseId: first.id,
+      reviewedAt: "2026-11-18T16:00:00.000Z",
+    };
+    const seed: LearningData = {
+      version: 1,
+      courses: [
+        first,
+        { ...first, id: "v2", previousVersionId: first.id, status: "draft" },
+      ],
+      series: [],
+      attempts: [],
+      reviewedCourseIds: [],
+      readingRecords: [],
+      spacedReviews: [],
+    };
+    expect((await save(parent, seed, 0, id)).statusCode).toBe(200);
+    const before = await envelope(token, id);
+    const offline: LearningData = {
+      ...before.data,
+      reviewedCourseIds: [first.id],
+      readingRecords: [firstRead],
+      spacedReviews: [review],
+    };
+    const replaced = publishCourseInData(seed, "v2", first.id);
+    expect(replaced.result.ok).toBe(true);
+    const remote = await save(parent, replaced.data, before.revision, id);
+    expect(remote.statusCode, remote.body).toBe(200);
+    expect((await save(token, offline, before.revision, id)).statusCode).toBe(
+      409,
+    );
+    const refreshed = await envelope(token, id);
+    const combined = mergeLearningData(before.data, offline, refreshed.data);
+    expect(combined.conflicts).toEqual([]);
+    expect(combined.data.spacedReviews).toEqual([
+      { ...review, courseId: "v2" },
+    ]);
+    // An older offline client still sends its original ID. The server also resolves it.
+    const put = await save(
+      token,
+      { ...combined.data, spacedReviews: [review] },
+      refreshed.revision,
+      id,
+    );
+    expect(put.statusCode, put.body).toBe(200);
+    const result = put.json().data as LearningData;
+    expect(result.readingRecords).toEqual([firstRead]);
+    expect(result.reviewedCourseIds).toEqual([]);
+    expect(result.spacedReviews).toEqual([{ ...review, courseId: "v2" }]);
+  });
+  it("conserve l’essai hors ligne après deux décisions parentales opposées et applique la dernière aux nouveaux essais", async () => {
+    const { token: parent, profiles } = await setup();
+    const id = profiles[0].id;
+    const token = await child(id);
+    const seed = clone(initialData);
+    const series = seed.series.find((entry) => entry.status === "published")!;
+    const q = {
+      ...series.questions[0],
+      type: "short-answer" as const,
+      choices: [],
+      correctChoiceId: "",
+      expectedAnswers: ["un demi"],
+    };
+    series.questions = [q];
+    const now = new Date().toISOString();
+    function attempt(data: LearningData, key: string) {
+      const started = startAttemptInData(data, series.id, key, now, true, {
+        profileId: id,
+      }).data;
+      return completeAttemptInData(
+        answerQuestionInData(started, key, q.id, "une moitié", false, now),
+        key,
+        now,
+      );
+    }
+    const withReport = requestAnswerReview(
+      attempt(seed, "premier"),
+      "premier",
+      q.id,
+    );
+    const reportId = withReport.answerReviews![0].id;
+    expect((await save(parent, withReport, 0, id)).statusCode).toBe(200);
+    const base = await envelope(parent, id);
+    const parentA = decideAnswerReview(base.data, reportId, "accepted");
+    const parentB = decideAnswerReview(base.data, reportId, "declined");
+    expect((await save(parent, parentA, base.revision, id)).statusCode).toBe(
+      200,
+    );
+    const childBase = await envelope(token, id);
+    const offline = attempt(childBase.data, "pendant-approbation");
+    expect((await save(parent, parentB, base.revision, id)).statusCode).toBe(
+      409,
+    );
+    const server = await envelope(parent, id);
+    const conflict = mergeLearningData(base.data, parentB, server.data);
+    expect(conflict.details).toMatchObject([
+      {
+        title: q.prompt,
+        field: "Vérification de la réponse",
+        local: "Confirmer la correction",
+        remote: "Accepter la variante",
+      },
+    ]);
+    const resolved = mergeLearningData(
+      base.data,
+      parentB,
+      server.data,
+      new Map([[conflict.conflicts[0], "local"]]),
+    );
+    expect(
+      (await save(parent, resolved.data, server.revision, id)).statusCode,
+    ).toBe(200);
+    const childCurrent = await envelope(token, id);
+    const rebased = mergeLearningData(
+      childBase.data,
+      offline,
+      childCurrent.data,
+    );
+    expect(rebased.conflicts).toEqual([]);
+    const synced = await save(token, rebased.data, childCurrent.revision, id);
+    expect(synced.statusCode, synced.body).toBe(200);
+    const historical = synced.json().data as LearningData;
+    expect(historical.answerReviews?.[0]).toMatchObject({
+      status: "declined",
+      previouslyAccepted: true,
+    });
+    expect(
+      historical.attempts.map((item) => item.answers[0].isCorrect),
+    ).toEqual([false, true]);
+    const future = attempt(historical, "après-décision");
+    const saved = await save(token, future, synced.json().revision, id);
+    expect(saved.statusCode, saved.body).toBe(200);
+    expect(
+      (saved.json().data as LearningData).attempts.map(
+        (item) => item.answers[0].isCorrect,
+      ),
+    ).toEqual([false, true, false]);
   });
   it("recalcule les corrections côté serveur et protège le snapshot d’une tentative", async () => {
     const session = await setup();

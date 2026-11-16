@@ -46,6 +46,8 @@ export function validateAnswerReviews(value: unknown, attempts: Attempt[]) {
       typeof review.questionId !== "string" ||
       review.id !== answerReviewId(review.attemptId, review.questionId) ||
       !["pending", "accepted", "declined"].includes(review.status) ||
+      (review.previouslyAccepted !== undefined &&
+        review.previouslyAccepted !== true) ||
       seen.has(review.id) ||
       !reviewDetails(attempts, review)
     )
@@ -100,18 +102,60 @@ export function mergeChildReviews(
     const existing = reviews.get(review.id);
     if (review.status !== "pending" && review.status !== existing?.status)
       throw new Error("Décision parentale requise.");
-    if (!existing) reviews.set(review.id, { ...review, status: "pending" });
+    if (!existing) {
+      if (review.previouslyAccepted)
+        throw new Error("Décision parentale requise.");
+      reviews.set(review.id, {
+        id: review.id,
+        attemptId: review.attemptId,
+        questionId: review.questionId,
+        status: "pending",
+      });
+    }
   }
   return [...reviews.values()];
+}
+
+export function preserveReviewDecisions(
+  current: AnswerReview[] | undefined,
+  incoming: AnswerReview[] | undefined,
+) {
+  if (!incoming) return current;
+  const original = new Map(
+    (current ?? []).map((review) => [review.id, review]),
+  );
+  return incoming.map(
+    ({ previouslyAccepted: _history, ...review }): AnswerReview => {
+      const old = original.get(review.id);
+      if (
+        old?.previouslyAccepted ||
+        (old?.status === "accepted" && review.status !== "accepted")
+      )
+        return { ...review, previouslyAccepted: true };
+      return review;
+    },
+  );
 }
 
 export function questionsForNewAttempt(
   data: LearningData,
   series: ExerciseSeries,
+) {
+  return questionsWithVariants(data, series, false);
+}
+
+function questionsWithVariants(
+  data: LearningData,
+  series: ExerciseSeries,
+  historical: boolean,
 ): Question[] {
   const variants = new Map<string, string[]>();
   for (const review of data.answerReviews ?? []) {
-    if (review.status !== "accepted") continue;
+    if (
+      review.status !== "accepted" &&
+      !(historical && review.previouslyAccepted)
+    )
+      continue;
     const details = reviewDetails(data.attempts, review);
     if (!details || details.attempt.seriesId !== series.id) continue;
     const published = series.questions.find((q) => q.id === review.questionId);
@@ -147,7 +191,7 @@ export function matchesPublishedQuestions(
   series: ExerciseSeries,
   supplied: Question[],
 ): boolean {
-  const approved = questionsForNewAttempt(data, series);
+  const approved = questionsWithVariants(data, series, true);
   return (
     supplied.length === series.questions.length &&
     supplied.every((question, index) => {

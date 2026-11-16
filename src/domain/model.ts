@@ -169,6 +169,8 @@ export interface AnswerReview {
   attemptId: string;
   questionId: string;
   status: "pending" | "accepted" | "declined";
+  /** A previous server decision was visible to devices that may still be offline. */
+  previouslyAccepted?: true;
 }
 export interface LearningData {
   version: 1;

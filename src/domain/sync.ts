@@ -1,4 +1,8 @@
-import type { LearningData } from "./model";
+import {
+  latestSpacedReviews,
+  publishedReadingEditions,
+} from "./reading-history";
+import type { LearningData, ReadingRecord, SpacedReview } from "./model";
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
 const copy = (value: unknown) =>
@@ -16,6 +20,7 @@ export interface FieldConflict {
 }
 const labels: Record<string, string> = {
   courses: "Cours",
+  answerReviews: "Vérification d’une réponse",
   series: "Série",
   attempts: "Tentative",
   plans: "Plan",
@@ -82,6 +87,22 @@ export function mergeLearningData(
     if (Array.isArray(b) && Array.isArray(c)) {
       const old = Array.isArray(a) ? a : [];
       if (path === "reviewedCourseIds") return [...new Set([...b, ...c])];
+      if (path === "spacedReviews")
+        return latestSpacedReviews([
+          ...(c as SpacedReview[]),
+          ...(b as SpacedReview[]),
+        ]);
+      if (path === "readingRecords") {
+        const records = [...(c as ReadingRecord[]), ...(b as ReadingRecord[])];
+        return [
+          ...new Map(
+            records.map((item) => [
+              JSON.stringify([item.courseId, item.reviewedAt]),
+              item,
+            ]),
+          ).values(),
+        ];
+      }
       const identified = (
         item: unknown,
       ): item is Record<string, unknown> & { id: string } =>
@@ -100,7 +121,12 @@ export function mergeLearningData(
         return Array.from(ids, (id) => {
           const item =
             before.get(id) ?? localItems.get(id) ?? remoteItems.get(id);
-          const label = item?.title ?? item?.name ?? item?.prompt ?? item?.word;
+          const label =
+            path === "answerReviews"
+              ? remote.attempts
+                  .find((attempt) => attempt.id === item?.attemptId)
+                  ?.questions.find((q) => q.id === item?.questionId)?.prompt
+              : (item?.title ?? item?.name ?? item?.prompt ?? item?.word);
           const itemTitle =
             typeof label === "string" && label.trim() ? label : title;
           const key = encodeURIComponent(id).replace(/\./g, "%2E");
@@ -137,13 +163,29 @@ export function mergeLearningData(
       );
     }
     conflicts.push(path);
-    details.push({ path, title, field, local: summary(b), remote: summary(c) });
+    const decision =
+      path.startsWith("answerReviews.") && path.endsWith(".status");
+    const format = (value: unknown) => {
+      if (decision && value === "accepted") return "Accepter la variante";
+      if (decision && value === "declined") return "Confirmer la correction";
+      if (decision && value === "pending") return "À vérifier";
+      return summary(value);
+    };
+    details.push({
+      path,
+      title,
+      field: decision ? "Vérification de la réponse" : field,
+      local: format(b),
+      remote: format(c),
+    });
     const choice = typeof prefer === "string" ? prefer : prefer?.get(path);
     return copy(choice === "local" ? b : c);
   }
-  return {
-    data: merge(base, local, remote, "", "", "") as LearningData,
-    conflicts,
-    details,
-  };
+  const data = merge(base, local, remote, "", "", "") as LearningData;
+  if (data.spacedReviews?.length)
+    data.spacedReviews = latestSpacedReviews(
+      data.spacedReviews,
+      publishedReadingEditions(data.courses),
+    );
+  return { data, conflicts, details };
 }

@@ -1,5 +1,9 @@
 import type { Attempt, LearningData, RevisionPlan } from "../src/domain/model";
 import { parseLearningData } from "../src/domain/learning";
+import {
+  latestSpacedReviews,
+  publishedReadingEditions,
+} from "../src/domain/reading-history";
 import { evaluateAnswer } from "../src/domain/answers";
 import { clone } from "../src/domain/learning";
 import { HttpError } from "./types";
@@ -206,16 +210,11 @@ export function mergeChildData(
     )
   )
     throw new HttpError(403, "Ce plan n’est pas disponible.");
-  const readingIds = new Set(
-    view.courses.flatMap((course) => [
-      course.id,
-      ...(course.replacedCourseIds ?? []),
-    ]),
-  );
+  const readingEditions = publishedReadingEditions(view.courses);
   const readingRecords = [...(current.readingRecords ?? [])];
   for (const record of incoming.readingRecords ?? []) {
     if (
-      !readingIds.has(record.courseId) &&
+      !readingEditions.has(record.courseId) &&
       !readingRecords.some(
         (existing) =>
           existing.courseId === record.courseId &&
@@ -234,19 +233,19 @@ export function mergeChildData(
     )
       readingRecords.push(record);
   }
-  const spacedReviews = [...(current.spacedReviews ?? [])];
-  for (const record of incoming.spacedReviews ?? []) {
-    if (!publishedIds.has(record.courseId))
-      throw new HttpError(
-        403,
-        "Cette révision ne correspond pas à une fiche publiée.",
-      );
-    const index = spacedReviews.findIndex(
-      (r) => r.courseId === record.courseId,
+  if (
+    (incoming.spacedReviews ?? []).some(
+      (record) => !readingEditions.has(record.courseId),
+    )
+  )
+    throw new HttpError(
+      403,
+      "Cette révision ne correspond pas à une fiche publiée.",
     );
-    if (index >= 0) spacedReviews[index] = record;
-    else spacedReviews.push(record);
-  }
+  const spacedReviews = latestSpacedReviews(
+    [...(current.spacedReviews ?? []), ...(incoming.spacedReviews ?? [])],
+    readingEditions,
+  );
   return parseLearningData(
     JSON.stringify({
       ...current,

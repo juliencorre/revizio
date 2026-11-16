@@ -6,6 +6,7 @@ import type {
   LearningData,
   SessionUser,
 } from "../src/domain/model";
+import { preserveReviewDecisions } from "../src/domain/answer-reviews";
 import { parseLearningData } from "../src/domain/learning";
 import { subjects } from "../src/domain/fixtures";
 import { isVocabularyLanguage } from "../src/domain/vocabulary";
@@ -501,8 +502,14 @@ export async function configureServerRoutes(
           data: user.role === "child" ? childData(current.data) : current.data,
         },
       );
-    if (data.answerReviews === undefined && current.data.answerReviews)
-      data.answerReviews = current.data.answerReviews;
+    if (
+      user.role === "parent" &&
+      (current.data.answerReviews || data.answerReviews)
+    )
+      data.answerReviews = preserveReviewDecisions(
+        current.data.answerReviews,
+        data.answerReviews,
+      );
     data = preserveVocabularyForLegacyClient(
       current.data,
       data,
