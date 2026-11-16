@@ -1,5 +1,7 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
+test.use({ colorScheme: "dark" });
+
 const bePresent: Record<string, string> = {
   I: "am",
   You: "are",
@@ -23,8 +25,8 @@ async function capture(page: Page, info: TestInfo, name: string) {
 
 async function readQuestion(page: Page) {
   const prompt = page.getByTestId("conjugation-prompt");
-  await expect(prompt).toHaveText(/^(I|You|He|She|It|We|They) ___$/);
-  const pronoun = (await prompt.innerText()).split(" ")[0];
+  await expect(prompt).toHaveText(/^(I|You|He|She|It|We|They)$/);
+  const pronoun = await prompt.innerText();
   let person = pronoun;
   if (pronoun === "You") {
     const hint = page
@@ -137,18 +139,53 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
   const correction = page.getByTestId("conjugation-correction");
   const next = page.getByTestId("conjugation-next");
   await practice.click();
+  const review = page.getByRole("button", {
+    name: "Revoir la fiche",
+    exact: true,
+  });
   await expect(table).toHaveCount(0);
+  await expect(review).toBeVisible();
+  await expect(practice).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Apprendre", exact: true }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Mes cours d’anglais" }),
+  ).toBeHidden();
   await expect(check).toBeDisabled();
   const first = await readQuestion(page);
-  await answer.fill("wrong");
-  await check.click();
+  const promptBox = (await page
+    .getByTestId("conjugation-prompt")
+    .boundingBox())!;
+  const answerBox = (await answer.boundingBox())!;
+  expect(answerBox.x).toBeGreaterThanOrEqual(promptBox.x + promptBox.width);
+  expect(promptBox.y + promptBox.height / 2).toBeGreaterThanOrEqual(
+    answerBox.y,
+  );
+  expect(promptBox.y + promptBox.height / 2).toBeLessThanOrEqual(
+    answerBox.y + answerBox.height,
+  );
+  for (const control of [answer, check, review]) {
+    const bounds = (await control.boundingBox())!;
+    expect(Math.min(bounds.width, bounds.height)).toBeGreaterThanOrEqual(44);
+  }
+  await capture(page, info, "enfant-saisie-be");
+  await answer.fill(first.form === "is" ? "am" : "is");
+  await answer.press("Enter");
   await expect(correction).toHaveText(first.pronoun + " " + first.form);
   await capture(page, info, "enfant-correction-be");
   await next.click();
   const second = await readQuestion(page);
+  const session = page.url();
+  await review.click();
+  await expect(table).toBeVisible();
+  await expect(practice).toHaveAccessibleName("Reprendre l’entraînement");
+  await practice.click();
+  await expect(page).toHaveURL(session);
+  expect(await readQuestion(page)).toEqual(second);
   await page.reload();
   await expect(
-    page.getByText("Personne 2 sur 8", { exact: true }),
+    page.getByText("Question 2 sur 8", { exact: true }),
   ).toBeVisible();
   expect(await readQuestion(page)).toEqual(second);
   await page.goto("/student");
@@ -157,7 +194,7 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
   );
   await page.getByTestId("start-next-session").click();
   await expect(
-    page.getByText("Personne 2 sur 8", { exact: true }),
+    page.getByText("Question 2 sur 8", { exact: true }),
   ).toBeVisible();
   expect(await readQuestion(page)).toEqual(second);
 
@@ -195,4 +232,50 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
   await page.goto(finishedSession);
   await expect(page.getByText("Cette fiche est indisponible")).toBeVisible();
   await expect(page.getByTestId("conjugation-table")).toHaveCount(0);
+});
+
+test("saisir une forme composée avec une hauteur réduite sur tablette", async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem("revizo.mode", "demo"));
+  await page.goto(
+    "/parent/english?section=conjugaison&verb=play&tense=future-will",
+  );
+  const add = page.getByTestId("add-conjugation-sheet");
+  await add.click();
+  await expect(add).toBeDisabled();
+  await page.goto("/student/subject/english");
+  await page.getByTestId("subject-conjugation").click();
+  await page.getByTestId("conjugation-practice").click();
+
+  const viewport = page.viewportSize()!;
+  const reducedHeight = viewport.height - 360;
+  await page.setViewportSize({ width: viewport.width, height: reducedHeight });
+  const prompt = page.getByTestId("conjugation-prompt");
+  const answer = page.getByTestId("conjugation-answer");
+  const check = page.getByTestId("conjugation-check");
+  const next = page.getByTestId("conjugation-next");
+  await answer.fill("will play");
+  const pronoun = await prompt.innerText();
+  const initial = (await check.boundingBox())!;
+  expect(initial.y).toBeGreaterThanOrEqual(0);
+  expect(initial.y + initial.height).toBeLessThanOrEqual(reducedHeight);
+
+  await answer.press("Enter");
+  await expect(page.getByTestId("conjugation-correction")).toHaveText(
+    pronoun + " will play",
+  );
+  await expect(next).toHaveAccessibleName("Continuer");
+  const continued = (await next.boundingBox())!;
+  expect(Math.min(continued.width, continued.height)).toBeGreaterThanOrEqual(
+    44,
+  );
+  expect(Math.abs(continued.y - initial.y)).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(continued.x + continued.width - initial.x - initial.width),
+  ).toBeLessThanOrEqual(2);
+  await next.click();
+  await expect(
+    page.getByText("Question 2 sur 8", { exact: true }),
+  ).toBeVisible();
 });
