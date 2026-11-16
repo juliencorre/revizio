@@ -147,8 +147,15 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
   await next.click();
   const second = await readQuestion(page);
   await page.reload();
-  await expect(practice).toHaveText("Reprendre l’entraînement");
-  await practice.click();
+  await expect(
+    page.getByText("Personne 2 sur 8", { exact: true }),
+  ).toBeVisible();
+  expect(await readQuestion(page)).toEqual(second);
+  await page.goto("/student");
+  await expect(page.getByTestId("next-study-session")).toContainText(
+    "be · Présent simple",
+  );
+  await page.getByTestId("start-next-session").click();
   await expect(
     page.getByText("Personne 2 sur 8", { exact: true }),
   ).toBeVisible();
@@ -176,4 +183,16 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
   await expect(page.getByTestId("conjugation-finished")).toContainText(
     "7 sur 8",
   );
+
+  const finishedSession = page.url();
+  await page.goto("/parent/subject/english?tab=conjugaison");
+  await page
+    .getByRole("button", { name: "be · Présent simple", exact: true })
+    .click();
+  await expect(add).toBeDisabled();
+  await page.getByTestId("remove-conjugation-be-present-simple").click();
+  await expect(add).toBeEnabled();
+  await page.goto(finishedSession);
+  await expect(page.getByText("Cette fiche est indisponible")).toBeVisible();
+  await expect(page.getByTestId("conjugation-table")).toHaveCount(0);
 });
