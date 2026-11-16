@@ -12,6 +12,7 @@ import { resolve, join } from "node:path";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { PNG } from "pngjs";
+import { extractText } from "unpdf";
 import { initialData } from "../../src/domain/fixtures";
 import { clone } from "../../src/domain/learning";
 import type { AiJob, CourseSource, LearningData } from "../../src/domain/model";
@@ -385,6 +386,15 @@ describe("installation Cloudflare dans workerd", () => {
     );
     expect(pdfUpload.status).toBe(200);
     const pdfSource = (await pdfUpload.json()) as CourseSource;
+    const secondPage = await request(
+      pdfSource.uri + "?page=2", "GET", undefined, parent.token,
+    );
+    expect(secondPage.status, await secondPage.clone().text()).toBe(200);
+    const citedText = await extractText(
+      new Uint8Array(await secondPage.arrayBuffer()),
+    );
+    expect(citedText.totalPages).toBe(1);
+    expect(citedText.text[0]).toContain("Une temperature negative");
     const pdfJob = (await (
       await request(
         "/api/ai/course",
