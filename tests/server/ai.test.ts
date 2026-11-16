@@ -71,7 +71,124 @@ describe("périmètre anglais", () => {
     ).toBe(false);
   });
 });
+describe("verdict des questions vrai/faux générées", () => {
+  async function generate(
+    choices: unknown,
+    correctChoiceIndex: unknown,
+    expectedAnswers: unknown,
+  ) {
+    return generateExercises(
+      {
+        available: async () => true,
+        json: async () => ({
+          questions: [
+            {
+              type: "true-false",
+              prompt: "Un nombre négatif est inférieur à zéro.",
+              choices,
+              correctChoiceIndex,
+              expectedAnswers,
+              explanation: "Compare sa position sur la droite graduée.",
+              hint: "Repère zéro.",
+              concept: "Nombres relatifs",
+              rubric: "",
+              sourceRefs: [],
+            },
+          ],
+        }),
+      },
+      { baseUrl: "http://localhost", model: "test" },
+      {
+        courses: [initialData.courses[0]],
+        types: ["true-false"],
+        level: "practice",
+        count: 1,
+      },
+    );
+  }
+
+  it.each([
+    { choices: [], index: 0, expected: ["Vrai"], correct: "c1" },
+    { choices: [], index: 0, expected: ["Faux"], correct: "c2" },
+    { choices: ["Faux", "Vrai"], index: 0, expected: [], correct: "c2" },
+    {
+      choices: ["faux", "VRAI"],
+      index: 1,
+      expected: [" vrai "],
+      correct: "c1",
+    },
+    { choices: ["Vrai", "Faux"], index: 1, expected: [], correct: "c2" },
+  ])(
+    "conserve le verdict explicite ou le choix indexé $correct",
+    async ({ choices, index, expected, correct }) => {
+      const [question] = await generate(choices, index, expected);
+      expect(question.choices).toEqual([
+        { id: "c1", label: "Vrai" },
+        { id: "c2", label: "Faux" },
+      ]);
+      expect(question.correctChoiceId).toBe(correct);
+      expect(question.expectedAnswers).toBeUndefined();
+    },
+  );
+  it.each([
+    { choices: [], index: 0, expected: [] },
+    { choices: [], index: 0, expected: ["Vrai", "Faux"] },
+    { choices: [], index: 0, expected: ["Peut-être"] },
+    { choices: [], index: 2, expected: ["Vrai"] },
+    { choices: ["Vrai", "Faux"], index: 0, expected: ["Faux"] },
+    { choices: ["Vrai", "Vrai"], index: 0, expected: [] },
+    { choices: ["Vrai", "Faux"], index: null, expected: [] },
+    { choices: ["Vrai", "Faux"], index: 2, expected: [] },
+  ])(
+    "refuse un verdict absent, ambigu ou contradictoire",
+    async ({ choices, index, expected }) => {
+      await expect(generate(choices, index, expected)).rejects.toThrow(
+        "verdict explicite unique et cohérent",
+      );
+    },
+  );
+});
 describe("garde-fous de fidélité", () => {
+  it.each([
+    { suffix: "A) premier\nB) deuxième", output: "Quel terme choisir ?" },
+    {
+      suffix: "A) autre\nB) deuxième",
+      output: "Quel terme choisir ?\n\nA) autre\nB) deuxième",
+    },
+  ])(
+    "retire uniquement les options entièrement recopiées à la fin d’un QCM",
+    async ({ suffix, output }) => {
+      const [question] = await generateExercises(
+        {
+          available: async () => true,
+          json: async () => ({
+            questions: [
+              {
+                type: "single-choice",
+                prompt: "Quel terme choisir ?\n\n" + suffix,
+                choices: ["premier", "deuxième"],
+                correctChoiceIndex: 1,
+                expectedAnswers: [],
+                explanation: "Le second terme convient.",
+                concept: "Ordinal",
+                hint: "",
+                sourceRefs: [],
+              },
+            ],
+          }),
+        },
+        { baseUrl: "http://localhost", model: "test" },
+        {
+          courses: [initialData.courses[0]],
+          types: ["single-choice"],
+          level: "practice",
+          count: 1,
+        },
+      );
+      expect(question.prompt).toBe(output);
+      expect(question.correctChoiceId).toBe("c2");
+    },
+  );
   it("régénère un problème qui mélange plusieurs résultats dans les réponses acceptées", async () => {
     let calls = 0;
     const client = {
