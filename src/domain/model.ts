@@ -1,3 +1,5 @@
+import type { ConjugationSheet } from "./conjugation";
+
 export type Profile = "child" | "parent";
 export type PublicationStatus = "draft" | "published";
 export type IconName =
@@ -181,6 +183,7 @@ export interface LearningData {
   reviewedCourseIds: string[];
   plans?: RevisionPlan[];
   english?: EnglishSettings;
+  conjugationSheets?: ConjugationSheet[];
   readingRecords?: ReadingRecord[];
   spacedReviews?: SpacedReview[];
   vocabularyLists?: VocabularyList[];

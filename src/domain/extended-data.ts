@@ -1,3 +1,5 @@
+import { isConjugationSheet } from "./conjugation";
+import { conjugationSeriesId } from "./conjugation-practice";
 import { validateAnswerReviews } from "./answer-reviews";
 import type { Course, ExerciseSeries, LearningData } from "./model";
 import {
@@ -27,6 +29,13 @@ export function validateExtendedData(
   series: ExerciseSeries[],
 ): void {
   validateVocabularyData(data);
+  if (
+    data.conjugationSheets !== undefined &&
+    (!Array.isArray(data.conjugationSheets) ||
+      !data.conjugationSheets.every(isConjugationSheet) ||
+      !ids(data.conjugationSheets.map(conjugationSeriesId)))
+  )
+    throw new Error("Les fiches de conjugaison sont invalides.");
   validateAnswerReviews(
     data.answerReviews,
     data.attempts as LearningData["attempts"],
@@ -145,6 +154,9 @@ export function extendedDataFields(data: LearningData): Partial<LearningData> {
   return {
     ...(data.answerReviews ? { answerReviews: data.answerReviews } : {}),
     ...(data.plans ? { plans: data.plans } : {}),
+    ...(data.conjugationSheets
+      ? { conjugationSheets: data.conjugationSheets }
+      : {}),
     ...(data.english ? { english: data.english } : {}),
     ...(data.readingRecords ? { readingRecords: data.readingRecords } : {}),
     ...(data.spacedReviews ? { spacedReviews: data.spacedReviews } : {}),

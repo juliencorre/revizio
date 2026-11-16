@@ -2,6 +2,8 @@ import {
   latestSpacedReviews,
   publishedReadingEditions,
 } from "./reading-history";
+import type { ConjugationSheet } from "./conjugation";
+import { conjugationSeriesId } from "./conjugation-practice";
 import type { LearningData, ReadingRecord, SpacedReview } from "./model";
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -86,6 +88,23 @@ export function mergeLearningData(
     if (same(a, b)) return copy(c);
     if (Array.isArray(b) && Array.isArray(c)) {
       const old = Array.isArray(a) ? a : [];
+      if (path === "conjugationSheets") {
+        const before = new Set(
+          (old as ConjugationSheet[]).map(conjugationSeriesId),
+        );
+        const local = new Map(
+          (b as ConjugationSheet[]).map((s) => [conjugationSeriesId(s), s]),
+        );
+        const remote = new Map(
+          (c as ConjugationSheet[]).map((s) => [conjugationSeriesId(s), s]),
+        );
+        // Independent additions combine; either parent can remove a published sheet.
+        return [...new Map([...remote, ...local])]
+          .filter(
+            ([id]) => !before.has(id) || (local.has(id) && remote.has(id)),
+          )
+          .map(([, sheet]) => sheet);
+      }
       if (path === "reviewedCourseIds") return [...new Set([...b, ...c])];
       if (path === "spacedReviews")
         return latestSpacedReviews([

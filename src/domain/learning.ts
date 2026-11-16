@@ -7,6 +7,10 @@ import type {
   LearningDiagram,
   Question,
 } from "./model";
+import {
+  isConjugationSeries,
+  questionsWithConjugationRetries,
+} from "./conjugation-practice";
 import { subjects } from "./fixtures";
 import { evaluateAnswer } from "./answers";
 import { questionsForNewAttempt } from "./answer-reviews";
@@ -436,12 +440,14 @@ export function answerQuestionInData(
     answeredAt: now,
     response: choiceId,
   };
+  const answers = [...attempt.answers, answer];
+  const questions = isConjugationSeries(attempt.seriesId)
+    ? questionsWithConjugationRetries(attempt.questions, answers)
+    : attempt.questions;
   return {
     ...data,
     attempts: data.attempts.map((item) =>
-      item.id === attemptId
-        ? { ...item, answers: [...item.answers, answer] }
-        : item,
+      item.id === attemptId ? { ...attempt, answers, questions } : item,
     ),
   };
 }

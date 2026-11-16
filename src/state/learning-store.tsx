@@ -15,6 +15,14 @@ import {
   decideAnswerReview,
   requestAnswerReview,
 } from "../domain/answer-reviews";
+import {
+  isConjugationSheet,
+  type ConjugationSheet,
+} from "../domain/conjugation";
+import {
+  conjugationSeriesId,
+  startConjugationInData,
+} from "../domain/conjugation-practice";
 import { initialData, subjects } from "../domain/fixtures";
 import {
   answerQuestionInData,
@@ -98,6 +106,10 @@ export interface LearningContextValue extends Omit<
   subjects: typeof subjects;
   plans: RevisionPlan[];
   english: EnglishSettings;
+  conjugationSheets: ConjugationSheet[];
+  addConjugationSheet(sheet: ConjugationSheet): void;
+  removeConjugationSheet(sheet: ConjugationSheet): void;
+  startConjugationAttempt(sheet: ConjugationSheet): string | null;
   vocabularyLists: VocabularyList[];
   vocabularySessions: VocabularySession[];
   isReady: boolean;
@@ -781,6 +793,54 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     },
     [assertParent, commit],
   );
+  const addConjugationSheet = useCallback(
+    (sheet: ConjugationSheet) => {
+      assertParent();
+      if (!isConjugationSheet(sheet))
+        throw new Error("Choisissez un verbe et un temps disponibles.");
+      const current = dataRef.current;
+      const sheets = current.conjugationSheets ?? [];
+      const id = conjugationSeriesId(sheet);
+      if (!sheets.some((item) => conjugationSeriesId(item) === id))
+        commit({
+          ...current,
+          conjugationSheets: [
+            ...sheets,
+            { verb: sheet.verb, tense: sheet.tense },
+          ],
+        });
+    },
+    [assertParent, commit],
+  );
+  const removeConjugationSheet = useCallback(
+    (sheet: ConjugationSheet) => {
+      assertParent();
+      const current = dataRef.current;
+      const id = conjugationSeriesId(sheet);
+      commit({
+        ...current,
+        conjugationSheets: (current.conjugationSheets ?? []).filter(
+          (item) => conjugationSeriesId(item) !== id,
+        ),
+      });
+    },
+    [assertParent, commit],
+  );
+  const startConjugationAttempt = useCallback(
+    (sheet: ConjugationSheet) => {
+      assertReady();
+      const result = startConjugationInData(
+        dataRef.current,
+        sheet,
+        newId("attempt"),
+        now(),
+        sessionRef.current.activeProfileId,
+      );
+      commit(result.data);
+      return result.attemptId;
+    },
+    [assertReady, commit],
+  );
   const updateEnglish = useCallback(
     (input: EnglishSettings, articlesOverride?: boolean) => {
       assertParent();
@@ -1256,6 +1316,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       subjects,
       plans: data.plans ?? [],
       english: data.english ?? clone(emptyEnglishSettings),
+      conjugationSheets: data.conjugationSheets ?? [],
       vocabularyLists: vocabularyListsFor(data),
       vocabularySessions: data.vocabularySessions ?? [],
       isReady: session.ready && loadedKey === key,
@@ -1295,6 +1356,9 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       completePlanStep,
       postponePlan,
       updateEnglish,
+      addConjugationSheet,
+      removeConjugationSheet,
+      startConjugationAttempt,
       saveVocabularyList,
       deleteVocabularyList,
       startGeneralReview,
@@ -1342,6 +1406,9 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       completePlanStep,
       postponePlan,
       updateEnglish,
+      addConjugationSheet,
+      removeConjugationSheet,
+      startConjugationAttempt,
       saveVocabularyList,
       deleteVocabularyList,
       startGeneralReview,

@@ -12,6 +12,8 @@ import {
   matchesPublishedQuestions,
   mergeChildReviews,
 } from "../src/domain/answer-reviews";
+import { isConjugationSeries } from "../src/domain/conjugation-practice";
+import { verifyConjugationAttempt } from "./conjugation";
 import { mergeVocabularySessions } from "./vocabulary";
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -46,7 +48,12 @@ export function mergeChildData(
       403,
       "Seul un parent peut modifier les listes de vocabulaire.",
     );
-  for (const key of ["courses", "series", "english"] as const)
+  for (const key of [
+    "courses",
+    "series",
+    "english",
+    "conjugationSheets",
+  ] as const)
     if (
       !same(
         incoming[key] ??
@@ -74,21 +81,27 @@ export function mergeChildData(
     const series = current.series.find(
       (s) => s.id === supplied.seriesId && s.status === "published",
     );
-    if (!existing && !series)
+    const conjugation = isConjugationSeries(supplied.seriesId)
+      ? verifyConjugationAttempt(current, supplied, existing)
+      : undefined;
+    const source = conjugation ?? series;
+    if (!existing && !source)
       throw new HttpError(403, "Cette série n’est pas disponible.");
     if (
       !existing &&
+      !conjugation &&
       !matchesPublishedQuestions(current, series!, supplied.questions)
     )
       throw new HttpError(
         403,
         "Cette tentative doit utiliser les questions publiées.",
       );
-    const questions = existing?.questions ?? supplied.questions;
+    const questions =
+      conjugation?.questions ?? existing?.questions ?? supplied.questions;
     if (
       !same(supplied.questions, questions) ||
-      supplied.subjectId !== (existing?.subjectId ?? series!.subjectId) ||
-      supplied.seriesTitle !== (existing?.seriesTitle ?? series!.title) ||
+      supplied.subjectId !== (existing?.subjectId ?? source!.subjectId) ||
+      supplied.seriesTitle !== (existing?.seriesTitle ?? source!.title) ||
       (existing &&
         (supplied.startedAt !== existing.startedAt ||
           supplied.seriesId !== existing.seriesId ||

@@ -510,6 +510,9 @@ export async function configureServerRoutes(
         current.data.answerReviews,
         data.answerReviews,
       );
+    // Older PWA bundles omit sheets even when saving unrelated parent edits.
+    if (data.conjugationSheets === undefined && current.data.conjugationSheets)
+      data.conjugationSheets = current.data.conjugationSheets;
     data = preserveVocabularyForLegacyClient(
       current.data,
       data,
