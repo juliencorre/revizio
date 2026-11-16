@@ -70,6 +70,7 @@ Les exercices utilisent une sortie JSON structurée, puis une validation des for
 - `GET /api/profiles` public expose seulement identifiant, prénom et classe. Les mutations `/api/profiles` et `/api/profiles/:id` sont réservées au parent.
 - `PATCH /api/account` reçoit `{currentPassword,parentName?,email?,newPassword?}`.
 - `GET /api/backup` exporte `{format:'revizio-backup',version:1,exportedAt,profiles,uploads}`. Les documents normalisés et originaux sont intégrés en base64 ; plafond de 100 Mo décodés. L’adresse de connexion, les mots de passe, PIN, sessions et réglages serveur ne sont pas exportés.
+- **Famille** estime le volume de la sauvegarde. Pour une grande bibliothèque, le fichier `.revizo` rassemble le sommaire et les pièces binaires. Le serveur vérifie la taille et l’empreinte de chaque pièce avant de valider la restauration. Les petits exports JSON restent lisibles.
 - `POST /api/backup/restore` reçoit `{backup}` (ou l’objet brut). Il **remplace** tous les profils, cours, résultats et documents de la famille connectée, après validation complète. Il conserve les comptes parents, conserve le PIN d’un profil déjà présent avec le même identifiant et demande un nouveau PIN pour les profils récupérés. Les sessions enfant sont invalidées. Une sauvegarde privée de l’état précédent est écrite dans `backups/` avant remplacement.
 - `DELETE /api/family` reçoit `{password}` et efface la famille, ses documents et les archives privées créées avant une restauration.
 

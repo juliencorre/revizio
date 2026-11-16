@@ -59,9 +59,9 @@ Les PDF textuels sont lus page par page avec PDF.js via `unpdf`. Pour les scans,
 | Fichier importé                                         | 25 Mo                                                                                                 |
 | Photos                                                  | JPEG/PNG, au maximum 12,5 mégapixels ; réduction à 2 200 px après lecture de l’orientation EXIF       |
 | PDF pour une préparation                                | 20 pages ; au maximum quatre images à transcrire dans une page scannée                                |
-| Sauvegarde portable complète                            | 12 Mo de documents décodés ; limite plus basse que le serveur local pour respecter la mémoire Workers |
+| Sauvegarde portable complète                            | JSON jusqu’à 12 Mio de pièces décodées ; archive .revizo avec transfert par document au-delà, dans la limite du stockage disponible |
 
-Pour une photo HEIC/WebP, exporter d’abord en JPEG/PNG. Une sauvegarde locale dépassant la limite cloud doit être réduite avant restauration. Les archives privées créées avant restauration comptent dans l’espace des documents. L’export portable ne comprend ni mots de passe, ni codes enfant, ni secret d’installation, ni journaux de génération.
+Pour une photo HEIC/WebP, exporter d’abord en JPEG/PNG. Pour une grande bibliothèque, exporter le fichier .revizo depuis **Famille**. La restauration doit pouvoir stocker les documents entrants pendant que la bibliothèque actuelle est encore en place. Les archives privées créées avant restauration comptent dans l’espace des documents. L’export portable ne comprend ni mots de passe, ni codes enfant, ni secret d’installation, ni journaux de génération.
 
 Le nouvel espace cloud est vide. Pour récupérer les cours d’une installation locale, créer d’abord le compte cloud, puis utiliser **Réglages → Restaurer une sauvegarde**. Les mots de passe et codes enfant ne sont pas transférés. Le dépôt et le déploiement ne copient pas automatiquement le répertoire local `.revizio/`.
 
