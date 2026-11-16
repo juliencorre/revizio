@@ -1,5 +1,11 @@
-import { useCallback, useRef, useState } from "react";
-import { View } from "react-native";
+import {
+  type ComponentRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { type Pressable, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Speech from "expo-speech";
 import {
@@ -224,6 +230,7 @@ function ConjugationPractice({ attempt }: { attempt: Attempt }) {
   const data = useLearning();
   const [response, setResponse] = useState("");
   const [checkedId, setCheckedId] = useState<string | null>(null);
+  const nextButton = useRef<ComponentRef<typeof Pressable>>(null);
   const [error, setError] = useState("");
   const questions = attempt.questions;
   const nextOpen = questions.find(
@@ -236,6 +243,9 @@ function ConjugationPractice({ attempt }: { attempt: Attempt }) {
   const answer = attempt.answers.find(
     (item) => item.questionId === question.id,
   );
+  useEffect(() => {
+    if (answer) nextButton.current?.focus();
+  }, [answer?.questionId]);
   const initialCount = questions.filter(
     (item) => !item.id.endsWith("-retry"),
   ).length;
@@ -327,7 +337,12 @@ function ConjugationPractice({ attempt }: { attempt: Attempt }) {
           <AppText variant="heading" testID="conjugation-correction">
             {question.explanation}
           </AppText>
-          <Button testID="conjugation-next" icon="arrow-right" onPress={next}>
+          <Button
+            ref={nextButton}
+            testID="conjugation-next"
+            icon="arrow-right"
+            onPress={next}
+          >
             {nextOpen ? "Continuer" : "Terminer"}
           </Button>
         </View>
