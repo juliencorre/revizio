@@ -46,6 +46,7 @@ test("ouvrir la source en contexte puis remplacer la fiche relue", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Fermer le document" }).click();
   await expect(reference).toBeInViewport();
+  await expect(reference).toBeFocused();
   await page.getByTestId("ai-course-confirm-review").click();
   await page.getByTestId("replace-published-course").click();
   await expect(

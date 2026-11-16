@@ -273,6 +273,7 @@ export function AppText({
 }
 export function Button({
   children,
+  ref,
   onPress,
   icon,
   variant = "primary",
@@ -284,6 +285,7 @@ export function Button({
   expanded,
 }: {
   children: ReactNode;
+  ref?: React.Ref<React.ComponentRef<typeof Pressable>>;
   onPress: () => void;
   icon?: IconName;
   variant?: "primary" | "secondary" | "ghost" | "orange" | "danger";
@@ -311,6 +313,7 @@ export function Button({
       : colors.primary;
   return (
     <Pressable
+      ref={ref}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       {...(selected === undefined ? {} : { "aria-pressed": selected })}

@@ -1,6 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ComponentRef } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, useWindowDimensions } from "react-native";
+import {
+  Pressable,
+  View,
+  useWindowDimensions,
+  type ScrollViewInstance,
+} from "react-native";
 import {
   AppIcon,
   AppText,
@@ -85,9 +90,14 @@ export function ReviewCourseScreen() {
   const { width, height } = useWindowDimensions();
   const contentWidth = useContentWidth();
   const sideBySide = width > height && contentWidth >= 650;
+  const reviewScroll = useRef<ScrollViewInstance>(null);
+  const citationButtons = useRef(
+    new Map<string, ComponentRef<typeof Pressable>>(),
+  );
   const [reference, setReference] = useState<{
     courseId: string;
     sectionId: string;
+    triggerId: string;
     source: CourseSource;
     ref: SourceReference;
   } | null>(null);
@@ -125,6 +135,34 @@ export function ReviewCourseScreen() {
           item.status === "published" && item.replacedCourseIds?.includes(id),
       )
     : undefined;
+  function closeReference() {
+    const trigger =
+      selectedReference &&
+      citationButtons.current.get(selectedReference.triggerId);
+    setReference(null);
+    if (!trigger) return;
+    // Closing the comparison changes section heights. Restore the reference after layout.
+    requestAnimationFrame(() => {
+      if (
+        typeof HTMLElement !== "undefined" &&
+        trigger instanceof HTMLElement
+      ) {
+        if (!trigger.isConnected) return;
+        trigger.focus({ preventScroll: true });
+        trigger.scrollIntoView({ block: "center", inline: "nearest" });
+      } else {
+        const content = reviewScroll.current?.getInnerViewRef();
+        if (content)
+          trigger.measureLayout(content, (_x, y) => {
+            reviewScroll.current?.scrollTo({
+              y: Math.max(0, y - 24),
+              animated: false,
+            });
+            trigger.focus();
+          });
+      }
+    });
+  }
   function sourceOf(ref: SourceReference): CourseSource {
     const sources = course!.sources.filter(
       (source) =>
@@ -311,7 +349,11 @@ export function ReviewCourseScreen() {
     }
   }
   return (
-    <ParentLayout active="import" subjectId={course.subjectId}>
+    <ParentLayout
+      active="import"
+      subjectId={course.subjectId}
+      scrollRef={reviewScroll}
+    >
       <View testID="parent-review" style={{ gap: 26 }}>
         <PageHeading
           eyebrow={subject?.title}
@@ -582,16 +624,23 @@ export function ReviewCourseScreen() {
                       <View style={s.row}>
                         {section.sourceRefs.map((ref, index) => {
                           const source = sourceOf(ref);
+                          const triggerId = `section-reference-${section.id}-${index}`;
                           return (
                             <Button
                               key={index}
                               variant="secondary"
                               icon="file"
-                              testID={`section-reference-${section.id}-${index}`}
+                              testID={triggerId}
+                              ref={(node) => {
+                                if (node)
+                                  citationButtons.current.set(triggerId, node);
+                                else citationButtons.current.delete(triggerId);
+                              }}
                               onPress={() =>
                                 setReference({
                                   courseId: id,
                                   sectionId: section.id,
+                                  triggerId,
                                   source,
                                   ref,
                                 })
@@ -612,7 +661,7 @@ export function ReviewCourseScreen() {
                         source={selectedReference.source}
                         page={selectedReference.ref.page}
                         excerpt={selectedReference.ref.excerpt}
-                        onClose={() => setReference(null)}
+                        onClose={closeReference}
                       />
                     )}
                 </View>
@@ -851,7 +900,7 @@ export function ReviewCourseScreen() {
             source={selectedReference.source}
             page={selectedReference.ref.page}
             excerpt={selectedReference.ref.excerpt}
-            onClose={() => setReference(null)}
+            onClose={closeReference}
           />
         )}
       </View>
