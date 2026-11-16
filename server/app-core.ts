@@ -459,6 +459,11 @@ export async function configureServerRoutes(
       user,
       (request.query as { profileId?: string }).profileId,
     );
+    const since = (request.query as {since?: string}).since;
+    if (since !== undefined && /^\d+$/.test(since)) {
+      const row = database.db.prepare("SELECT revision FROM learning WHERE profile_id=?").get(profile.id);
+      if (row && Number(row.revision) === Number(since)) return { revision: Number(since), unchanged: true };
+    }
     const current = database.data(profile.id);
     return {
       ...current,

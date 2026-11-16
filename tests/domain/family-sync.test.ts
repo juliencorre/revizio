@@ -179,6 +179,56 @@ describe("synchronisation familiale durable", () => {
       expect(h.statuses.at(-1)).toBe("synced");
     },
   );
+  it("conserve les champs indépendants avec un choix différent sur chaque conflit", async () => {
+    let remote: RemoteData = { data: clone(initialData), revision: 4 };
+    remote.data.courses[0].title = "Titre distant";
+    remote.data.courses[0].description = "Description distante";
+    const h = harness(
+      async <T>(
+        _path: string,
+        options?: { method?: string; body?: string },
+      ) => {
+        if (options?.method === "PUT")
+          remote = { data: JSON.parse(options.body!).data, revision: 5 };
+        return clone(remote) as T;
+      },
+    );
+    await h.load();
+    h.edit((data) => {
+      data.courses[0].title = "Titre local";
+      data.courses[0].description = "Description locale";
+      data.courses[1].title = "Autre chapitre";
+    });
+    await h.sync.sync();
+    const prefix = "courses." + initialData.courses[0].id;
+    await h.sync.resolve("server", prefix + ".title");
+    expect(h.statuses.at(-1)).toBe("conflict");
+    await h.sync.resolve("local", prefix + ".description");
+    expect(remote.data.courses[0]).toMatchObject({
+      title: "Titre distant",
+      description: "Description locale",
+    });
+    expect(remote.data.courses[1].title).toBe("Autre chapitre");
+  });
+  it("ne réécrit pas la copie locale quand la révision du serveur est inchangée", async () => {
+    const paths: string[] = [];
+    const h = harness(async <T>(path: string) => {
+      paths.push(path);
+      return (
+        path.endsWith("&since=0")
+          ? { unchanged: true, revision: 0 }
+          : { data: clone(initialData), revision: 0 }
+      ) as T;
+    });
+    await h.load();
+    await h.sync.sync();
+    await h.sync.sync();
+    expect(paths).toEqual([
+      "/data?profileId=child-1",
+      "/data?profileId=child-1&since=0",
+    ]);
+    expect(h.saved.setItem).toHaveBeenCalledTimes(1);
+  });
   it("conserve les mutations faites pendant un PUT et les changements distincts du serveur", async () => {
     const gate = deferred();
     let puts = 0;

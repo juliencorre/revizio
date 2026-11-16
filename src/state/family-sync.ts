@@ -1,6 +1,10 @@
 import type { LearningData } from "../domain/model";
 import { clone, parseLearningData } from "../domain/learning";
-import { mergeLearningData } from "../domain/sync";
+import {
+  mergeLearningData,
+  type FieldConflict,
+  type ConflictChoice,
+} from "../domain/sync";
 export type SyncStatus =
   "local" | "syncing" | "synced" | "offline" | "conflict";
 export interface RemoteData {
@@ -22,6 +26,7 @@ interface SyncOptions {
     options?: { method?: string; body?: string },
   ): Promise<T>;
   prepare?(data: LearningData): Promise<LearningData>;
+  conflicts?(fields: FieldConflict[]): void;
   status(status: SyncStatus): void;
   error(message: string | null): void;
 }
@@ -29,6 +34,8 @@ export class FamilySync {
   private base: LearningData;
   private revision = 0;
   private dirty = false;
+  private knownBase = false;
+  private choices = new Map<string, ConflictChoice>();
   private sequence = 0;
   private disposed = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -57,6 +64,7 @@ export class FamilySync {
         const data = parseLearningData(JSON.stringify(saved.data));
         this.base = parseLearningData(JSON.stringify(saved.base));
         this.revision = saved.revision;
+        this.knownBase = saved.knownBase ?? saved.revision > 0;
         this.dirty = saved.pending;
         return data;
       }
@@ -68,6 +76,7 @@ export class FamilySync {
       ]);
       this.base = base ? parseLearningData(base) : clone(fallback);
       this.revision = Number(revision) || 0;
+      this.knownBase = !!base && revision !== null;
       this.dirty = pending === "1";
       return raw ? parseLearningData(raw) : clone(fallback);
     } catch {
@@ -80,6 +89,12 @@ export class FamilySync {
   changed(data: LearningData) {
     this.sequence++;
     this.dirty = true;
+    if (this.conflict) {
+      this.choices.clear();
+      this.options.conflicts?.(
+        mergeLearningData(this.base, data, this.conflict.data).details,
+      );
+    }
     void this.persist(data, true).catch(() =>
       this.options.error(
         "La copie locale ne peut pas être enregistrée. Gardez cette page ouverte.",
@@ -98,6 +113,7 @@ export class FamilySync {
       base: this.base,
       revision: this.revision,
       pending: dirty,
+      knownBase: this.knownBase,
     });
     this.writes = this.writes
       .catch(() => undefined)
@@ -128,14 +144,28 @@ export class FamilySync {
       return;
     }
     const { profileId, request } = this.options;
-    this.options.status("syncing");
+    if (this.dirty || !this.knownBase) this.options.status("syncing");
     try {
       for (let tries = 0; tries < 4 && !this.disposed; tries++) {
-        const remote = await request<RemoteData>(
-          "/data?profileId=" + encodeURIComponent(profileId),
+        const response = await request<
+          RemoteData | { revision: number; unchanged: true }
+        >(
+          "/data?profileId=" +
+            encodeURIComponent(profileId) +
+            (this.knownBase ? "&since=" + this.revision : ""),
         );
         if (this.disposed) return;
+        if ("unchanged" in response && !this.dirty) {
+          this.options.error(null);
+          this.options.status("synced");
+          return;
+        }
+        const remote: RemoteData =
+          "unchanged" in response
+            ? { data: this.base, revision: this.revision }
+            : response;
         if (!this.dirty) {
+          this.knownBase = true;
           this.base = clone(remote.data);
           this.revision = remote.revision;
           this.options.apply(remote.data);
@@ -148,6 +178,8 @@ export class FamilySync {
         const merged = mergeLearningData(this.base, local, remote.data);
         if (merged.conflicts.length) {
           this.conflict = remote;
+          this.choices.clear();
+          this.options.conflicts?.(merged.details);
           this.options.error(
             "Des modifications du même contenu existent sur un autre appareil. Choisissez la version à conserver.",
           );
@@ -170,6 +202,7 @@ export class FamilySync {
             }),
           });
           if (this.disposed) return;
+          this.knownBase = true;
           this.base = clone(saved.data);
           this.revision = saved.revision;
           if (sequence === this.sequence) {
@@ -217,6 +250,8 @@ export class FamilySync {
     );
     if (this.disposed) return;
     this.conflict = null;
+    this.options.conflicts?.([]);
+    this.knownBase = true;
     this.dirty = false;
     this.base = clone(remote.data);
     this.revision = remote.revision;
@@ -225,27 +260,43 @@ export class FamilySync {
     this.options.error(null);
     this.options.status("synced");
   }
-  async resolve(strategy: "local" | "server") {
+  async resolve(strategy: "local" | "server", path?: string) {
     const remote = this.conflict;
-    if (!remote) return;
-    const next =
-      strategy === "server"
-        ? remote.data
-        : mergeLearningData(
-            this.base,
-            this.options.getData(),
-            remote.data,
-            "local",
-          ).data;
+    if (!remote || this.disposed) return;
+    const side = strategy === "server" ? "remote" : "local";
+    if (path) this.choices.set(path, side);
+    const merged = mergeLearningData(
+      this.base,
+      this.options.getData(),
+      remote.data,
+      path ? this.choices : side,
+    );
+    const remaining = path
+      ? merged.details.filter((field) => !this.choices.has(field.path))
+      : [];
+    if (remaining.length) {
+      this.options.conflicts?.(remaining);
+      return;
+    }
+    this.choices.clear();
     this.conflict = null;
+    this.options.conflicts?.([]);
     this.base = clone(remote.data);
+    this.knownBase = true;
     this.revision = remote.revision;
-    this.dirty = strategy === "local";
-    this.options.apply(next);
-    await this.persist(next, this.dirty);
-    this.options.error(null);
-    if (this.dirty) await this.sync();
-    else this.options.status("synced");
+    this.dirty = JSON.stringify(merged.data) !== JSON.stringify(remote.data);
+    this.options.apply(merged.data);
+    try {
+      await this.persist(merged.data, this.dirty);
+      if (this.disposed) return;
+      this.options.error(null);
+      if (this.dirty) await this.sync();
+      else this.options.status("synced");
+    } catch {
+      this.options.error(
+        "La copie locale ne peut pas être enregistrée. Gardez cette page ouverte.",
+      );
+    }
   }
   dispose() {
     this.disposed = true;

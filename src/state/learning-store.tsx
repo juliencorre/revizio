@@ -1,4 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState } from "react-native";
+import type { FieldConflict } from "../domain/sync";
 import React, {
   createContext,
   useCallback,
@@ -104,7 +106,8 @@ export interface LearningContextValue extends Omit<
   syncStatus: SyncStatus;
   syncNow(): Promise<void>;
   reloadFromServer(): Promise<void>;
-  resolveSyncConflict(strategy: "local" | "server"): Promise<void>;
+  syncConflicts: FieldConflict[];
+  resolveSyncConflict(strategy: "local" | "server", path?: string): Promise<void>;
   addCourse(input: CourseDraftInput): string;
   updateCourse(id: string, updates: Partial<Omit<Course, "id">>): void;
   publishCourse(id: string): PublicationResult;
@@ -193,6 +196,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
   const readyRef = useRef(false);
   readyRef.current = session.ready && loadedKey === key;
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [syncConflicts, setSyncConflicts] = useState<FieldConflict[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("local");
   const syncRef = useRef<FamilySync | null>(null);
   const persistenceRef = useRef<ReturnType<
@@ -233,6 +237,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     setLoadedKey("");
     setStorageError(null);
     setStatus("local");
+    setSyncConflicts([]);
     const fallback =
       session.mode === "demo" ? clone(initialData) : emptyLearningData();
     if (session.mode === "family" && session.user && session.activeProfileId) {
@@ -247,6 +252,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           },
           request: apiFetch,
           prepare: prepareRemote,
+          conflicts: fields => { if (active) setSyncConflicts(fields); },
           status: (status) => {
             if (active) setStatus(status);
           },
@@ -258,26 +264,33 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       );
       syncRef.current = sync;
       persistenceRef.current = null;
+      let hydrated = false;
+      const foreground = () => typeof document !== "undefined"
+        ? document.visibilityState !== "hidden"
+        : AppState.currentState !== "background" && AppState.currentState !== "inactive";
+      const refresh = () => { if (hydrated && active && foreground()) void sync.sync(); };
       void sync.load(fallback).then((local) => {
         if (!active) return;
         apply(local);
         setLoadedKey(key);
-        void sync.sync();
+        hydrated = true;
+        refresh();
       });
-      const interval = setInterval(() => {
-        void sync.sync();
-      }, 15000);
-      const online = () => {
-        void sync.sync();
-      };
+      const interval = setInterval(refresh, 15000);
+      const appState = typeof document === "undefined"
+        ? AppState.addEventListener("change", state => { if (state === "active") refresh(); })
+        : undefined;
+      if (typeof document !== "undefined") document.addEventListener("visibilitychange", refresh);
       if (typeof window !== "undefined")
-        window.addEventListener("online", online);
+        window.addEventListener("online", refresh);
       return () => {
         active = false;
         sync.dispose();
         clearInterval(interval);
+        appState?.remove();
+        if (typeof document !== "undefined") document.removeEventListener("visibilitychange", refresh);
         if (typeof window !== "undefined")
-          window.removeEventListener("online", online);
+          window.removeEventListener("online", refresh);
         if (syncRef.current === sync) syncRef.current = null;
       };
     }
@@ -339,8 +352,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     if (syncRef.current) await syncRef.current.reload();
   }, []);
   const resolveSyncConflict = useCallback(
-    async (strategy: "local" | "server") => {
-      await syncRef.current?.resolve(strategy);
+    async (strategy: "local" | "server", path?: string) => {
+      await syncRef.current?.resolve(strategy, path);
     },
     [],
   );
@@ -1192,6 +1205,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       syncStatus,
       syncNow,
       reloadFromServer,
+      syncConflicts,
       resolveSyncConflict,
       addCourse,
       updateCourse,
@@ -1236,6 +1250,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       syncStatus,
       syncNow,
       reloadFromServer,
+      syncConflicts,
       resolveSyncConflict,
       addCourse,
       updateCourse,
