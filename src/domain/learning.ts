@@ -419,6 +419,8 @@ export function answerQuestionInData(
   if (
     !attempt ||
     attempt.completedAt ||
+    (isConjugationSeries(attempt.seriesId) &&
+      attempt.questions[attempt.answers.length]?.id !== questionId) ||
     attempt.answers.some((answer) => answer.questionId === questionId)
   )
     return data;

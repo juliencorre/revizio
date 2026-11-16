@@ -67,6 +67,8 @@ export function startConjugationInData(
     .reverse()
     .find((attempt) => attempt.seriesId === seriesId && !attempt.completedAt);
   if (pending) return { data, attemptId: pending.id };
+  if (data.attempts.some((attempt) => attempt.id === id))
+    return { data, attemptId: null };
   const questions = conjugationQuestions(sheet);
   for (let i = questions.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
