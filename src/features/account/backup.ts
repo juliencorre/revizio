@@ -202,7 +202,7 @@ async function transferRequest<T>(
       const status =
         error instanceof ApiError
           ? error.status
-          : error instanceof TypeError
+          : error instanceof TypeError || controller.signal.aborted
             ? 0
             : -1;
       if (
@@ -230,7 +230,9 @@ export async function exportFamilyBackup(progress: (message: string) => void) {
     estimate.jsonBytes <= estimate.jsonBodyLimit
   )
     return exportJsonBackup(await apiFetch("/backup"));
-  const manifest = await apiFetch<BackupManifest>("/backup/manifest");
+  const manifest = await transferRequest((signal) =>
+    apiFetch<BackupManifest>("/backup/manifest", { signal }),
+  );
   checkManifest(manifest);
   const metadata = new TextEncoder().encode(JSON.stringify(manifest));
   if (metadata.byteLength > maxManifestBytes)
@@ -268,7 +270,7 @@ export async function exportFamilyBackup(progress: (message: string) => void) {
           "?sha256=" +
           upload[part].sha256 +
           (part === "original" ? "&original=1" : "");
-        const response = await transferRequest(async (signal) => {
+        const content = await transferRequest(async (signal) => {
           const response = await fetch(url, {
             credentials: "include",
             headers: apiAuthHeaders(),
@@ -279,25 +281,23 @@ export async function exportFamilyBackup(progress: (message: string) => void) {
               "Le serveur est momentanément occupé.",
               response.status,
             );
-          return response;
+          if (!response.ok)
+            throw new Error(
+              `Le document « ${upload.name} » a changé ou est indisponible. Relancez l’export.`,
+            );
+          const partContent = handle
+            ? new Uint8Array(await response.arrayBuffer())
+            : await response.blob();
+          const size =
+            partContent instanceof Uint8Array
+              ? partContent.byteLength
+              : partContent.size;
+          if (size !== upload[part].size)
+            throw new ApiError("Le téléchargement est incomplet.", 0);
+          return partContent;
         });
-        if (!response.ok)
-          throw new Error(
-            "Le document « " +
-              upload.name +
-              " » a changé ou est indisponible. Relancez l’export.",
-          );
-        if (handle) {
-          const bytes = new Uint8Array(await response.arrayBuffer());
-          if (bytes.length !== upload[part].size)
-            throw new Error("Le téléchargement est incomplet.");
-          await handle.writeBytes(bytes);
-        } else {
-          const blob = await response.blob();
-          if (blob.size !== upload[part].size)
-            throw new Error("Le téléchargement est incomplet.");
-          blobs.push(blob);
-        }
+        if (content instanceof Uint8Array) await handle!.writeBytes(content);
+        else blobs.push(content);
       }
     }
   } finally {
