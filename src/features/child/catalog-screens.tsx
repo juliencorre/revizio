@@ -91,13 +91,23 @@ export function StudentSubjectScreen() {
               </Button>
             )}
             {subject.id === "english" && (
-              <Button
-                variant="secondary"
-                icon="book"
-                onPress={() => router.push("/student/english")}
-              >
-                Vocabulaire et verbes
-              </Button>
+              <>
+                <Button
+                  variant="secondary"
+                  icon="pencil"
+                  testID="subject-conjugation"
+                  onPress={() => router.push("/student/conjugation")}
+                >
+                  Ma conjugaison
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon="book"
+                  onPress={() => router.push("/student/english")}
+                >
+                  Vocabulaire et verbes
+                </Button>
+              </>
             )}
           </View>
           <NextControl subjectId={subject.id} />
