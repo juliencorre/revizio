@@ -152,6 +152,9 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
   await expect(
     page.getByRole("button", { name: "Mes cours d’anglais" }),
   ).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Changer de profil" }),
+  ).toBeHidden();
   await expect(check).toBeDisabled();
   const first = await readQuestion(page);
   const promptBox = (await page
@@ -169,8 +172,8 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
     const bounds = (await control.boundingBox())!;
     expect(Math.min(bounds.width, bounds.height)).toBeGreaterThanOrEqual(44);
   }
-  await capture(page, info, "enfant-saisie-be");
   await answer.fill(first.form === "is" ? "am" : "is");
+  await capture(page, info, "enfant-saisie-be");
   await answer.press("Enter");
   await expect(correction).toHaveText(first.pronoun + " " + first.form);
   await capture(page, info, "enfant-correction-be");
@@ -222,6 +225,11 @@ test("publier be au présent, écouter la fiche et reprendre les personnes à re
   );
 
   const finishedSession = page.url();
+  await page.getByTestId("conjugation-restart").click();
+  await expect(
+    page.getByText("Question 1 sur 8", { exact: true }),
+  ).toBeVisible();
+  await expect(page).not.toHaveURL(finishedSession);
   await page.goto("/parent/subject/english?tab=conjugaison");
   await page
     .getByRole("button", { name: "be · Présent simple", exact: true })
@@ -266,6 +274,8 @@ test("saisir une forme composée avec une hauteur réduite sur tablette", async 
     pronoun + " will play",
   );
   await expect(next).toHaveAccessibleName("Continuer");
+  // Dismissing the software keyboard restores the full viewport on iPad.
+  await page.setViewportSize(viewport);
   const continued = (await next.boundingBox())!;
   expect(Math.min(continued.width, continued.height)).toBeGreaterThanOrEqual(
     44,

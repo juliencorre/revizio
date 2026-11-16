@@ -1,11 +1,5 @@
-import {
-  type ComponentRef,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { type Pressable, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Speech from "expo-speech";
 import {
@@ -14,20 +8,19 @@ import {
   Card,
   EmptyState,
   PageHeading,
-  ProgressBar,
 } from "@/components/ui";
 import { conjugationVerbs, type ConjugationSheet } from "@/domain/conjugation";
 import {
   conjugationSeriesId,
   conjugationTitle,
 } from "@/domain/conjugation-practice";
-import type { Attempt } from "@/domain/model";
 import { conjugationDestination } from "@/domain/study-overview";
 import { ChildShell, Loading } from "@/features/child/shared";
-import { Field } from "@/features/parent/shared";
 import { speechSupported } from "@/services/speech-supported";
 import { useLearning } from "@/state/learning-store";
 import { spacing, useTheme } from "@/theme";
+import { ConjugationExercise } from "./conjugation-exercise";
+import { ConjugationPracticeFrame } from "./conjugation-practice-frame";
 import { ConjugationTable } from "./conjugation-table";
 
 const actions = {
@@ -53,6 +46,55 @@ export function StudentConjugationScreen() {
         (item) => item.verb === verb && item.tense === tense,
       )
     : data.conjugationSheets[0];
+  const practicing = mode === "practice";
+  const lesson = sheet && (
+    <ConjugationLesson
+      key={data.activeProfileId + conjugationSeriesId(sheet)}
+      sheet={sheet}
+      practicing={practicing}
+      attemptId={attemptId}
+    />
+  );
+  const unavailable = !data.isReady ? (
+    <Loading />
+  ) : !sheet ? (
+    <EmptyState
+      icon="book"
+      title={
+        targeted
+          ? "Cette fiche est indisponible"
+          : "Tes fiches de conjugaison arriveront ici"
+      }
+      description={
+        targeted
+          ? "Retrouve les verbes et les temps publiés pour toi dans tes fiches."
+          : "Un parent peut choisir un verbe et un temps, puis ajouter la fiche à ta révision."
+      }
+    >
+      {targeted && data.conjugationSheets.length > 0 && (
+        <Button
+          icon="book"
+          onPress={() => router.replace("/student/conjugation")}
+        >
+          Mes fiches
+        </Button>
+      )}
+    </EmptyState>
+  ) : null;
+  if (practicing) {
+    return (
+      <ConjugationPracticeFrame
+        backLabel={sheet ? "Revoir la fiche" : "Mes cours d’anglais"}
+        onBack={() =>
+          router.replace(
+            sheet ? conjugationDestination(sheet) : "/student/subject/english",
+          )
+        }
+      >
+        {unavailable ?? lesson}
+      </ConjugationPracticeFrame>
+    );
+  }
   return (
     <ChildShell active="courses">
       <View style={{ gap: spacing.xl }} testID="student-conjugation">
@@ -69,32 +111,7 @@ export function StudentConjugationScreen() {
             </Button>
           }
         />
-        {!data.isReady ? (
-          <Loading />
-        ) : !sheet ? (
-          <EmptyState
-            icon="book"
-            title={
-              targeted
-                ? "Cette fiche est indisponible"
-                : "Tes fiches de conjugaison arriveront ici"
-            }
-            description={
-              targeted
-                ? "Retrouve les verbes et les temps publiés pour toi dans tes fiches."
-                : "Un parent peut choisir un verbe et un temps, puis ajouter la fiche à ta révision."
-            }
-          >
-            {targeted && data.conjugationSheets.length > 0 && (
-              <Button
-                icon="book"
-                onPress={() => router.replace("/student/conjugation")}
-              >
-                Mes fiches
-              </Button>
-            )}
-          </EmptyState>
-        ) : (
+        {unavailable ?? (
           <>
             {data.conjugationSheets.length > 1 && (
               <View style={{ gap: spacing.sm }}>
@@ -126,12 +143,7 @@ export function StudentConjugationScreen() {
                 )}
               </View>
             )}
-            <ConjugationLesson
-              key={data.activeProfileId + conjugationSeriesId(sheet)}
-              sheet={sheet}
-              practicing={mode === "practice"}
-              attemptId={attemptId}
-            />
+            {lesson}
           </>
         )}
       </View>
@@ -176,6 +188,32 @@ function ConjugationLesson({
   useEffect(() => {
     if (practicing && !attemptId) practice();
   }, [attemptId, practice, practicing]);
+  if (practicing) {
+    return (
+      <>
+        {attempt ? (
+          <ConjugationExercise
+            key={attempt.id}
+            attempt={attempt}
+            onRestart={practice}
+          />
+        ) : (
+          <Card>
+            <AppText color={colors.muted}>
+              {attemptId
+                ? "Cette tentative est indisponible."
+                : "Ouverture de la séance…"}
+            </AppText>
+          </Card>
+        )}
+        {!!error && (
+          <View accessibilityRole="alert">
+            <AppText color={colors.danger}>{error}</AppText>
+          </View>
+        )}
+      </>
+    );
+  }
   return (
     <Card style={{ gap: spacing.lg }}>
       <View style={{ gap: spacing.xs }}>
@@ -185,8 +223,7 @@ function ConjugationLesson({
       <View style={actions}>
         <Button
           icon="book"
-          selected={!practicing}
-          variant={practicing ? "secondary" : "primary"}
+          selected
           testID="conjugation-learn"
           onPress={() => {
             router.replace(conjugationDestination(sheet));
@@ -197,32 +234,15 @@ function ConjugationLesson({
         </Button>
         <Button
           icon="pencil"
-          selected={practicing}
-          variant={practicing ? "primary" : "secondary"}
+          variant="secondary"
           testID="conjugation-practice"
-          onPress={() => {
-            if (!attempt || attempt.completedAt) practice();
-          }}
+          onPress={practice}
         >
-          {pending && !attempt
-            ? "Reprendre l’entraînement"
-            : attempt?.completedAt
-              ? "M’entraîner à nouveau"
-              : "M’entraîner"}
+          {pending ? "Reprendre l’entraînement" : "M’entraîner"}
         </Button>
       </View>
       {!!error && <AppText color={colors.danger}>{error}</AppText>}
-      {attempt ? (
-        <ConjugationPractice key={attempt.id} attempt={attempt} />
-      ) : practicing ? (
-        <AppText color={colors.muted}>
-          {attemptId
-            ? "Cette tentative est indisponible."
-            : "Ouverture de la séance…"}
-        </AppText>
-      ) : (
-        <SpokenTable sheet={sheet} />
-      )}
+      <SpokenTable sheet={sheet} />
     </Card>
   );
 }
@@ -268,160 +288,6 @@ function SpokenTable({ sheet }: { sheet: ConjugationSheet }) {
       <AppText color={colors.muted}>Touche une forme pour l’écouter.</AppText>
       <ConjugationTable sheet={sheet} onSpeak={speak} />
       {!!error && <AppText color={colors.orange}>{error}</AppText>}
-    </View>
-  );
-}
-
-function ConjugationPractice({ attempt }: { attempt: Attempt }) {
-  const { colors } = useTheme();
-  const data = useLearning();
-  const [response, setResponse] = useState("");
-  const [checkedId, setCheckedId] = useState<string | null>(null);
-  const nextButton = useRef<ComponentRef<typeof Pressable>>(null);
-  const [error, setError] = useState("");
-  const questions = attempt.questions;
-  const nextOpen = questions.find(
-    (item) => !attempt.answers.some((answer) => answer.questionId === item.id),
-  );
-  const question =
-    questions.find((item) => item.id === checkedId) ??
-    nextOpen ??
-    questions[questions.length - 1];
-  const answer = attempt.answers.find(
-    (item) => item.questionId === question.id,
-  );
-  useEffect(() => {
-    if (answer) nextButton.current?.focus();
-  }, [answer?.questionId]);
-  const initialCount = questions.filter(
-    (item) => !item.id.endsWith("-retry"),
-  ).length;
-  const index = questions.indexOf(question);
-  const retry = question.id.endsWith("-retry");
-  const number = retry ? index - initialCount + 1 : index + 1;
-  const total = retry ? questions.length - initialCount : initialCount;
-  function verify() {
-    if (!response.trim() || answer) return;
-    try {
-      data.answerQuestion(attempt.id, question.id, response.trim(), false);
-      setCheckedId(question.id);
-      setError("");
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Ta réponse n’a pas pu être enregistrée.",
-      );
-    }
-  }
-  function next() {
-    try {
-      if (!nextOpen) data.completeAttempt(attempt.id);
-      setResponse("");
-      setCheckedId(null);
-      setError("");
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Ta séance n’a pas pu être enregistrée.",
-      );
-    }
-  }
-  if (attempt.completedAt) {
-    const correctFirst = attempt.answers.filter(
-      (item) => item.isCorrect && !item.questionId.endsWith("-retry"),
-    ).length;
-    const missedAgain = questions.filter(
-      (item) =>
-        item.id.endsWith("-retry") &&
-        attempt.answers.some(
-          (answer) => answer.questionId === item.id && !answer.isCorrect,
-        ),
-    );
-    return (
-      <View
-        style={{ gap: spacing.md }}
-        testID="conjugation-finished"
-        accessibilityLiveRegion="polite"
-      >
-        <AppText variant="heading">Séance terminée</AppText>
-        <AppText>{`Bonnes réponses du premier coup · ${correctFirst} sur ${initialCount}`}</AppText>
-        {missedAgain.length > 0 && (
-          <>
-            <AppText variant="label">Formes à revoir</AppText>
-            {missedAgain.map((item) => (
-              <AppText key={item.id}>{item.explanation}</AppText>
-            ))}
-          </>
-        )}
-      </View>
-    );
-  }
-  return (
-    <View style={{ gap: spacing.lg }} testID="conjugation-exercise">
-      <View style={{ gap: spacing.sm }}>
-        <AppText variant="label">
-          {retry ? "À revoir" : "Personne"} {number} sur {total}
-        </AppText>
-        <ProgressBar value={((number - (answer ? 0 : 1)) / total) * 100} />
-      </View>
-      <View style={{ gap: spacing.xs }} accessibilityLiveRegion="polite">
-        <AppText variant="hero" testID="conjugation-prompt">
-          {question.prompt}
-        </AppText>
-        {!!question.hint && (
-          <AppText color={colors.muted}>{question.hint}</AppText>
-        )}
-      </View>
-      {answer ? (
-        <View style={{ gap: spacing.md }} accessibilityLiveRegion="polite">
-          <AppText color={answer.isCorrect ? colors.green : colors.ink}>
-            {answer.isCorrect
-              ? "Bonne réponse !"
-              : `Tu as écrit « ${answer.choiceId} ».`}
-          </AppText>
-          <AppText variant="heading" testID="conjugation-correction">
-            {question.explanation}
-          </AppText>
-          <Button
-            ref={nextButton}
-            testID="conjugation-next"
-            icon="arrow-right"
-            onPress={next}
-          >
-            {nextOpen ? "Continuer" : "Terminer"}
-          </Button>
-        </View>
-      ) : (
-        <>
-          <Field
-            key={question.id}
-            label="Complète avec la forme du verbe"
-            placeholder="Ta réponse"
-            testID="conjugation-answer"
-            value={response}
-            accessibilityLabel={`Complète la forme du verbe pour « ${question.prompt} »`}
-            autoFocus
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            maxLength={120}
-            onChangeText={setResponse}
-            returnKeyType="done"
-            onSubmitEditing={verify}
-          />
-          <Button
-            testID="conjugation-check"
-            icon="check"
-            disabled={!response.trim()}
-            onPress={verify}
-          >
-            Vérifier
-          </Button>
-        </>
-      )}
-      {!!error && <AppText color={colors.danger}>{error}</AppText>}
     </View>
   );
 }

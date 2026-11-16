@@ -1,10 +1,11 @@
 import { type ComponentRef, useEffect, useRef, useState } from "react";
-import { type Pressable, Text, View, useWindowDimensions } from "react-native";
+import { type Pressable, Text, View } from "react-native";
 import { AppText, Button, Card } from "@/components/ui";
 import type { Attempt } from "@/domain/model";
 import { Field } from "@/features/parent/shared";
 import { useLearning } from "@/state/learning-store";
-import { breakpoints, radius, spacing, useTheme } from "@/theme";
+import { radius, spacing, useTheme } from "@/theme";
+import { useCompactPractice } from "./conjugation-practice-frame";
 
 export function ConjugationExercise({
   attempt,
@@ -15,8 +16,7 @@ export function ConjugationExercise({
 }) {
   const data = useLearning();
   const { colors } = useTheme();
-  const { width, height } = useWindowDimensions();
-  const compact = width < breakpoints.medium || height < 500;
+  const compact = useCompactPractice();
   const [response, setResponse] = useState("");
   const [checkedId, setCheckedId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -39,8 +39,6 @@ export function ConjugationExercise({
   ).length;
   const cardStyle = {
     width: "100%",
-    maxWidth: 740,
-    alignSelf: "center",
     paddingHorizontal: compact ? spacing.lg : 36,
     paddingVertical: compact ? spacing.lg : 28,
   } as const;
@@ -81,7 +79,13 @@ export function ConjugationExercise({
     );
   }
 
-  if (!question) return null;
+  if (!question) {
+    return (
+      <Card>
+        <AppText>Cette séance ne contient aucune question.</AppText>
+      </Card>
+    );
+  }
   const index = questions.indexOf(question);
   const retry = question.id.endsWith("-retry");
   const number = retry ? index - initialCount + 1 : index + 1;
@@ -94,6 +98,7 @@ export function ConjugationExercise({
   const compoundForms = questions.some((item) =>
     item.expectedAnswers?.[0]?.includes(" "),
   );
+  const phraseHeight = compact ? 58 : 70;
   const phraseStyle = {
     fontSize: compact ? 32 : 42,
     lineHeight: compact ? 40 : 52,
@@ -181,7 +186,7 @@ export function ConjugationExercise({
             flexDirection: "row",
             alignItems: "center",
             gap: spacing.lg,
-            minHeight: compact ? 54 : 66,
+            minHeight: phraseHeight,
             marginTop: compact ? spacing.sm : spacing.lg,
           }}
         >
@@ -217,7 +222,7 @@ export function ConjugationExercise({
                     ...phraseStyle,
                     borderWidth: 2,
                     borderRadius: radius.sm,
-                    minHeight: compact ? 54 : 66,
+                    minHeight: phraseHeight,
                     paddingVertical: spacing.xs,
                     outlineWidth: 0,
                   }}
@@ -237,7 +242,7 @@ export function ConjugationExercise({
         </View>
         <View
           style={{
-            minHeight: width < breakpoints.medium ? 58 : compact ? 32 : 38,
+            minHeight: compact ? 58 : 38,
             paddingTop: spacing.xs,
           }}
         >

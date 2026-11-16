@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import React, { Suspense, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -6,7 +6,7 @@ import {
   View,
   type ScrollViewInstance,
 } from "react-native";
-import { usePathname, useRouter } from "expo-router";
+import { useGlobalSearchParams, usePathname, useRouter } from "expo-router";
 import {
   AppIcon,
   AppText,
@@ -14,6 +14,7 @@ import {
   Button,
   Card,
   EmptyState,
+  PageLoading,
   useContentWidth,
   type NavigationItem,
 } from "@/components/ui";
@@ -68,6 +69,10 @@ export function ChildShell({
 export function StudentWorkspace({ children }: { children: ReactNode }) {
   const data = useLearning();
   const pathname = usePathname();
+  const { mode } = useGlobalSearchParams<{ mode?: string }>();
+  if (pathname === "/student/conjugation" && mode === "practice") {
+    return <Suspense fallback={<PageLoading />}>{children}</Suspense>;
+  }
   const section = pathname.split("/")[2];
   const active =
     section === "progress"
