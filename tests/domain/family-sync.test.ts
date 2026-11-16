@@ -179,6 +179,32 @@ describe("synchronisation familiale durable", () => {
       expect(h.statuses.at(-1)).toBe("synced");
     },
   );
+  it("reprend la synchronisation si une édition résout le dernier désaccord", async () => {
+    const remote = { data: clone(initialData), revision: 2 };
+    remote.data.courses[0].title = "Titre partagé";
+    const h = harness(
+      async <T>(
+        _path: string,
+        options?: { method?: string; body?: string },
+      ) => {
+        if (options?.body) remote.data = JSON.parse(options.body).data;
+        return clone(remote) as T;
+      },
+    );
+    await h.load();
+    h.edit((data) => {
+      data.courses[0].title = "Titre local";
+    });
+    await h.sync.sync();
+    expect(h.statuses.at(-1)).toBe("conflict");
+    h.edit((data) => {
+      data.courses[0].title = "Titre partagé";
+      data.courses[1].description = "Un autre changement";
+    });
+    await h.sync.sync();
+    expect(h.statuses.at(-1)).toBe("synced");
+    expect(remote.data.courses[1].description).toBe("Un autre changement");
+  });
   it("conserve les champs indépendants avec un choix différent sur chaque conflit", async () => {
     let remote: RemoteData = { data: clone(initialData), revision: 4 };
     remote.data.courses[0].title = "Titre distant";

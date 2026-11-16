@@ -91,9 +91,13 @@ export class FamilySync {
     this.dirty = true;
     if (this.conflict) {
       this.choices.clear();
-      this.options.conflicts?.(
-        mergeLearningData(this.base, data, this.conflict.data).details,
+      const { details } = mergeLearningData(
+        this.base,
+        data,
+        this.conflict.data,
       );
+      this.options.conflicts?.(details);
+      if (!details.length) this.conflict = null;
     }
     void this.persist(data, true).catch(() =>
       this.options.error(
