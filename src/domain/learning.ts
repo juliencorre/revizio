@@ -2,6 +2,7 @@ import type {
   Answer,
   Attempt,
   Course,
+  CustomSubject,
   ExerciseSeries,
   LearningData,
   LearningDiagram,
@@ -11,14 +12,12 @@ import {
   isConjugationSeries,
   questionsWithConjugationRetries,
 } from "./conjugation-practice";
-import { subjects } from "./fixtures";
+import { hasSubject, parseCustomSubjects } from "./subjects";
 import { evaluateAnswer } from "./answers";
 import { questionsForNewAttempt } from "./answer-reviews";
 import { extendedDataFields, validateExtendedData } from "./extended-data";
 export type PublicationResult = { ok: boolean; error?: string };
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-const knownSubject = (id: string) =>
-  subjects.some((subject) => subject.id === id);
 const unique = (ids: string[]) => new Set(ids).size === ids.length;
 const text = (value: unknown): value is string => typeof value === "string";
 const nonempty = (value: unknown): value is string =>
@@ -153,8 +152,12 @@ export function questionError(question: Question): string | null {
     return "Indiquez la notion travaillée pour chaque question.";
   return null;
 }
-export function coursePublicationError(course: Course): string | null {
-  if (!knownSubject(course.subjectId)) return "Choisissez une matière valide.";
+export function coursePublicationError(
+  course: Course,
+  customSubjects?: CustomSubject[],
+): string | null {
+  if (!hasSubject(course.subjectId, customSubjects))
+    return "Choisissez une matière valide.";
   if (!nonempty(course.title)) return "Ajoutez un titre au cours.";
   if (
     !course.sections.some(
@@ -186,8 +189,10 @@ export function coursePublicationError(course: Course): string | null {
 export function seriesPublicationError(
   series: ExerciseSeries,
   courses: Course[],
+  customSubjects?: CustomSubject[],
 ): string | null {
-  if (!knownSubject(series.subjectId)) return "Choisissez une matière valide.";
+  if (!hasSubject(series.subjectId, customSubjects))
+    return "Choisissez une matière valide.";
   if (!nonempty(series.title)) return "Ajoutez un titre à la série.";
   if (!series.courseIds.length || !unique(series.courseIds))
     return "Choisissez au moins un cours, sans doublon.";
@@ -233,7 +238,7 @@ export function publishCourseInData(
       data,
       result: { ok: false, error: "Cette fiche ne peut pas être publiée." },
     };
-  const error = coursePublicationError(course);
+  const error = coursePublicationError(course, data.customSubjects);
   if (error) return { data, result: { ok: false, error } };
   if (!replaceId) {
     if (course.status === "published") return { data, result: { ok: true } };
@@ -324,7 +329,7 @@ export function publishSeriesInData(
 ): { data: LearningData; result: PublicationResult } {
   const series = data.series.find((item) => item.id === seriesId);
   const error = series
-    ? seriesPublicationError(series, data.courses)
+    ? seriesPublicationError(series, data.courses, data.customSubjects)
     : "Cette série est introuvable.";
   if (error) return { data, result: { ok: false, error } };
   if (series!.status === "published") return { data, result: { ok: true } };
@@ -355,7 +360,10 @@ export function startAttemptInData(
   const series = data.series.find(
     (item) => item.id === seriesId && item.status === "published",
   );
-  if (!series || seriesPublicationError(series, data.courses))
+  if (
+    !series ||
+    seriesPublicationError(series, data.courses, data.customSubjects)
+  )
     return { data, attemptId: null };
   const unfinished = [...data.attempts]
     .reverse()
@@ -538,12 +546,15 @@ function isQuestion(value: unknown): value is Question {
     (choice) => record(choice) && nonempty(choice.id) && text(choice.label),
   );
 }
-function isCourse(value: unknown): value is Course {
+function isCourse(
+  value: unknown,
+  customSubjects?: CustomSubject[],
+): value is Course {
   if (
     !record(value) ||
     !nonempty(value.id) ||
     !text(value.subjectId) ||
-    !knownSubject(value.subjectId) ||
+    !hasSubject(value.subjectId, customSubjects) ||
     !text(value.title) ||
     !text(value.description) ||
     !date(value.updatedAt) ||
@@ -605,13 +616,16 @@ function isCourse(value: unknown): value is Course {
     unique(value.sources.map((source) => (source as { id: string }).id))
   );
 }
-function isSeries(value: unknown): value is ExerciseSeries {
+function isSeries(
+  value: unknown,
+  customSubjects?: CustomSubject[],
+): value is ExerciseSeries {
   return (
     record(value) &&
     nonempty(value.id) &&
     text(value.title) &&
     text(value.subjectId) &&
-    knownSubject(value.subjectId) &&
+    hasSubject(value.subjectId, customSubjects) &&
     ["draft", "published"].some((status) => status === value.status) &&
     ["discovery", "practice", "challenge"].some(
       (level) => level === value.level,
@@ -630,14 +644,17 @@ function isSeries(value: unknown): value is ExerciseSeries {
     unique(value.questions.map((question) => question.id))
   );
 }
-function isAttempt(value: unknown): value is Attempt {
+function isAttempt(
+  value: unknown,
+  customSubjects?: CustomSubject[],
+): value is Attempt {
   if (
     !record(value) ||
     !nonempty(value.id) ||
     !nonempty(value.seriesId) ||
     !nonempty(value.seriesTitle) ||
     !text(value.subjectId) ||
-    !knownSubject(value.subjectId) ||
+    !hasSubject(value.subjectId, customSubjects) ||
     !date(value.startedAt) ||
     !optionalMode(value.mode) ||
     ![value.profileId, value.planId, value.stepId].every(optionalId) ||
@@ -691,15 +708,16 @@ export function parseLearningData(raw: string): LearningData {
   const value: unknown = JSON.parse(raw);
   if (!record(value) || value.version !== 1)
     throw new Error("Version de sauvegarde non prise en charge.");
+  const customSubjects = parseCustomSubjects(value.customSubjects);
   if (
     !Array.isArray(value.courses) ||
-    !value.courses.every(isCourse) ||
+    !value.courses.every((item) => isCourse(item, customSubjects)) ||
     !unique(value.courses.map((course) => course.id)) ||
     !Array.isArray(value.series) ||
-    !value.series.every(isSeries) ||
+    !value.series.every((item) => isSeries(item, customSubjects)) ||
     !unique(value.series.map((series) => series.id)) ||
     !Array.isArray(value.attempts) ||
-    !value.attempts.every(isAttempt) ||
+    !value.attempts.every((item) => isAttempt(item, customSubjects)) ||
     !unique(value.attempts.map((attempt) => attempt.id)) ||
     !Array.isArray(value.reviewedCourseIds) ||
     !value.reviewedCourseIds.every(nonempty)
@@ -709,7 +727,8 @@ export function parseLearningData(raw: string): LearningData {
     value.subjectVisibility !== undefined &&
     (!record(value.subjectVisibility) ||
       !Object.entries(value.subjectVisibility).every(
-        ([id, visible]) => knownSubject(id) && typeof visible === "boolean",
+        ([id, visible]) =>
+          hasSubject(id, customSubjects) && typeof visible === "boolean",
       ))
   )
     throw new Error("Le choix des matières est invalide.");
@@ -718,7 +737,8 @@ export function parseLearningData(raw: string): LearningData {
   if (
     data.courses.some(
       (course) =>
-        course.status === "published" && coursePublicationError(course),
+        course.status === "published" &&
+        coursePublicationError(course, customSubjects),
     ) ||
     data.series.some(
       (series) =>
@@ -726,12 +746,13 @@ export function parseLearningData(raw: string): LearningData {
           (id) => !data.courses.some((course) => course.id === id),
         ) ||
         (series.status === "published" &&
-          seriesPublicationError(series, data.courses)),
+          seriesPublicationError(series, data.courses, customSubjects)),
     )
   )
     throw new Error("Les contenus de la sauvegarde sont incohérents.");
   return {
     ...clone(extendedDataFields(data)),
+    ...(customSubjects && { customSubjects }),
     ...(data.subjectVisibility && {
       subjectVisibility: { ...data.subjectVisibility },
     }),

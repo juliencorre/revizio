@@ -285,3 +285,73 @@ test("choisir les matières de chaque enfant et retrouver une matière réactiv�
     await student.close();
   }
 });
+
+test("ajouter une matière à un enfant puis y publier un cours", async ({
+  page,
+  browser,
+}, info) => {
+  const [first, second] = await family(page);
+  const button = (name: string) =>
+    page.getByRole("button", { name, exact: true });
+  await page.goto("/parent/settings");
+  await button("Choisir les matières de " + first.name).click();
+  const field = page.getByRole("textbox", {
+    name: "Nom de la nouvelle matière",
+  });
+  await field.fill("Astronomie");
+  await button("Ajouter une matière").click();
+  const choice = page.getByRole("checkbox", { name: "Astronomie" });
+  await expect(choice).toBeChecked();
+  await page.screenshot({ path: info.outputPath("matiere-ajoutee.png") });
+  await field.fill("astronomie");
+  await button("Ajouter une matière").click();
+  await expect(page.getByText(/Cette matière existe déjà/)).toBeVisible();
+  await expect(choice).toHaveCount(1);
+  await choice.click();
+  await expect(choice).not.toBeChecked();
+  await choice.click();
+  await button("Terminer").click();
+  await button("Astronomie").click();
+  await button("Ajouter un cours").click();
+  await page.getByTestId("course-title").fill("Le système solaire");
+  await button("Créer le brouillon").click();
+  await page
+    .getByTestId("course-content")
+    .fill("La Terre tourne autour du Soleil.");
+  await page.getByTestId("save-course").click();
+  await button("Confirmer la relecture du cours").click();
+  await page.getByTestId("publish-course").click();
+  await expect(button("Préparer des exercices")).toBeVisible();
+  await button("Menu de la matière").click();
+  await expect(
+    page.getByRole("button", { name: "Le système solaire", exact: true }),
+  ).toBeVisible();
+  await page.getByTestId("parent-child-trigger").click();
+  await page.getByRole("menuitemradio", { name: second.name }).click();
+  await button("Matières").click();
+  await expect(button("Choisir les matières")).toBeVisible();
+  await expect(button("Astronomie")).toHaveCount(0);
+  const student = await browser.newContext({
+    baseURL: info.project.use.baseURL,
+    viewport: page.viewportSize(),
+    hasTouch: true,
+  });
+  try {
+    const login = await student.request.post("/api/child-login", {
+      data: { profileId: first.id, pin: "426813" },
+    });
+    expect(login.ok(), await login.text()).toBe(true);
+    const childPage = await student.newPage();
+    await childPage.goto("/student/subjects");
+    await childPage.getByRole("button", { name: "Ouvrir Astronomie" }).click();
+    await expect(
+      childPage.getByText("Le système solaire", { exact: true }),
+    ).toBeVisible();
+    await childPage.reload();
+    await expect(
+      childPage.getByText("Le système solaire", { exact: true }),
+    ).toBeVisible();
+  } finally {
+    await student.close();
+  }
+});

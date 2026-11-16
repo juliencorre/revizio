@@ -501,6 +501,75 @@ describe("compte et sessions serveur", () => {
 });
 
 describe("contenus publiés, réponses et concurrence", () => {
+  it("réserve la création des matières au parent et accepte les anciens clients et la préparation de cours", async () => {
+    const { token, profiles } = await setup();
+    const id = profiles[0].id;
+    const subject = { id: "custom-calcul-mental", title: "Calcul mental" };
+    const original = clone(initialData);
+    const course = {
+      ...original.courses[0],
+      id: "les-relatifs",
+      subjectId: subject.id,
+    };
+    const stored = await save(
+      token,
+      {
+        ...original,
+        customSubjects: [subject],
+        courses: [...original.courses, course],
+      },
+      0,
+      id,
+    );
+    expect(stored.statusCode, stored.body).toBe(200);
+    const student = await child(id);
+    const view = await envelope(student, id);
+    expect(view.data.customSubjects).toEqual([subject]);
+    const change = await save(
+      student,
+      {
+        ...view.data,
+        customSubjects: [
+          subject,
+          { id: "custom-robotique", title: "Robotique" },
+        ],
+      },
+      view.revision,
+      id,
+    );
+    expect(change.statusCode).toBe(403);
+    const legacy = await save(
+      token,
+      { ...stored.json().data, customSubjects: undefined },
+      view.revision,
+      id,
+    );
+    expect(legacy.statusCode, legacy.body).toBe(200);
+    expect(legacy.json().data.customSubjects).toEqual([subject]);
+    const backup = await app.inject({
+      url: "/api/backup",
+      headers: bearer(token),
+    });
+    expect(backup.json().profiles[0].data.customSubjects).toEqual([subject]);
+    const generation = await app.inject({
+      method: "POST",
+      url: "/api/ai/course",
+      headers: bearer(token),
+      payload: {
+        profileId: id,
+        title: "Les nombres relatifs",
+        subjectId: subject.id,
+        sourceText:
+          "Un nombre relatif est positif, négatif ou nul. Pour additionner deux nombres de même signe, on additionne les distances à zéro et on garde le signe.",
+      },
+    });
+    expect(generation.statusCode, generation.body).toBe(200);
+    const done = await job(token, generation.json().job.id);
+    expect(done).toMatchObject({
+      status: "succeeded",
+      result: { course: { subjectId: subject.id } },
+    });
+  });
   it("conserve les matières du profil avec une ancienne application et réserve le choix au parent", async () => {
     const { token, profiles } = await setup();
     const id = profiles[0].id;

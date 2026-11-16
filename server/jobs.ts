@@ -353,13 +353,17 @@ export class JobQueue {
               (source) => (source.storageId ?? source.id) === id,
             );
       });
+      const subjectId = String(payload.subjectId ?? old?.subjectId ?? "");
       const course = await generateCourse(
         this.client,
         settings,
         {
           grade,
           title: String(payload.title ?? old?.title ?? "Nouveau cours"),
-          subjectId: String(payload.subjectId ?? old?.subjectId ?? ""),
+          subjectId,
+          subjectTitle: data.customSubjects?.find(
+            (subject) => subject.id === subjectId,
+          )?.title,
           sourceText,
           pages,
           sources: allSources,

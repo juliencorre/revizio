@@ -23,8 +23,9 @@ import {
   conjugationSeriesId,
   startConjugationInData,
 } from "../domain/conjugation-practice";
+import { hasSubject, newCustomSubject, subjectCatalog } from "../domain/subjects";
 import { visibleLearningData } from "../domain/subject-visibility";
-import { initialData, subjects } from "../domain/fixtures";
+import { initialData } from "../domain/fixtures";
 import {
   answerQuestionInData,
   clone,
@@ -72,6 +73,7 @@ import type {
   QuestionType,
   RevisionPlan,
   SeriesDraftInput,
+  Subject,
   VocabularyLanguage,
   VocabularyList,
   VocabularyMode,
@@ -104,7 +106,9 @@ export interface LearningContextValue extends Omit<
   LearningData,
   "version" | "plans" | "english" | "vocabularyLists" | "vocabularySessions"
 > {
-  subjects: typeof subjects;
+  subjects: Subject[];
+  allSubjects: Subject[];
+  addSubject(name: string): void;
   defaultSubjectId: string;
   setSubjectVisible(id: string, visible: boolean): void;
   plans: RevisionPlan[];
@@ -377,11 +381,24 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     },
     [apply],
   );
+  const addSubject = useCallback(
+    (name: string) => {
+      assertParent();
+      const current = dataRef.current;
+      const subject = newCustomSubject(name, current.customSubjects);
+      commit({
+        ...current,
+        customSubjects: [...(current.customSubjects ?? []), subject],
+      });
+      void syncRef.current?.sync();
+    },
+    [assertParent, commit],
+  );
   const setSubjectVisible = useCallback(
     (id: string, visible: boolean) => {
       assertParent();
       const current = dataRef.current;
-      if (!subjects.some((subject) => subject.id === id))
+      if (!hasSubject(id, current.customSubjects))
         throw new Error("Matière inconnue.");
       if ((current.subjectVisibility?.[id] ?? true) === visible) return;
       commit({
@@ -456,6 +473,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       assertParent();
       const outcome = publishCourseInData(dataRef.current, id, replaceId);
       commit(outcome.data);
+      if (outcome.result.ok) void syncRef.current?.sync();
       return outcome.result;
     },
     [assertParent, commit],
@@ -534,6 +552,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       assertParent();
       const result = publishSeriesInData(dataRef.current, id);
       commit(result.data);
+      if (result.result.ok) void syncRef.current?.sync();
       return result.result;
     },
     [assertParent, commit],
@@ -1330,14 +1349,20 @@ export function LearningProvider({ children }: { children: ReactNode }) {
   );
   // Keep the complete profile for mutations, synchronization and backup.
   const visible = useMemo(() => visibleLearningData(data), [data]);
+  const allSubjects = useMemo(
+    () => subjectCatalog(data.customSubjects),
+    [data.customSubjects],
+  );
   const activeSubjects = useMemo(
-    () => subjects.filter(({ id }) => data.subjectVisibility?.[id] !== false),
-    [data.subjectVisibility],
+    () => allSubjects.filter(({ id }) => data.subjectVisibility?.[id] !== false),
+    [allSubjects, data.subjectVisibility],
   );
   const value = useMemo<LearningContextValue>(
     () => ({
       ...visible,
       subjects: activeSubjects,
+      allSubjects,
+      addSubject,
       defaultSubjectId:
         data.subjectVisibility?.maths === false ? (activeSubjects[0]?.id ?? "") : "maths",
       setSubjectVisible,
@@ -1401,6 +1426,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     [
       data.subjectVisibility,
       activeSubjects,
+      allSubjects,
+      addSubject,
       visible,
       setSubjectVisible,
       session,

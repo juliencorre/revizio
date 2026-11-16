@@ -43,6 +43,8 @@ export function mergeChildData(
   profileId?: string,
 ): LearningData {
   const view = childData(current);
+  if (!same(incoming.customSubjects ?? [], current.customSubjects ?? []))
+    throw new HttpError(403, "Seul un parent peut modifier les matières de cet enfant.");
   if (
     Object.keys({
       ...current.subjectVisibility,

@@ -260,6 +260,7 @@ export async function generateCourse(
   input: {
     title: string;
     subjectId: string;
+    subjectTitle?: string;
     grade?: string;
     sourceText: string;
     pages: ExtractedPage[];
@@ -301,6 +302,7 @@ export async function generateCourse(
               : "Sélectionne les définitions précises, les conditions de validité, les méthodes et les exemples qui permettent de réviser l’objectif du cours au niveau indiqué. Choisis les extraits essentiels au lieu de recopier tout le document.",
             title: input.title,
             subjectId: input.subjectId,
+            subjectTitle: input.subjectTitle,
             sourceText: input.sourceText,
             pages,
           }),

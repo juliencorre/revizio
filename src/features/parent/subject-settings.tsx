@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -8,11 +9,11 @@ import {
   PageHeading,
   useFocusVisible,
 } from "@/components/ui";
-import { subjects } from "@/domain/fixtures";
+import { maxSubjectNameLength } from "@/domain/subjects";
 import type { Subject } from "@/domain/model";
 import { useLearning } from "@/state/learning-store";
 import { spacing, useTheme } from "@/theme";
-import { Notice, ParentLayout, useParentStyles } from "./shared";
+import { Field, Notice, ParentLayout, useParentStyles } from "./shared";
 
 function SubjectChoice({
   subject,
@@ -65,6 +66,70 @@ function SubjectChoice({
   );
 }
 
+function AddSubjectForm() {
+  const { addSubject } = useLearning();
+  const [name, setName] = useState("");
+  const [feedback, setFeedback] = useState<{
+    text: string;
+    error: boolean;
+  } | null>(null);
+
+  function submit() {
+    try {
+      addSubject(name);
+      setFeedback({
+        text: `La matière « ${name.trim()} » a été ajoutée.`,
+        error: false,
+      });
+      setName("");
+    } catch (cause) {
+      setFeedback({
+        text:
+          cause instanceof Error
+            ? cause.message
+            : "Impossible d’ajouter cette matière.",
+        error: true,
+      });
+    }
+  }
+
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: spacing.md,
+          alignItems: "flex-end",
+        }}
+      >
+        <View style={{ flexGrow: 1, flexBasis: 230 }}>
+          <Field
+            label="Nom de la nouvelle matière"
+            placeholder="Par exemple, Sciences et technologie"
+            value={name}
+            maxLength={maxSubjectNameLength}
+            returnKeyType="done"
+            onChangeText={(text) => {
+              setName(text);
+              setFeedback(null);
+            }}
+            onSubmitEditing={submit}
+          />
+        </View>
+        <Button icon="plus" onPress={submit} disabled={!name.trim()}>
+          Ajouter une matière
+        </Button>
+      </View>
+      {feedback && (
+        <Notice error={feedback.error} success={!feedback.error}>
+          {feedback.text}
+        </Notice>
+      )}
+    </View>
+  );
+}
+
 export function SubjectSettings() {
   const data = useLearning();
   const router = useRouter();
@@ -75,10 +140,11 @@ export function SubjectSettings() {
         description="Cochez les matières à afficher pour cet enfant. Vous pouvez réactiver une matière pour retrouver ses cours et ses résultats."
       />
       <Card style={{ gap: spacing.lg }}>
+        <AddSubjectForm key={data.activeProfileId} />
         <View
           style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}
         >
-          {subjects.map((subject) => {
+          {data.allSubjects.map((subject) => {
             const checked = data.subjectVisibility?.[subject.id] !== false;
             return (
               <SubjectChoice

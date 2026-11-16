@@ -8,7 +8,7 @@ import type {
 } from "../src/domain/model";
 import { preserveReviewDecisions } from "../src/domain/answer-reviews";
 import { parseLearningData } from "../src/domain/learning";
-import { subjects } from "../src/domain/fixtures";
+import { hasSubject } from "../src/domain/subjects";
 import { isVocabularyLanguage } from "../src/domain/vocabulary";
 import {
   FAMILY_LIMITS,
@@ -481,9 +481,14 @@ export async function configureServerRoutes(
     const profile = profileFor(user, body.profileId);
     if (!Number.isInteger(body.revision) || Number(body.revision) < 0)
       throw new HttpError(400, "La version des données est manquante.");
+    const current = database.data(profile.id);
     let data: LearningData;
     try {
-      data = parseLearningData(JSON.stringify(body.data));
+      // Older clients may omit the catalogue while sending courses that still reference it.
+      const incoming = objectBody(body.data);
+      data = parseLearningData(
+        JSON.stringify({ customSubjects: current.data.customSubjects, ...incoming }),
+      );
     } catch (error) {
       throw new HttpError(
         400,
@@ -492,7 +497,6 @@ export async function configureServerRoutes(
           : "Ces données ne sont pas valides.",
       );
     }
-    const current = database.data(profile.id);
     if (current.revision !== Number(body.revision))
       throw new HttpError(
         409,
@@ -714,9 +718,10 @@ export async function configureServerRoutes(
         profileId: profile.id,
       };
       if (kind === "course") {
+        const learning = database.data(profile.id).data;
         if (
           !body.existingCourseId &&
-          (!subjects.some((subject) => subject.id === body.subjectId) ||
+          (!hasSubject(body.subjectId, learning.customSubjects) ||
             typeof body.title !== "string" ||
             !body.title.trim())
         )
@@ -726,9 +731,7 @@ export async function configureServerRoutes(
           );
         if (
           body.existingCourseId &&
-          !database
-            .data(profile.id)
-            .data.courses.some((course) => course.id === body.existingCourseId)
+          !learning.courses.some((course) => course.id === body.existingCourseId)
         )
           throw new HttpError(404, "Le cours à compléter est introuvable.");
         payload.sourceIds = validSourceIds(
@@ -738,7 +741,7 @@ export async function configureServerRoutes(
         );
         if (
           body.subjectId !== undefined &&
-          !subjects.some((subject) => subject.id === body.subjectId)
+          !hasSubject(body.subjectId, learning.customSubjects)
         )
           throw new HttpError(400, "Choisissez une matière valide.");
         if (

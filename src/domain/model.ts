@@ -55,6 +55,7 @@ export interface Subject {
   icon: IconName;
   color: string;
 }
+export type CustomSubject = Pick<Subject, "id" | "title">;
 export interface CourseSource {
   id: string;
   name: string;
@@ -178,6 +179,7 @@ export interface LearningData {
   version: 1;
   /** Unconfigured subjects are visible in existing and newly created profiles. */
   subjectVisibility?: Record<string, boolean>;
+  customSubjects?: CustomSubject[];
   courses: Course[];
   series: ExerciseSeries[];
   attempts: Attempt[];
