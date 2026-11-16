@@ -147,6 +147,9 @@ export function extendedDataFields(data: LearningData): Partial<LearningData> {
       : data.english?.words.length
         ? { vocabularyLists: legacyEnglishVocabulary(data.english) }
         : {}),
+    ...(data.vocabularyRetainedWords
+      ? { vocabularyRetainedWords: data.vocabularyRetainedWords }
+      : {}),
     ...(data.vocabularySessions
       ? {
           vocabularySessions: restoredVocabularySessions(

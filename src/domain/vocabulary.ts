@@ -76,6 +76,45 @@ export function vocabularyListsFor(
 ): VocabularyList[] {
   return data.vocabularyLists ?? legacyEnglishVocabulary(data.english);
 }
+/** Preserve removed published rows. An edit to an existing row corrects that sense. */
+export function retainRemovedVocabulary(
+  previous: LearningData,
+  next: LearningData,
+): LearningData {
+  const remaining = new Map(
+    vocabularyListsFor(next).map((list) => [list.id, list]),
+  );
+  const retained = new Map(
+    (previous.vocabularyRetainedWords ?? []).map((word) => [word.id, word]),
+  );
+  for (const word of next.vocabularyRetainedWords ?? [])
+    retained.set(word.id, word);
+  for (const list of vocabularyListsFor(previous)) {
+    const replacement = remaining.get(list.id);
+    if (
+      list.status !== "published" ||
+      replacement?.status === "draft" ||
+      replacement === list
+    )
+      continue;
+    const currentIds = new Set(replacement?.words.map((word) => word.id));
+    for (const word of list.words) {
+      if (currentIds.has(word.id)) continue;
+      const id = list.language + ":" + wordKey(word);
+      if (!retained.has(id))
+        retained.set(id, {
+          ...word,
+          id,
+          language: list.language,
+          sourceTitle: list.title,
+        });
+    }
+  }
+  return retained.size
+    ? { ...next, vocabularyRetainedWords: [...retained.values()] }
+    : next;
+}
+
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === "string";
@@ -88,6 +127,9 @@ export function isVocabularyList(value: unknown): value is VocabularyList {
   return (
     object(value) &&
     id(value.id) &&
+    (value.archived === undefined ||
+      (typeof value.archived === "boolean" &&
+        (!value.archived || value.status === "published"))) &&
     vocabularyLanguages.some((item) => item.id === value.language) &&
     (value.id !== legacyEnglishListId || value.language === "english") &&
     text(value.title) &&
@@ -102,6 +144,8 @@ export function isVocabularyList(value: unknown): value is VocabularyList {
       (word) =>
         object(word) &&
         id(word.id) &&
+        (word.context === undefined ||
+          (text(word.context) && word.context.length <= 160)) &&
         text(word.term) &&
         text(word.translation) &&
         word.term.length <= 300 &&
@@ -123,11 +167,22 @@ export function vocabularyListError(list: VocabularyList): string | null {
     )
   )
     return "Complétez chaque mot et sa traduction avant de publier.";
-  const terms = list.words.flatMap((word) =>
-    vocabularyVariants(word.term).map(normalizeAnswer),
-  );
-  if (!unique(terms))
-    return "Un mot apparaît dans plusieurs lignes. Regroupez ses traductions sur une seule ligne, séparées par un point-virgule.";
+  const contexts = new Map<string, Set<string>>();
+  for (const word of list.words) {
+    const context = normalizeAnswer(word.context ?? "");
+    for (const term of vocabularyVariants(word.term).map(normalizeAnswer)) {
+      const previous = contexts.get(term) ?? new Set<string>();
+      if (
+        previous.size &&
+        (!context || previous.has("") || previous.has(context))
+      )
+        return "Un mot apparaît dans plusieurs lignes. Regroupez ses variantes ou précisez un contexte différent pour chaque sens.";
+      previous.add(context);
+      contexts.set(term, previous);
+    }
+  }
+  if (!unique(list.words.map(wordKey)))
+    return "Cette liste contient deux fois le même mot avec la même traduction.";
   return null;
 }
 export function normalizeVocabularyList(list: VocabularyList): VocabularyList {
@@ -159,28 +214,36 @@ export function vocabularyQuestions(
 ): VocabularyQuestion[] {
   const error = vocabularyListError(list);
   if (error) throw new Error(error);
+  return writtenVocabularyQuestions(list.words, mode);
+}
+
+export function writtenVocabularyQuestions(
+  words: VocabularyWord[],
+  mode: VocabularyMode,
+  contextFor = (word: VocabularyWord, _direction: VocabularyDirection) =>
+    word.context?.trim(),
+): VocabularyQuestion[] {
   const directions: VocabularyDirection[] =
     mode === "both" ? ["to-french", "from-french"] : [mode];
-  // All outward translations come before the reverse round: the correction is not the next answer.
-  return directions.flatMap((direction) =>
-    list.words.map((word) => {
-      const promptKey = direction === "to-french" ? "term" : "translation";
-      const answerKey = direction === "to-french" ? "translation" : "term";
+  return directions.flatMap((direction) => {
+    const promptKey = direction === "to-french" ? "term" : "translation";
+    const answerKey = direction === "to-french" ? "translation" : "term";
+    const accepted = new Map<string, Map<string, string>>();
+    const key = (prompt: string, context?: string) =>
+      JSON.stringify([normalizeAnswer(prompt), normalizeAnswer(context ?? "")]);
+    for (const word of words) {
+      const context = contextFor(word, direction);
+      for (const variant of vocabularyVariants(word[promptKey])) {
+        const bucket = key(variant, context);
+        const answers = accepted.get(bucket) ?? new Map<string, string>();
+        for (const answer of vocabularyVariants(word[answerKey]))
+          answers.set(normalizeAnswer(answer), answer);
+        accepted.set(bucket, answers);
+      }
+    }
+    return words.map((word) => {
       const prompt = vocabularyVariants(word[promptKey])[0];
-      // Two approved synonyms with the same prompt must never mark a valid translation wrong.
-      const expectedAnswers = [
-        ...new Map(
-          list.words
-            .filter((candidate) =>
-              vocabularyVariants(candidate[promptKey]).some(
-                (variant) =>
-                  normalizeAnswer(variant) === normalizeAnswer(prompt),
-              ),
-            )
-            .flatMap((candidate) => vocabularyVariants(candidate[answerKey]))
-            .map((answer) => [normalizeAnswer(answer), answer]),
-        ).values(),
-      ];
+      const context = contextFor(word, direction);
       return {
         id: `${word.id}:${direction}`,
         wordId: word.id,
@@ -188,10 +251,11 @@ export function vocabularyQuestions(
         translation: word.translation,
         direction,
         prompt,
-        expectedAnswers,
+        ...(context ? { context } : {}),
+        expectedAnswers: [...accepted.get(key(prompt, context))!.values()],
       };
-    }),
-  );
+    });
+  });
 }
 export type VocabularyWordStatus = "new" | "learning" | "review" | "known";
 export const vocabularyStatusLabels: Record<VocabularyWordStatus, string> = {
@@ -204,20 +268,23 @@ export interface VocabularyDirectionProgress {
   answered: number;
   streak: number;
   lastCorrect?: boolean;
+  lastAnsweredAt?: string;
+  nextReviewAt?: number;
+  spacedSuccesses: number;
 }
 export interface VocabularyWordProgress {
   word: VocabularyWord;
   status: VocabularyWordStatus;
   directions: Record<VocabularyDirection, VocabularyDirectionProgress>;
 }
-const wordKey = (word: Pick<VocabularyWord, "term" | "translation">) =>
+export const wordKey = (word: Pick<VocabularyWord, "term" | "translation">) =>
   JSON.stringify(
     [word.term, word.translation].map((value) =>
       vocabularyVariants(value).map(normalizeAnswer).sort(),
     ),
   );
 export function vocabularyProgress(
-  list: VocabularyList,
+  list: Pick<VocabularyList, "words" | "language">,
   sessions: VocabularySession[],
 ): VocabularyWordProgress[] {
   const progress: VocabularyWordProgress[] = list.words
@@ -230,30 +297,24 @@ export function vocabularyProgress(
       word,
       status: "new",
       directions: {
-        "to-french": { answered: 0, streak: 0 },
-        "from-french": { answered: 0, streak: 0 },
+        "to-french": { answered: 0, streak: 0, spacedSuccesses: 0 },
+        "from-french": { answered: 0, streak: 0, spacedSuccesses: 0 },
       },
     }));
   const entries = new Map(
-    progress.map((entry) => [
-      entry.word.id,
-      { entry, key: wordKey(entry.word) },
-    ]),
+    progress.map((entry) => [wordKey(entry.word), entry]),
   );
   const events = sessions
-    .filter(
-      (session) =>
-        session.listId === list.id && session.language === list.language,
-    )
+    .filter((session) => session.language === list.language)
     .flatMap((session) => {
       const questions = new Map(
         session.questions.map((question) => [question.id, question]),
       );
       return session.answers.flatMap((answer) => {
         const question = questions.get(answer.questionId);
-        const current = question && entries.get(question.wordId);
-        return question && current && wordKey(question) === current.key
-          ? [{ question, answer, entry: current.entry }]
+        const entry = question && entries.get(wordKey(question));
+        return question && entry && !question.retryOf
+          ? [{ question, answer, entry }]
           : [];
       });
     })
@@ -265,6 +326,25 @@ export function vocabularyProgress(
     const direction = entry.directions[question.direction];
     const correct =
       evaluateVocabularyAnswer(question, answer.choiceId) && !answer.usedHint;
+    const time = Date.parse(answer.answeredAt);
+    const previousDay =
+      direction.lastAnsweredAt &&
+      new Date(direction.lastAnsweredAt).toISOString().slice(0, 10);
+    const day = new Date(time).toISOString().slice(0, 10);
+    if (!correct) direction.spacedSuccesses = 0;
+    else if (previousDay !== day) direction.spacedSuccesses++;
+    if (
+      !correct ||
+      previousDay !== day ||
+      direction.nextReviewAt === undefined
+    ) {
+      const intervals = [1, 1, 3, 7, 14, 30];
+      direction.nextReviewAt =
+        time +
+        intervals[Math.min(direction.spacedSuccesses, intervals.length - 1)] *
+          86400000;
+    }
+    direction.lastAnsweredAt = answer.answeredAt;
     direction.answered++;
     direction.streak = correct ? direction.streak + 1 : 0;
     direction.lastCorrect = correct;
@@ -291,7 +371,11 @@ export function createVocabularySession(
     startedAt: string;
   },
 ): VocabularySession | null {
-  if (list.status !== "published" || !vocabularyModes.includes(input.mode))
+  if (
+    list.archived ||
+    list.status !== "published" ||
+    !vocabularyModes.includes(input.mode)
+  )
     return null;
   let questions = vocabularyQuestions(list, input.mode);
   if (input.scope === "review") {
@@ -313,6 +397,53 @@ export function createVocabularySession(
       }
     : null;
 }
+export const generalReviewSize = 8;
+export const repertoireTitle = (language: VocabularyLanguage) =>
+  "Révision générale · " + languageLabel(language);
+
+function retryQuestion(
+  questions: VocabularyQuestion[],
+  index: number,
+  correct: boolean,
+) {
+  const q = questions[index];
+  if (
+    correct ||
+    q.retryOf ||
+    questions.length - index - 1 < 2 ||
+    questions.filter((item) => item.retryOf).length >= 2
+  )
+    return null;
+  return { ...q, id: "retry-" + q.id, retryOf: q.id };
+}
+
+function validGeneralReviewStructure(session: VocabularySession) {
+  const original = session.questions.filter((q) => !q.retryOf);
+  if (
+    !original.length ||
+    original.length > generalReviewSize ||
+    session.mode !== "both" ||
+    session.scope !== "review" ||
+    session.listId !== "repertoire-" + session.language ||
+    session.listTitle !== repertoireTitle(session.language) ||
+    !unique(original.map(wordKey)) ||
+    original.some((q, index) => q.id !== "recall-" + index)
+  )
+    return false;
+  const expected = [...original];
+  for (const [index, answer] of session.answers.entries()) {
+    const q = expected[index];
+    if (!q || q.id !== answer.questionId) return false;
+    const retry = retryQuestion(
+      expected,
+      index,
+      evaluateVocabularyAnswer(q, answer.choiceId),
+    );
+    if (retry) expected.push(retry);
+  }
+  return JSON.stringify(expected) === JSON.stringify(session.questions);
+}
+
 export function answerVocabularySession(
   session: VocabularySession,
   questionId: string,
@@ -328,15 +459,20 @@ export function answerVocabularySession(
     response.length > 300
   )
     return session;
+  const isCorrect = evaluateVocabularyAnswer(question, response);
+  const retry =
+    session.source === "repertoire" &&
+    retryQuestion(session.questions, session.answers.length, isCorrect);
   return {
     ...session,
+    ...(retry ? { questions: [...session.questions, retry] } : {}),
     answers: [
       ...session.answers,
       {
         questionId,
         choiceId: response,
         response,
-        isCorrect: evaluateVocabularyAnswer(question, response),
+        isCorrect,
         usedHint: false,
         answeredAt,
       },
@@ -350,6 +486,7 @@ export function isVocabularySession(
     !object(value) ||
     !id(value.id) ||
     !id(value.listId) ||
+    (value.source !== undefined && value.source !== "repertoire") ||
     !text(value.listTitle) ||
     !value.listTitle.trim() ||
     value.listTitle.length > 160 ||
@@ -378,6 +515,10 @@ export function isVocabularySession(
         q.term.length <= 300 &&
         text(q.translation) &&
         q.translation.length <= 300 &&
+        (q.context === undefined ||
+          (text(q.context) && q.context.length <= 160)) &&
+        (q.retryOf === undefined ||
+          (value.source === "repertoire" && id(q.retryOf))) &&
         text(q.prompt) &&
         !!q.prompt.trim() &&
         q.prompt.length <= 300 &&
@@ -411,8 +552,10 @@ export function isVocabularySession(
   )
     return false;
   return (
-    value.completedAt === undefined ||
-    value.answers.length === value.questions.length
+    (value.completedAt === undefined ||
+      value.answers.length === value.questions.length) &&
+    (value.source !== "repertoire" ||
+      validGeneralReviewStructure(value as unknown as VocabularySession))
   );
 }
 export function validateVocabularyData(value: Record<string, unknown>) {
@@ -426,6 +569,32 @@ export function validateVocabularyData(value: Record<string, unknown>) {
       ))
   )
     throw new Error("Les listes de vocabulaire sont invalides.");
+  if (
+    value.vocabularyRetainedWords !== undefined &&
+    (!Array.isArray(value.vocabularyRetainedWords) ||
+      !value.vocabularyRetainedWords.every(
+        (word) =>
+          object(word) &&
+          isVocabularyLanguage(word.language) &&
+          text(word.sourceTitle) &&
+          !!word.sourceTitle.trim() &&
+          word.sourceTitle.length <= 160 &&
+          text(word.term) &&
+          word.term.length <= 300 &&
+          vocabularyVariants(word.term).length &&
+          text(word.translation) &&
+          word.translation.length <= 300 &&
+          vocabularyVariants(word.translation).length &&
+          (word.context === undefined ||
+            (text(word.context) && word.context.length <= 160)) &&
+          word.id ===
+            word.language +
+              ":" +
+              wordKey({ term: word.term, translation: word.translation }),
+      ) ||
+      !unique(value.vocabularyRetainedWords.map((word) => word.id)))
+  )
+    throw new Error("Le répertoire de vocabulaire est invalide.");
   if (
     value.vocabularySessions !== undefined &&
     (!Array.isArray(value.vocabularySessions) ||

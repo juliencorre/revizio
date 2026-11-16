@@ -11,6 +11,8 @@ import type {
 } from "../../src/domain/model";
 import {
   answerVocabularySession,
+  isVocabularySession,
+  retainRemovedVocabulary,
   createVocabularySession,
   evaluateVocabularyAnswer,
   legacyEnglishListId,
@@ -20,6 +22,12 @@ import {
   vocabularyProgress,
   vocabularyQuestions,
 } from "../../src/domain/vocabulary";
+
+import {
+  createGeneralReview,
+  publicationPreview,
+  vocabularyRepertoire,
+} from "../../src/domain/vocabulary-repertoire";
 
 const list = (language: VocabularyLanguage = "spanish"): VocabularyList => ({
   id: "list-1",
@@ -180,7 +188,7 @@ describe("suivi des mots et snapshots des séances", () => {
     expect(sessions[0].questions).toEqual(oldQuestions);
     expect(vocabularyProgress(value, sessions)[1].status).toBe("known");
   });
-  it("ignore les scores forgés et distingue les listes et les langues", () => {
+  it("partage les progrès entre listes dans la même langue et ignore les scores forgés", () => {
     const value = list();
     const failure = answerAll(session(value), "faux");
     failure.answers.forEach((answer) => {
@@ -188,8 +196,17 @@ describe("suivi des mots et snapshots des séances", () => {
     });
     expect(vocabularyProgress(value, [failure])[0].status).toBe("review");
     expect(
-      vocabularyProgress({ ...value, id: "other" }, [failure])[0].status,
-    ).toBe("new");
+      vocabularyProgress(
+        {
+          language: value.language,
+          words: value.words.map((word) => ({
+            ...word,
+            id: "other-" + word.id,
+          })),
+        },
+        [failure],
+      )[0].status,
+    ).toBe("review");
     expect(
       vocabularyProgress({ ...value, language: "latin" }, [failure])[0].status,
     ).toBe("new");
@@ -358,4 +375,204 @@ it("conserve intégralement un ancien répertoire anglais de plus de 200 mots", 
   ];
   expect(migrated.vocabularySessions[0].questions).toHaveLength(500);
   expect(() => parseLearningData(JSON.stringify(migrated))).not.toThrow();
+});
+
+describe("répertoire et révision générale", () => {
+  const start = "2026-11-16T10:00:00.000Z";
+  const general = (
+    lists: VocabularyList[],
+    history: VocabularySession[] = [],
+    when = start,
+  ) =>
+    createGeneralReview(
+      { vocabularyLists: lists },
+      history,
+      "spanish",
+      "general",
+      when,
+    )!;
+
+  it("réunit les sources publiées ou archivées et conserve les mots après suppression", () => {
+    const spanish = list();
+    const archived = { ...list(), id: "archived", archived: true };
+    archived.words = [
+      { id: "other", term: "HOGAR ; CASA", translation: "  maison  " },
+      { id: "new", term: "libro", translation: "livre" },
+    ];
+    const privateList = {
+      ...list(),
+      id: "private",
+      status: "draft" as const,
+      words: [{ id: "private", term: "secreto", translation: "secret" }],
+    };
+    const old = {
+      ...initialData,
+      vocabularyLists: [spanish, archived, privateList, list("latin")],
+    };
+    const repertoire = vocabularyRepertoire(old, "spanish");
+    expect(repertoire.words).toHaveLength(3);
+    expect(
+      publicationPreview(
+        archived,
+        vocabularyRepertoire({ vocabularyLists: [spanish] }, "spanish"),
+      ),
+    ).toMatchObject({ existing: 1, added: 1 });
+    const next = retainRemovedVocabulary(old, { ...old, vocabularyLists: [] });
+    const restored = parseLearningData(JSON.stringify(next));
+    expect(vocabularyRepertoire(restored, "spanish").words).toHaveLength(3);
+    expect(
+      restored.vocabularyRetainedWords?.some((w) => w.term === "secreto"),
+    ).toBe(false);
+    expect(
+      createGeneralReview(restored, [], "spanish", "later", start)?.questions,
+    ).toHaveLength(3);
+    expect(
+      createGeneralReview(restored, [], "english", "empty", start),
+    ).toBeNull();
+    expect(() =>
+      parseLearningData(
+        JSON.stringify({
+          ...restored,
+          vocabularyRetainedWords: [{ term: "invalide" }],
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it("garde un mot retiré de la liste mais remplace une traduction corrigée", () => {
+    const old = { ...initialData, vocabularyLists: [list()] };
+    const updated = {
+      ...list(),
+      words: [{ ...list().words[0], translation: "foyer" }],
+    };
+    const data = retainRemovedVocabulary(old, {
+      ...old,
+      vocabularyLists: [updated],
+    });
+    expect(
+      vocabularyRepertoire(data, "spanish").words.map(
+        (word) => word.translation,
+      ),
+    ).toEqual(["foyer", "arbre"]);
+  });
+
+  it("choisit le sens inverse quand les titres d’origine ne distinguent pas deux homonymes", () => {
+    const river = {
+      ...list(),
+      words: [{ id: "r", term: "banco", translation: "banc" }],
+    };
+    const bank = {
+      ...river,
+      id: "2",
+      words: [{ id: "b", term: "banco", translation: "banque" }],
+    };
+    expect(general([river, bank]).questions.map((q) => q.prompt)).toEqual([
+      "banc",
+      "banque",
+    ]);
+  });
+
+  it("distingue deux sens et conserve précisément l’indice et les réponses présentés", () => {
+    const river = {
+      id: "river",
+      term: "banco",
+      translation: "banc",
+      context: "Dans un parc",
+    };
+    const bank = {
+      id: "bank",
+      term: "banco",
+      translation: "banque",
+      context: "Pour déposer de l’argent",
+    };
+    const value = { ...list(), words: [river, bank] };
+    const preview = publicationPreview(
+      { ...value, words: [bank] },
+      vocabularyRepertoire(
+        { vocabularyLists: [{ ...value, words: [river] }] },
+        "spanish",
+      ),
+    );
+    expect(preview.otherSenses.get(bank.id)).toEqual(["banc"]);
+    expect(vocabularyListError(value)).toBeNull();
+    const review = general([value]);
+    expect(review.questions.map((q) => [q.context, q.expectedAnswers])).toEqual(
+      [
+        [river.context, ["banc"]],
+        [bank.context, ["banque"]],
+      ],
+    );
+    const answered = answerVocabularySession(
+      review,
+      review.questions[0].id,
+      "banc",
+      start,
+    );
+    const progress = vocabularyProgress(value, [answered]);
+    expect(progress.map((item) => item.status)).toEqual(["learning", "new"]);
+  });
+
+  it("mélange deux chapitres, limite la séance et reprend une erreur sans la transformer en acquis", () => {
+    const longList = {
+      ...list(),
+      words: Array.from({ length: 16 }, (_, i) => ({
+        id: "word" + i,
+        term: "mot" + i,
+        translation: "traduction" + i,
+      })),
+    };
+    const second = { ...list(), id: "2", title: "Maison" };
+    let review = general([longList, second]);
+    expect(review.questions).toHaveLength(8);
+    expect(review.questions.some((q) => q.term === "casa ; hogar")).toBe(true);
+    const first = review.questions[0];
+    review = answerVocabularySession(review, first.id, "erreur", start);
+    expect(review.questions.at(-1)).toMatchObject({
+      retryOf: first.id,
+      prompt: first.prompt,
+    });
+    for (const q of review.questions.slice(1))
+      review = answerVocabularySession(
+        review,
+        q.id,
+        q.expectedAnswers[0],
+        start,
+      );
+    expect(isVocabularySession(review)).toBe(true);
+    expect(vocabularyProgress(longList, [review])[0].status).toBe("review");
+    const next = general([longList, second], [review], "2026-11-18T10:00:00Z");
+    expect(next.questions[0]).toMatchObject({
+      term: first.term,
+      direction: first.direction,
+    });
+    expect(
+      isVocabularySession({
+        ...review,
+        questions: review.questions.slice(0, -1),
+      }),
+    ).toBe(false);
+  });
+
+  it("espace séparément les deux sens et allonge le délai seulement lors de réussites sur plusieurs jours", () => {
+    const value = list();
+    const first = answerAll(session(value, "to-french"));
+    const again = answerAll(session(value, "to-french"));
+    const next = session(value, "to-french");
+    const later = answerVocabularySession(
+      next,
+      next.questions[0].id,
+      "maison",
+      "2026-11-18T10:00:00Z",
+    );
+    const [entry] = vocabularyProgress(value, [first, again, later]);
+    expect(entry.directions["to-french"]).toMatchObject({
+      spacedSuccesses: 2,
+      nextReviewAt: Date.parse("2026-11-21T10:00:00Z"),
+    });
+    expect(entry.directions["from-french"].answered).toBe(0);
+    expect(
+      general([value], [first, again], "2026-11-15T11:00:00Z").questions[0]
+        .direction,
+    ).toBe("from-french");
+  });
 });

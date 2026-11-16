@@ -4,9 +4,11 @@ import {
   evaluateVocabularyAnswer,
   legacyEnglishListId,
   legacyEnglishVocabulary,
+  retainRemovedVocabulary,
   vocabularyListsFor,
   vocabularyQuestions,
 } from "../src/domain/vocabulary";
+import { validGeneralReviewContent } from "../src/domain/vocabulary-repertoire";
 import { HttpError } from "./types";
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -51,7 +53,19 @@ export function preserveVocabularyForLegacyClient(
   }
   if (raw.vocabularySessions === undefined)
     next.vocabularySessions = clone(current.vocabularySessions ?? []);
-  return next;
+  if (child) {
+    if (
+      raw.vocabularyRetainedWords !== undefined &&
+      !same(
+        next.vocabularyRetainedWords ?? [],
+        current.vocabularyRetainedWords ?? [],
+      )
+    )
+      throw new HttpError(403, "Seul un parent peut modifier le répertoire.");
+    next.vocabularyRetainedWords = current.vocabularyRetainedWords;
+    return next;
+  }
+  return retainRemovedVocabulary(current, next);
 }
 /** The parent owns lists; the server owns snapshots and grades, even for offline submissions. */
 export function mergeVocabularySessions(
@@ -66,7 +80,13 @@ export function mergeVocabularySessions(
         answers,
         completedAt,
         ...snapshot
-      }: VocabularySession) => snapshot;
+      }: VocabularySession) =>
+        snapshot.source === "repertoire"
+          ? {
+              ...snapshot,
+              questions: snapshot.questions.filter((q) => !q.retryOf),
+            }
+          : snapshot;
       if (!same(context(supplied), context(existing)))
         throw new HttpError(
           403,
@@ -87,9 +107,18 @@ export function mergeVocabularySessions(
           403,
           "Les réponses de vocabulaire enregistrées ne peuvent pas être réécrites.",
         );
+    } else if (supplied.source === "repertoire") {
+      if (!validGeneralReviewContent(current, supplied))
+        throw new HttpError(
+          403,
+          "Cette question ne correspond pas au répertoire publié.",
+        );
     } else {
       const list = vocabularyListsFor(current).find(
-        (list) => list.id === supplied.listId && list.status === "published",
+        (list) =>
+          list.id === supplied.listId &&
+          list.status === "published" &&
+          !list.archived,
       );
       if (
         !list ||

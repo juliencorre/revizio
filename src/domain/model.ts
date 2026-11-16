@@ -172,6 +172,7 @@ export interface LearningData {
   readingRecords?: ReadingRecord[];
   spacedReviews?: SpacedReview[];
   vocabularyLists?: VocabularyList[];
+  vocabularyRetainedWords?: RetainedVocabularyWord[];
   vocabularySessions?: VocabularySession[];
 }
 export interface CourseDraftInput {
@@ -234,9 +235,14 @@ export type VocabularyDirection = "to-french" | "from-french";
 export type VocabularyMode = VocabularyDirection | "both";
 export interface VocabularyWord {
   id: string;
+  context?: string;
   /** A semicolon separates explicitly accepted variants on either side. */
   term: string;
   translation: string;
+}
+export interface RetainedVocabularyWord extends VocabularyWord {
+  language: VocabularyLanguage;
+  sourceTitle: string;
 }
 export interface VocabularyPhotoWord extends Pick<
   VocabularyWord,
@@ -245,6 +251,7 @@ export interface VocabularyPhotoWord extends Pick<
   reading: "copied" | "suggested" | "uncertain";
 }
 export interface VocabularyList {
+  archived?: boolean;
   id: string;
   language: VocabularyLanguage;
   title: string;
@@ -254,6 +261,8 @@ export interface VocabularyList {
   englishWordsRevision?: number;
 }
 export interface VocabularyQuestion {
+  context?: string;
+  retryOf?: string;
   id: string;
   wordId: string;
   term: string;
@@ -263,6 +272,7 @@ export interface VocabularyQuestion {
   expectedAnswers: string[];
 }
 export interface VocabularySession {
+  source?: "repertoire";
   id: string;
   listId: string;
   language: VocabularyLanguage;

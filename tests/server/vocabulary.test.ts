@@ -10,6 +10,8 @@ import {
   createVocabularySession,
 } from "../../src/domain/vocabulary";
 
+import { createGeneralReview } from "../../src/domain/vocabulary-repertoire";
+
 let app: FastifyInstance,
   root: string,
   parentToken: string,
@@ -168,6 +170,58 @@ describe("vocabulaire familial protégé par le serveur", () => {
     altered.questions[0].expectedAnswers = ["chat"];
     forged.data.vocabularySessions!.push(altered);
     expect((await save(childToken, forged)).statusCode).toBe(403);
+  });
+  it("synchronise les rappels d’une révision générale et conserve les mots après suppression", async () => {
+    const parent = await envelope(parentToken);
+    parent.data.vocabularyLists![0].words.push(
+      { id: "2", term: "libro", translation: "livre" },
+      { id: "3", term: "arroz", translation: "riz" },
+    );
+    expect((await save(parentToken, parent)).statusCode).toBe(200);
+    const child = await envelope(childToken);
+    const session = createGeneralReview(
+      child.data,
+      [],
+      "spanish",
+      "cross-list",
+      "2026-11-16T10:00:00Z",
+    )!;
+    child.data.vocabularySessions = [session];
+    expect((await save(childToken, child)).statusCode).toBe(200);
+    const resume = await envelope(childToken);
+    resume.data.vocabularySessions = [
+      answerVocabularySession(
+        session,
+        session.questions[0].id,
+        "erreur",
+        "2026-11-16T10:01:00Z",
+      ),
+    ];
+    expect((await save(childToken, resume)).statusCode).toBe(200);
+    const archived = await envelope(parentToken);
+    archived.data.vocabularyLists = [];
+    expect((await save(parentToken, archived)).statusCode).toBe(200);
+    const after = await envelope(childToken);
+    expect(after.data.vocabularySessions![0].questions.at(-1)?.retryOf).toBe(
+      session.questions[0].id,
+    );
+    expect(after.data.vocabularyRetainedWords).toHaveLength(3);
+    expect(JSON.stringify(after.data)).not.toContain("secretum");
+    const general = createGeneralReview(
+      after.data,
+      after.data.vocabularySessions!,
+      "spanish",
+      "again",
+      "2026-11-17T10:00:00Z",
+    )!;
+    after.data.vocabularySessions!.push(general);
+    expect((await save(childToken, after)).statusCode).toBe(200);
+    const altered = await envelope(childToken);
+    const privateQuestion = structuredClone(general);
+    privateQuestion.id = "modified";
+    privateQuestion.questions[0].expectedAnswers = ["autre réponse"];
+    altered.data.vocabularySessions!.push(privateQuestion);
+    expect((await save(childToken, altered)).statusCode).toBe(403);
   });
   it("préserve le snapshot d’une séance commencée avant modification de la liste", async () => {
     const child = await envelope(childToken);
