@@ -71,6 +71,63 @@ test("connexion automatique malgré une ancienne adresse, sans démonstration ni
   expect((await page.request.get("/api/settings")).status()).toBe(403);
 });
 
+test("un profil déjà choisi ouvre directement la saisie de son code", async ({
+  page,
+}, info) => {
+  const setup = await page.request.post("/api/setup", {
+    data: {
+      parentName: "Parent",
+      email: "parent@example.test",
+      password,
+      children: [
+        { name: "Camille", pin: "426813" },
+        { name: "Milo", pin: "579246" },
+      ],
+    },
+  });
+  expect(setup.ok()).toBe(true);
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  const openProfile = (name: string) =>
+    page.getByRole("button", {
+      name: "Entrer dans l’espace enfant de " + name,
+    });
+  const pin = page.getByTestId("auth-pin");
+  const submit = page.getByTestId("auth-submit");
+
+  await openProfile("Camille").click();
+  await expect(
+    page.getByText("Bonjour Camille", { exact: true }),
+  ).toBeVisible();
+  await pin.fill("1234");
+  await page.getByRole("button", { name: /profil/i }).click();
+  await openProfile("Milo").click();
+  await expect(
+    page.getByText("Bonjour Milo", { exact: true }),
+  ).toBeVisible();
+  await expect(pin).toHaveValue("");
+  await expect(pin).toBeFocused();
+  await expect(page.getByTestId("auth-child-name")).toHaveCount(0);
+  await expect(page.getByText("Camille", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("radio")).toHaveCount(0);
+  await expect(page.getByTestId("auth-switch-parent")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /profil/i })).toHaveCount(1);
+  for (const control of [pin, submit]) {
+    const bounds = (await control.boundingBox())!;
+    expect(Math.min(bounds.width, bounds.height)).toBeGreaterThanOrEqual(44);
+  }
+  await page.screenshot({ path: info.outputPath("profil-enfant-code.png") });
+
+  await pin.fill("426813");
+  await submit.click();
+  await expect(page.getByTestId("auth-error")).toContainText("incorrect");
+  await pin.fill("579246");
+  await submit.click();
+  await expect(page.getByTestId("student-home")).toContainText(
+    "Bonjour Milo",
+  );
+});
+
 test("invitation privée, deux enfants et compte conjoint sans réglage technique", async ({
   page,
   browser,

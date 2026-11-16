@@ -2,23 +2,21 @@ import { useEffect, useRef, useState, type ComponentRef } from "react";
 import {
   ActivityIndicator,
   Platform,
-  Pressable,
   ScrollView,
   View,
   useWindowDimensions,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   AppIcon,
   AppText,
-  Badge,
   Brand,
   Button,
   Card,
   PageHeading,
 } from "@/components/ui";
 import { Field, Notice } from "@/features/parent/shared";
-import { createThemedStyles, useTheme } from "@/theme";
+import { createThemedStyles, spacing, useTheme } from "@/theme";
 import { useSession } from "@/state/session";
 import {
   PasswordField,
@@ -31,13 +29,31 @@ import {
 } from "./shared";
 
 export function AuthScreen() {
-  const { colors, neumorphic } = useTheme();
-  const styles = useStyles();
   const params = useLocalSearchParams<{
     target?: string;
     profileId?: string;
   }>();
   const target = params.target === "child" ? "child" : "parent";
+  const profileId =
+    typeof params.profileId === "string" ? params.profileId : "";
+  return (
+    <AuthForm
+      key={target + "/" + profileId}
+      target={target}
+      profileId={profileId}
+    />
+  );
+}
+
+function AuthForm({
+  target,
+  profileId,
+}: {
+  target: "parent" | "child";
+  profileId: string;
+}) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const session = useSession();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -52,14 +68,14 @@ export function AuthScreen() {
   const [secondChildName, setSecondChildName] = useState("");
   const [secondPin, setSecondPin] = useState("");
   const [pin, setPin] = useState("");
-  const [profileId, setProfileId] = useState(
-    typeof params.profileId === "string" ? params.profileId : "",
-  );
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [error, setError] = useState("");
   const setup = !!session.health?.needsSetup && session.serverAvailable;
-  const selected = session.profiles.find((profile) => profile.id === profileId);
+  const selected =
+    !setup && target === "child"
+      ? session.profiles.find((profile) => profile.id === profileId)
+      : undefined;
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const invitation = new URLSearchParams(window.location.hash.slice(1));
@@ -74,14 +90,6 @@ export function AuthScreen() {
       window.location.pathname + window.location.search,
     );
   }, []);
-  useEffect(() => {
-    if (!session.profiles.some((profile) => profile.id === profileId))
-      setProfileId(session.profiles[0]?.id ?? "");
-  }, [session.profiles, profileId]);
-  useEffect(() => {
-    if (session.mode === "family" && session.user?.role === target && !setup)
-      router.replace(target === "parent" ? "/parent" : "/student");
-  }, [session.mode, session.user?.role, target, setup, router]);
   function fail(message: string) {
     setError(message);
     scroll.current?.scrollTo({ y: 0, animated: true });
@@ -154,7 +162,9 @@ export function AuthScreen() {
         router.replace("/parent");
       } else {
         await session.childLogin(
-          selected ? { profileId } : { childName: childName.trim() },
+          selected
+            ? { profileId: selected.id }
+            : { childName: childName.trim() },
           pin,
         );
         router.replace("/student");
@@ -178,6 +188,10 @@ export function AuthScreen() {
         <AppText color={colors.muted}>On retrouve votre espace…</AppText>
       </View>
     );
+  if (!setup && session.mode === "family" && session.user?.role === target)
+    return <Redirect href={target === "parent" ? "/parent" : "/student"} />;
+  if (!setup && target === "child" && session.profiles.length && !selected)
+    return <Redirect href="/" />;
   return (
     <ScrollView
       ref={scroll}
@@ -185,6 +199,7 @@ export function AuthScreen() {
       contentContainerStyle={[
         styles.content,
         { padding: width >= 900 ? 40 : 24 },
+        selected && styles.childContent,
       ]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -197,35 +212,35 @@ export function AuthScreen() {
           onPress={() => router.replace("/")}
           disabled={busy}
         >
-          Choix des profils
+          {selected ? "Changer de profil" : "Choix des profils"}
         </Button>
       </View>
       <View style={styles.main} testID="auth-screen">
-        <PageHeading
-          eyebrow={
-            setup
-              ? "Bienvenue dans votre famille Révizo"
-              : target === "parent"
-                ? "Espace parent"
-                : "Mon espace de révision"
-          }
-          title={
-            setup
-              ? "Créons votre espace familial"
-              : target === "parent"
-                ? "Connexion parent"
-                : selected
-                  ? "Bonjour " + selected.name
+        {!selected && (
+          <PageHeading
+            eyebrow={
+              setup
+                ? "Bienvenue dans votre famille Révizo"
+                : target === "parent"
+                  ? "Espace parent"
+                  : "Mon espace de révision"
+            }
+            title={
+              setup
+                ? "Créons votre espace familial"
+                : target === "parent"
+                  ? "Connexion parent"
                   : "Bonjour !"
-          }
-          description={
-            setup
-              ? "Un espace privé pour deux parents et deux enfants, en CM1 et en 5e."
-              : target === "parent"
-                ? "Retrouvez les cours, les exercices et les progrès de vos enfants."
-                : "Ton prénom et ton code suffisent pour retrouver tes révisions."
-          }
-        />
+            }
+            description={
+              setup
+                ? "Un espace privé pour deux parents et deux enfants, en CM1 et en 5e."
+                : target === "parent"
+                  ? "Retrouvez les cours, les exercices et les progrès de vos enfants."
+                  : "Ton prénom et ton code suffisent pour retrouver tes révisions."
+            }
+          />
+        )}
         {error && (
           <View testID="auth-error">
             <Notice error>{error}</Notice>
@@ -422,44 +437,9 @@ export function AuthScreen() {
             </>
           ) : (
             <>
-              <View style={{ gap: 14 }}>
-                {session.profiles.map((profile) => (
-                  <Pressable
-                    key={profile.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: profile.id === profileId }}
-                    accessibilityLabel={"Choisir le profil " + profile.name}
-                    testID={"auth-profile-" + profile.id}
-                    disabled={busy}
-                    onPress={() => {
-                      setProfileId(profile.id);
-                      setPin("");
-                      setError("");
-                    }}
-                    style={({ pressed }) => [
-                      styles.profile,
-                      (profile.id === profileId || pressed) && neumorphic.inset,
-                      profile.id === profileId && {
-                        borderColor: colors.primary,
-                      },
-                    ]}
-                  >
-                    <AppIcon
-                      name={profile.id === profileId ? "check" : "book"}
-                    />
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <AppText variant="label">{profile.name}</AppText>
-                      <AppText variant="small" color={colors.muted}>
-                        {profile.grade}
-                      </AppText>
-                    </View>
-                    {needsPin(profile) && (
-                      <Badge tone="orange">Code à définir</Badge>
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-              {!session.profiles.length && (
+              {selected ? (
+                <AppText variant="title">{"Bonjour " + selected.name}</AppText>
+              ) : (
                 <Field
                   label="Ton prénom"
                   value={childName}
@@ -471,7 +451,7 @@ export function AuthScreen() {
                   testID="auth-child-name"
                 />
               )}
-              {selected && needsPin(selected) && (
+              {needsPin(selected) && (
                 <Notice>
                   Un parent doit définir ton code dans les réglages avant ta
                   première connexion.
@@ -479,13 +459,15 @@ export function AuthScreen() {
               )}
               <PasswordField
                 label="Ton code"
+                autoFocus={!!selected && !needsPin(selected)}
+                inputMode="numeric"
                 value={pin}
                 onChangeText={change((value) =>
                   setPin(value.replace(/\D/g, "")),
                 )}
                 maxLength={8}
                 keyboardType="number-pad"
-                editable={!busy}
+                editable={!busy && !needsPin(selected)}
                 testID="auth-pin"
                 onSubmitEditing={() => void submit()}
                 returnKeyType="go"
@@ -495,10 +477,8 @@ export function AuthScreen() {
           <Button
             icon={setup ? "plus" : "lock"}
             onPress={() => void submit()}
-            disabled={
-              busy ||
-              (!setup && target === "child" && !!selected && needsPin(selected))
-            }
+            disabled={busy || needsPin(selected)}
+            style={selected ? styles.childSubmit : undefined}
             testID="auth-submit"
           >
             {busy
@@ -509,7 +489,7 @@ export function AuthScreen() {
                   ? "Me connecter"
                   : "Entrer dans mon espace"}
           </Button>
-          {!setup && (
+          {!setup && !selected && (
             <View style={s.row}>
               {target === "child" ? (
                 <Button
@@ -535,8 +515,10 @@ export function AuthScreen() {
             </View>
           )}
         </Card>
-        <ServerConnectionCard initiallyExpanded={!session.serverAvailable} />
-        {session.health?.demoAvailable && (
+        {(!selected || !session.serverAvailable) && (
+          <ServerConnectionCard initiallyExpanded={!session.serverAvailable} />
+        )}
+        {!selected && session.health?.demoAvailable && (
           <View style={{ gap: 12, alignItems: "center" }}>
             <AppText
               variant="small"
@@ -563,7 +545,7 @@ export function AuthScreen() {
     </ScrollView>
   );
 }
-const useStyles = createThemedStyles(({ colors, neumorphic }) => ({
+const useStyles = createThemedStyles(({ colors }) => ({
   page: { flex: 1, backgroundColor: colors.background },
   content: {
     flexGrow: 1,
@@ -587,14 +569,11 @@ const useStyles = createThemedStyles(({ colors, neumorphic }) => ({
     paddingBottom: 28,
   },
   divider: { height: 1, backgroundColor: colors.border },
-  profile: {
-    ...neumorphic.small,
-    minHeight: 70,
-    borderRadius: 20,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
+  childContent: {
+    maxWidth: 528,
+    justifyContent: "center",
+    gap: spacing.lg,
   },
+  childSubmit: { alignSelf: "stretch" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 24 },
 }));
