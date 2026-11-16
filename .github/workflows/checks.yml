@@ -16,7 +16,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
+  build:
+    name: Construire et tester
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -29,15 +30,85 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npx wrangler deploy --dry-run
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
+        env:
+          EXPO_PUBLIC_API_URL: ""
+      - name: Préparer le Worker avec l’export vérifié
+        run: |
+          node <<'JS'
+          const fs = require("node:fs");
+          const ts = require("typescript");
+          const { config, error } = ts.readConfigFile("wrangler.jsonc", ts.sys.readFile);
+          if (error) throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
+          // Expo vient de construire dist. Conserver les routes et les bindings du dépôt.
+          delete config.build?.command;
+          fs.writeFileSync("wrangler.ci.json", JSON.stringify(config));
+          JS
+          npx wrangler deploy --config wrangler.ci.json --dry-run --outdir worker-compile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: application-verifiee
+          path: |
+            dist/
+            worker-compile/
+            wrangler.ci.json
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  tablette:
+    name: Recette ${{ matrix.projet }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - projet: tablet-landscape
+            navigateur: chromium
+          - projet: tablet-portrait
+            navigateur: chromium
+          - projet: ipad-safari-landscape
+            navigateur: webkit
+          - projet: ipad-safari-portrait
+            navigateur: webkit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: application-verifiee
+      - run: npx playwright install --with-deps "${{ matrix.navigateur }}"
+      - run: npm run test:e2e -- --project="${{ matrix.projet }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: recette-tablette
-          path: test-results/
+          name: recette-${{ matrix.projet }}
+          path: |
+            test-results/
+            artifacts/playwright-report.json
+          if-no-files-found: warn
+          overwrite: true
           retention-days: 14
+
+  check:
+    needs: [build, tablette]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Vérifier la construction et les quatre recettes
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          TABLET_RESULT: ${{ needs.tablette.result }}
+        run: |
+          test "$BUILD_RESULT" = success
+          test "$TABLET_RESULT" = success
 
   deploy:
     name: Publier cours.gofel.fr
@@ -64,12 +135,14 @@ jobs:
             exit 1
           fi
       - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: application-verifiee
       - name: Publier la version vérifiée
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLATE_API_TOKEN }}
-          EXPO_PUBLIC_API_URL: ""
         # Existing Cloudflare secrets and the family Durable Object are preserved.
-        run: npx wrangler deploy --config wrangler.jsonc --keep-vars --message "GitHub main ${GITHUB_SHA}"
+        run: npx wrangler deploy worker-compile/index.js --no-bundle --config wrangler.ci.json --keep-vars --message "GitHub main ${GITHUB_SHA}"
       - name: Vérifier la version publiée
         run: node scripts/verify-cloud-deployment.mjs https://cours.gofel.fr
