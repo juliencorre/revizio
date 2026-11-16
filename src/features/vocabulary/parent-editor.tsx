@@ -56,10 +56,12 @@ function VocabularyEditor() {
     id,
     language: requestedLanguage,
     photoJob,
+    importDocument,
   } = useLocalSearchParams<{
     id: string;
     language?: string;
     photoJob?: string;
+    importDocument?: string;
   }>();
   const saved = data.vocabularyLists.find((list) => list.id === id);
   const language = saved?.language ?? vocabularyLanguage(requestedLanguage);
@@ -224,6 +226,7 @@ function VocabularyEditor() {
               <VocabularyPhotoImport
                 key={photoJob ?? "photo"}
                 jobId={photoJob}
+                open={importDocument === "1" || !!photoJob}
                 list={list}
                 onAdd={(words) => {
                   appendWords(words);

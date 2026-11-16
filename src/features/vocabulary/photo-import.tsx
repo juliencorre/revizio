@@ -201,15 +201,15 @@ function PhotoReview({
 export function VocabularyPhotoImport({
   list,
   jobId,
+  open,
   onAdd,
-}: ImportProps & { jobId?: string }) {
+}: ImportProps & { jobId?: string; open: boolean }) {
   const { colors } = useTheme();
   const vocabularyStyles = useVocabularyStyles();
   const { activeProfileId, isDemo } = useLearning();
   const navigation = useNavigation<{
-    setParams(params: { photoJob?: string }): void;
+    setParams(params: { photoJob?: string; importDocument?: string }): void;
   }>();
-  const [open, setOpen] = useState(!!jobId);
   const [job, setJob] = useState<AiJob | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [error, setError] = useState("");
@@ -281,19 +281,18 @@ export function VocabularyPhotoImport({
     if (mounted.current) navigation.setParams({ photoJob: queued.id });
   }
   function close() {
-    setOpen(false);
     setError("");
-    if (jobId) navigation.setParams({ photoJob: undefined });
+    navigation.setParams({ photoJob: undefined, importDocument: undefined });
   }
   if (!open)
     return (
       <Button
-        icon="camera"
+        icon="file"
         variant="secondary"
         style={{ alignSelf: "flex-start" }}
-        onPress={() => setOpen(true)}
+        onPress={() => navigation.setParams({ importDocument: "1" })}
       >
-        Importer des documents
+        Importer des mots (PDF, photo…)
       </Button>
     );
   return (

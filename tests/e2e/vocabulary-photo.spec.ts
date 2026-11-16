@@ -5,7 +5,7 @@ import type { AiJob, LearningData } from "../../src/domain/model";
 
 test.use({ serviceWorkers: "block" });
 
-async function openList(page: Page) {
+async function setupFamily(page: Page) {
   expect((await page.request.post("/__test/reset")).ok()).toBe(true);
   const setup = await page.request.post("/api/setup", {
     data: {
@@ -18,10 +18,22 @@ async function openList(page: Page) {
     },
   });
   expect(setup.ok()).toBe(true);
+  return (await setup.json()).profiles[0].id as string;
+}
+async function openList(page: Page) {
+  const profileId = await setupFamily(page);
   await page.goto("/parent/vocabulary?language=spanish");
   await page.getByTestId("add-vocabulary-list").click();
   await page.getByTestId("vocabulary-title").fill("Mon cahier");
-  return (await setup.json()).profiles[0].id as string;
+  return profileId;
+}
+async function openLatinImport(page: Page) {
+  await setupFamily(page);
+  await page.goto("/parent/subject/latin");
+  await page.getByRole("tab", { name: "Vocabulaire", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Importer une liste (PDF, photo…)" })
+    .click();
 }
 async function selectPhoto(page: Page, monolingual = false, camera = false) {
   // Only image pixels reach the model. When present, French is in the left column.
@@ -36,7 +48,10 @@ async function selectPhoto(page: Page, monolingual = false, camera = false) {
     .jpeg()
     .toBuffer();
   await page
-    .getByRole("button", { name: "Importer des documents", exact: true })
+    .getByRole("button", {
+      name: "Importer des mots (PDF, photo…)",
+      exact: true,
+    })
     .click();
   const picker = page.waitForEvent("filechooser");
   await page
@@ -53,6 +68,33 @@ async function selectPhoto(page: Page, monolingual = false, camera = false) {
     buffer: image,
   });
 }
+test("ouvre le sélecteur de PDF depuis le vocabulaire de latin", async ({
+  page,
+}) => {
+  await openLatinImport(page);
+  await expect(page.getByText("Latin ↔ Français · Pour Camille")).toBeVisible();
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choisir des fichiers" }).click();
+  await (
+    await chooser
+  ).setFiles({
+    name: "liste-latin.pdf",
+    mimeType: "application/pdf",
+    buffer: textPdf([
+      "Vocabulaire de latin avec traduction francaise. rosa = la rose",
+    ]),
+  });
+  await expect(
+    page.getByRole("button", { name: "Retirer liste-latin.pdf" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Analyser les documents" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Fermer l’import" }).click();
+  await expect(
+    page.getByRole("button", { name: "Importer des mots (PDF, photo…)" }),
+  ).toBeVisible();
+});
 test("relit la photo et ajoute seulement les nouvelles paires acceptées au brouillon", async ({
   page,
 }) => {
@@ -139,7 +181,10 @@ test("relit la photo et ajoute seulement les nouvelles paires acceptées au brou
   await page.reload();
   await expect(page.getByTestId("vocabulary-term-1")).toHaveValue("la ventana");
   await expect(
-    page.getByRole("button", { name: "Importer des documents", exact: true }),
+    page.getByRole("button", {
+      name: "Importer des mots (PDF, photo…)",
+      exact: true,
+    }),
   ).toBeVisible();
   expect(await words()).toHaveLength(1);
   await page.getByTestId("publish-vocabulary-list").click();
@@ -196,8 +241,15 @@ for (const format of ["DOCX", "PDF"]) {
       "Nécessite le modèle local.",
     );
     test.setTimeout(240000);
-    await openList(page);
-    await page.getByRole("button", { name: "Importer des documents" }).click();
+    if (format === "PDF") {
+      await openLatinImport(page);
+      await page.getByTestId("vocabulary-title").fill("Vocabulaire de latin");
+    } else {
+      await openList(page);
+      await page
+        .getByRole("button", { name: "Importer des mots (PDF, photo…)" })
+        .click();
+    }
     const button = page.getByRole("button", { name: "Choisir des fichiers" });
     const bounds = await button.boundingBox();
     expect(Math.min(bounds!.width, bounds!.height)).toBeGreaterThanOrEqual(44);
@@ -211,12 +263,12 @@ for (const format of ["DOCX", "PDF"]) {
         name: "vocabulaire.pdf",
         mimeType: "application/pdf",
         buffer: textPdf([
-          "Vocabulaire : espagnol - francais. el jardin = le jardin",
-          "Vocabulaire : espagnol - francais. la casa = la maison",
+          "Vocabulaire de latin avec traduction francaise. aqua = l'eau",
+          "Vocabulaire de latin avec traduction francaise. rosa = la rose",
         ]),
       });
     await page.getByRole("button", { name: "Analyser les documents" }).click();
-    const expected = format === "DOCX" ? "la ventana" : "la casa";
+    const expected = format === "DOCX" ? "la ventana" : "rosa";
     await expect(
       page.getByRole("button", { name: "Ajouter 2 mots au brouillon" }),
     ).toBeEnabled({ timeout: 210000 });
@@ -240,6 +292,10 @@ for (const format of ["DOCX", "PDF"]) {
         ),
       )
       .toContain(expected);
+    await page.getByTestId("save-vocabulary-draft").click();
+    await expect(
+      page.getByText("Le brouillon est enregistré dans l’espace parent."),
+    ).toBeVisible();
   });
 }
 

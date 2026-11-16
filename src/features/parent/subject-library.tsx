@@ -195,6 +195,16 @@ export function SubjectLibrary({ subject }: { subject: Subject }) {
     onAdd: () => void,
     entries: Entry[];
   let note: string | undefined;
+  function openNewVocabularyList(importDocument = false) {
+    router.push({
+      pathname: "/parent/vocabulary/[id]",
+      params: {
+        id: localId("vocabulary-list"),
+        language: subjectId,
+        ...(importDocument ? { importDocument: "1" } : {}),
+      },
+    });
+  }
   switch (tab) {
     case "cours":
       heading = courseHeading(subject);
@@ -256,11 +266,7 @@ export function SubjectLibrary({ subject }: { subject: Subject }) {
       heading = "Listes de vocabulaire";
       action = "Créer une liste";
       empty = "Aucune liste de vocabulaire pour le moment.";
-      onAdd = () =>
-        router.push({
-          pathname: "/parent/vocabulary/[id]",
-          params: { id: localId("vocabulary-list"), language: subjectId },
-        });
+      onAdd = () => openNewVocabularyList();
       entries = data.vocabularyLists
         .filter((l) => l.language === subjectId)
         .map((list) => {
@@ -329,6 +335,15 @@ export function SubjectLibrary({ subject }: { subject: Subject }) {
           <AppText variant="heading" style={styles.heading}>
             {heading}
           </AppText>
+          {tab === "vocabulaire" && (
+            <Button
+              icon="file"
+              variant="secondary"
+              onPress={() => openNewVocabularyList(true)}
+            >
+              Importer une liste (PDF, photo…)
+            </Button>
+          )}
           <Button
             testID={tab === "vocabulaire" ? "add-vocabulary-list" : undefined}
             style={styles.primary}
