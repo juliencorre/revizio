@@ -298,15 +298,37 @@ test("ajouter une matière à un enfant puis y publier un cours", async ({
   const field = page.getByRole("textbox", {
     name: "Nom de la nouvelle matière",
   });
+  const openForm = button("Ajouter une matière");
+  await expect(openForm).toBeVisible();
+  await expect(field).toHaveCount(0);
+  await page.screenshot({
+    path: info.outputPath("matieres-sans-formulaire.png"),
+  });
+  await openForm.click();
+  await expect(field).toBeFocused();
+  await field.fill("Robotique");
+  await button("Annuler").click();
+  await expect(field).toHaveCount(0);
+  await expect(openForm).toBeFocused();
+  await expect(page.getByRole("checkbox", { name: "Robotique" })).toHaveCount(
+    0,
+  );
+
+  await openForm.click();
+  await expect(field).toHaveValue("");
   await field.fill("Astronomie");
-  await button("Ajouter une matière").click();
+  await button("Ajouter").click();
   const choice = page.getByRole("checkbox", { name: "Astronomie" });
   await expect(choice).toBeChecked();
+  await expect(field).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("matiere-ajoutee.png") });
+  await openForm.click();
   await field.fill("astronomie");
-  await button("Ajouter une matière").click();
+  await button("Ajouter").click();
   await expect(page.getByText(/Cette matière existe déjà/)).toBeVisible();
+  await expect(field).toHaveValue("astronomie");
   await expect(choice).toHaveCount(1);
+  await button("Annuler").click();
   await choice.click();
   await expect(choice).not.toBeChecked();
   await choice.click();

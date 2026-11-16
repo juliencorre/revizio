@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type ComponentRef } from "react";
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -66,45 +66,66 @@ function SubjectChoice({
   );
 }
 
-function AddSubjectForm() {
+function SubjectActions() {
   const { addSubject } = useLearning();
-  const [name, setName] = useState("");
-  const [feedback, setFeedback] = useState<{
-    text: string;
-    error: boolean;
-  } | null>(null);
+  const router = useRouter();
+  const trigger = useRef<ComponentRef<typeof Pressable>>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [added, setAdded] = useState("");
+
+  function close() {
+    setName(null);
+    setError("");
+    requestAnimationFrame(() => trigger.current?.focus());
+  }
 
   function submit() {
+    if (!name?.trim()) return;
     try {
       addSubject(name);
-      setFeedback({
-        text: `La matière « ${name.trim()} » a été ajoutée.`,
-        error: false,
-      });
-      setName("");
+      setAdded(name.trim());
+      close();
     } catch (cause) {
-      setFeedback({
-        text:
-          cause instanceof Error
-            ? cause.message
-            : "Impossible d’ajouter cette matière.",
-        error: true,
-      });
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible d’ajouter cette matière.",
+      );
     }
   }
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: spacing.md,
-          alignItems: "flex-end",
-        }}
-      >
-        <View style={{ flexGrow: 1, flexBasis: 230 }}>
+      {name === null ? (
+        <>
+          <View style={actionRow}>
+            <Button
+              icon="check"
+              onPress={() => router.replace("/parent/subjects")}
+            >
+              Terminer
+            </Button>
+            <Button
+              ref={trigger}
+              variant="ghost"
+              icon="plus"
+              onPress={() => {
+                setAdded("");
+                setName("");
+              }}
+            >
+              Ajouter une matière
+            </Button>
+          </View>
+          {!!added && (
+            <Notice success>La matière « {added} » a été ajoutée.</Notice>
+          )}
+        </>
+      ) : (
+        <>
           <Field
+            autoFocus
             label="Nom de la nouvelle matière"
             placeholder="Par exemple, Sciences et technologie"
             value={name}
@@ -112,27 +133,34 @@ function AddSubjectForm() {
             returnKeyType="done"
             onChangeText={(text) => {
               setName(text);
-              setFeedback(null);
+              setError("");
             }}
             onSubmitEditing={submit}
           />
-        </View>
-        <Button icon="plus" onPress={submit} disabled={!name.trim()}>
-          Ajouter une matière
-        </Button>
-      </View>
-      {feedback && (
-        <Notice error={feedback.error} success={!feedback.error}>
-          {feedback.text}
-        </Notice>
+          {!!error && <Notice error>{error}</Notice>}
+          <View style={actionRow}>
+            <Button onPress={submit} disabled={!name.trim()}>
+              Ajouter
+            </Button>
+            <Button variant="ghost" onPress={close}>
+              Annuler
+            </Button>
+          </View>
+        </>
       )}
     </View>
   );
 }
 
+const actionRow = {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: spacing.sm,
+} as const;
+
 export function SubjectSettings() {
   const data = useLearning();
-  const router = useRouter();
   return (
     <ParentLayout active="subjects">
       <PageHeading
@@ -140,7 +168,6 @@ export function SubjectSettings() {
         description="Cochez les matières à afficher pour cet enfant. Vous pouvez réactiver une matière pour retrouver ses cours et ses résultats."
       />
       <Card style={{ gap: spacing.lg }}>
-        <AddSubjectForm key={data.activeProfileId} />
         <View
           style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}
         >
@@ -157,13 +184,7 @@ export function SubjectSettings() {
           })}
         </View>
         {data.storageError && <Notice error>{data.storageError}</Notice>}
-        <Button
-          icon="check"
-          style={{ alignSelf: "flex-start" }}
-          onPress={() => router.replace("/parent/subjects")}
-        >
-          Terminer
-        </Button>
+        <SubjectActions key={data.activeProfileId} />
       </Card>
     </ParentLayout>
   );
