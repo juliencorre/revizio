@@ -257,6 +257,7 @@ export interface VocabularyList {
   title: string;
   status: PublicationStatus;
   words: VocabularyWord[];
+  requireArticles?: boolean;
   /** Used only by the migrated English repertoire to reconcile its two editors. */
   englishWordsRevision?: number;
 }
@@ -270,6 +271,7 @@ export interface VocabularyQuestion {
   direction: VocabularyDirection;
   prompt: string;
   expectedAnswers: string[];
+  guide?: { instruction: string; models: string[] };
 }
 export interface VocabularySession {
   source?: "repertoire";

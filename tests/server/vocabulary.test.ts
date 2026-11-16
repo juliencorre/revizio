@@ -8,6 +8,7 @@ import type { LearningData, VocabularySession } from "../../src/domain/model";
 import {
   answerVocabularySession,
   createVocabularySession,
+  vocabularyQuestions,
 } from "../../src/domain/vocabulary";
 
 import { createGeneralReview } from "../../src/domain/vocabulary-repertoire";
@@ -160,6 +161,7 @@ describe("vocabulaire familial protégé par le serveur", () => {
     snapshot.data.vocabularySessions![0].questions[0].expectedAnswers = [
       "chat",
     ];
+    snapshot.data.vocabularySessions![0].questions[0].guide!.models = ["chat"];
     expect((await save(childToken, snapshot)).statusCode).toBe(403);
     const rewritten = await envelope(childToken);
     rewritten.data.vocabularySessions![0].answers[0].choiceId = "maison";
@@ -168,6 +170,7 @@ describe("vocabulaire familial protégé par le serveur", () => {
     const forged = await envelope(childToken);
     const altered = practice(forged.data, "forged");
     altered.questions[0].expectedAnswers = ["chat"];
+    altered.questions[0].guide!.models = ["chat"];
     forged.data.vocabularySessions!.push(altered);
     expect((await save(childToken, forged)).statusCode).toBe(403);
   });
@@ -220,8 +223,31 @@ describe("vocabulaire familial protégé par le serveur", () => {
     const privateQuestion = structuredClone(general);
     privateQuestion.id = "modified";
     privateQuestion.questions[0].expectedAnswers = ["autre réponse"];
+    privateQuestion.questions[0].guide!.models = ["autre réponse"];
     altered.data.vocabularySessions!.push(privateQuestion);
     expect((await save(childToken, altered)).statusCode).toBe(403);
+  });
+  it("synchronise une séance hors ligne ancienne avec sa correction exacte", async () => {
+    const child = await envelope(childToken);
+    const legacy = practice(child.data, "offline-legacy");
+    legacy.questions = vocabularyQuestions(
+      child.data.vocabularyLists![0],
+      "both",
+      false,
+    );
+    const answered = answerVocabularySession(
+      legacy,
+      legacy.questions[0].id,
+      "la maison",
+      "2026-11-15T10:00:01.000Z",
+    );
+    child.data.vocabularySessions = [answered];
+    expect((await save(childToken, child)).statusCode).toBe(200);
+    const after = await envelope(parentToken);
+    expect(after.data.vocabularySessions![0].answers[0].isCorrect).toBe(false);
+    expect(
+      after.data.vocabularySessions![0].questions[0].expectedAnswers,
+    ).toEqual(["maison"]);
   });
   it("préserve le snapshot d’une séance commencée avant modification de la liste", async () => {
     const child = await envelope(childToken);
@@ -239,7 +265,7 @@ describe("vocabulaire familial protégé par le serveur", () => {
     const after = await envelope(parentToken);
     expect(
       after.data.vocabularySessions![0].questions[0].expectedAnswers,
-    ).toEqual(["maison"]);
+    ).toEqual(["la maison", "maison"]);
     expect(
       after.data.vocabularySessions![0].answers.every(
         (answer) => answer.isCorrect,

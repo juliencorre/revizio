@@ -107,7 +107,7 @@ describe("quiz borné", () => {
     });
     expect(quiz[0]).toMatchObject({
       type: "fill-blank",
-      expectedAnswers: ["castle"],
+      expectedAnswers: ["the castle", "castle"],
     });
   });
   it("produit un support publié et des identifiants stables lors de la validation parent", () => {

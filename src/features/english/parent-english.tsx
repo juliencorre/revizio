@@ -1,3 +1,4 @@
+import { legacyEnglishListId } from "@/domain/vocabulary";
 import { subjectHref } from "@/features/parent/subject-navigation";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -177,6 +178,8 @@ function EnglishEditor({ conjugation }: { conjugation: boolean }) {
     sample = generateBoundedQuiz(
       conjugation ? { ...effective, words: [] } : effective,
       5,
+      data.vocabularyLists.find((list) => list.id === legacyEnglishListId)
+        ?.requireArticles,
     );
   } catch {}
   function change(next: EnglishSettings) {

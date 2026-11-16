@@ -709,7 +709,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     [assertParent, commit],
   );
   const updateEnglish = useCallback(
-    (input: EnglishSettings) => {
+    (input: EnglishSettings, articlesOverride?: boolean) => {
       assertParent();
       const error = englishValidation(input);
       if (error) throw new Error(error);
@@ -727,7 +727,10 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       const previousList = vocabularyListsFor(current).find(
         (list) => list.id === legacyEnglishListId,
       );
-      const material = buildEnglishMaterial(english);
+      const material = buildEnglishMaterial(
+        english,
+        articlesOverride ?? previousList?.requireArticles,
+      );
       commit(
         retainRemovedVocabulary(current, {
           ...current,
@@ -736,9 +739,8 @@ export function LearningProvider({ children }: { children: ReactNode }) {
             ...vocabularyListsFor(current).filter(
               (list) => list.id !== legacyEnglishListId,
             ),
-            ...legacyEnglishVocabulary(english).map((list) => ({
+            ...legacyEnglishVocabulary(english, previousList).map((list) => ({
               ...list,
-              title: previousList?.title ?? list.title,
               ...(previousList?.archived && list.status === "published"
                 ? { archived: true }
                 : {}),
@@ -807,14 +809,17 @@ export function LearningProvider({ children }: { children: ReactNode }) {
           "La langue d’une liste existante ne peut pas être changée.",
         );
       if (list.id === legacyEnglishListId && list.status === "published") {
-        updateEnglish({
-          ...(current.english ?? clone(emptyEnglishSettings)),
-          words: list.words.map((word) => ({
-            id: word.id,
-            en: word.term,
-            fr: word.translation,
-          })),
-        });
+        updateEnglish(
+          {
+            ...(current.english ?? clone(emptyEnglishSettings)),
+            words: list.words.map((word) => ({
+              id: word.id,
+              en: word.term,
+              fr: word.translation,
+            })),
+          },
+          !!list.requireArticles,
+        );
         list.englishWordsRevision = dataRef.current.english?.wordsRevision ?? 0;
       }
       commit(

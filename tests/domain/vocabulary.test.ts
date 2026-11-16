@@ -77,9 +77,15 @@ describe("listes de vocabulaire dans trois langues", () => {
         "from-french",
       ]);
       expect(questions[0].prompt).toBe("casa");
-      expect(questions[0].expectedAnswers).toEqual(["maison"]);
+      expect(questions[0].expectedAnswers).toEqual(
+        language === "spanish" ? ["la maison", "maison"] : ["maison"],
+      );
       expect(questions[2].prompt).toBe("maison");
-      expect(questions[2].expectedAnswers).toEqual(["casa", "hogar"]);
+      expect(questions[2].expectedAnswers).toEqual(
+        language === "spanish"
+          ? ["la casa", "casa", "hogar"]
+          : ["casa", "hogar"],
+      );
       expect(vocabularyQuestions(list(language), "to-french")).toHaveLength(2);
       expect(vocabularyQuestions(list(language), "from-french")).toHaveLength(
         2,
@@ -103,7 +109,7 @@ describe("listes de vocabulaire dans trois langues", () => {
     value.words[0].term = "casa";
     value.words.push({ id: "hogar", term: "hogar", translation: "maison" });
     const question = vocabularyQuestions(value, "from-french")[0];
-    expect(question.expectedAnswers).toEqual(["casa", "hogar"]);
+    expect(question.expectedAnswers).toEqual(["la casa", "casa", "hogar"]);
   });
   it("bloque la publication des lignes incomplètes, des doublons et des listes vides", () => {
     const value = list();
@@ -147,6 +153,142 @@ describe("listes de vocabulaire dans trois langues", () => {
       "incomplete",
       "duplicate",
     ]);
+  });
+});
+describe("consignes et formes écrites du vocabulaire", () => {
+  function questions(
+    language: VocabularyLanguage,
+    term: string,
+    translation: string,
+    requireArticles = false,
+  ) {
+    return vocabularyQuestions(
+      {
+        ...list(language),
+        words: [{ id: "word", term, translation }],
+        requireArticles,
+      },
+      "both",
+    );
+  }
+
+  it.each(["hablo", "yo hablo", "hablo ; yo hablo"])(
+    "accepte le sujet espagnol facultatif avec la fiche %s",
+    (term) => {
+      const [french, spanish] = questions("spanish", term, "je parle");
+      expect(spanish.guide?.instruction).toContain("laisser de côté");
+      expect(spanish.guide?.models).toEqual(["yo hablo"]);
+      expect(spanish.expectedAnswers).toEqual(["hablo", "yo hablo"]);
+      for (const wrong of ["tú hablo", "yo habla", "hablar"])
+        expect(evaluateVocabularyAnswer(spanish, wrong)).toBe(false);
+      expect(french.guide?.instruction).toContain("avec son sujet");
+      expect(evaluateVocabularyAnswer(french, "parle")).toBe(false);
+    },
+  );
+
+  it("garde le sujet anglais, les pronoms réfléchis et les accents", () => {
+    expect(questions("english", "I speak", "je parle")[1]).toMatchObject({
+      expectedAnswers: ["I speak"],
+      guide: { instruction: "Écris la phrase avec son sujet." },
+    });
+    expect(
+      questions("english", "I'm happy", "je suis heureux")[1].guide
+        ?.instruction,
+    ).toContain("avec son sujet");
+    expect(
+      questions("spanish", "yo me levanto", "je me lève")[1].expectedAnswers,
+    ).toEqual(["me levanto", "yo me levanto"]);
+    expect(
+      questions("spanish", "hablas", "tu parles")[1].expectedAnswers,
+    ).toEqual(["hablas", "tú hablas"]);
+    expect(questions("latin", "amo", "j’aime")[1].expectedAnswers).toEqual([
+      "amo",
+      "ego amo",
+    ]);
+  });
+
+  it("conserve les impersonnels, les pronoms isolés et les expressions", () => {
+    for (const [es, fr] of [
+      ["llueve", "il pleut"],
+      ["me gusta", "j’aime"],
+      ["yo", "je"],
+      ["la veo", "je la vois"],
+      ["La Habana", "La Havane"],
+      ["a veces", "parfois"],
+    ]) {
+      const question = questions("spanish", es, fr)[1];
+      if (es === "la veo") {
+        expect(evaluateVocabularyAnswer(question, "veo")).toBe(false);
+      } else expect(question.expectedAnswers).toEqual([es]);
+    }
+    expect(
+      questions("english", "to see him", "le voir")[0].expectedAnswers,
+    ).toEqual(["le voir"]);
+  });
+
+  it("accepte le bon article même sur une ancienne liste et présente la forme complète", () => {
+    const [french, spanish] = questions("spanish", "casa", "maison");
+    expect(french.guide?.models).toEqual(["la maison"]);
+    expect(evaluateVocabularyAnswer(french, "la maison")).toBe(true);
+    expect(evaluateVocabularyAnswer(french, "le maison")).toBe(false);
+    expect(evaluateVocabularyAnswer(spanish, "el casa")).toBe(false);
+    expect(questions("english", "pound", "livre")[0].guide?.models).toEqual([
+      "la livre",
+    ]);
+    const water = questions("latin", "aqua", "eau")[0];
+    expect(evaluateVocabularyAnswer(water, " L'EAU ")).toBe(true);
+    expect(water.guide?.models).toEqual(["l’eau"]);
+  });
+
+  it("respecte l’article du parent sur un nom nouveau ou composé, y compris en révision du genre", () => {
+    const normal = questions("spanish", "la brújula", "la boussole")[0];
+    expect(normal.expectedAnswers).toEqual(["la boussole", "boussole"]);
+    const strict = questions(
+      "spanish",
+      "la brújula",
+      "boussole ; la boussole",
+      true,
+    )[0];
+    expect(strict.guide?.instruction).toBe(
+      "Écris le nom avec son article défini.",
+    );
+    expect(strict.expectedAnswers).toEqual(["la boussole"]);
+    expect(
+      questions("english", "classroom", "la salle de classe")[0]
+        .expectedAnswers,
+    ).toContain("salle de classe");
+    expect(
+      questions("spanish", "hablo", "je parle", true)[1].expectedAnswers,
+    ).toContain("yo hablo");
+  });
+  it("compte une réponse courte en vocabulaire et réserve le suivi du genre aux articles donnés", () => {
+    const nouns = {
+      ...list(),
+      words: [{ id: "casa", term: "la casa", translation: "la maison" }],
+    };
+    const first = session(nouns, "to-french");
+    const answered = answerVocabularySession(
+      first,
+      first.questions[0].id,
+      "maison",
+      "2026-11-15T10:00:01.000Z",
+    );
+    expect(
+      vocabularyProgress(nouns, [answered])[0].directions["to-french"].streak,
+    ).toBe(1);
+    expect(
+      vocabularyProgress({ ...nouns, requireArticles: true }, [answered])[0]
+        .directions["to-french"].answered,
+    ).toBe(0);
+    expect(answered.answers[0].isCorrect).toBe(true);
+  });
+  it("conserve les variantes qu’un parent a expressément autorisées", () => {
+    const english = questions("english", "speak ; I speak", "je parle")[1];
+    expect(english.guide?.instruction).toContain("laisser de côté");
+    expect(english.guide?.models).toEqual(["I speak"]);
+    const noun = questions("spanish", "casa", "maison ; une maison", true)[0];
+    expect(noun.expectedAnswers).toEqual(["une maison"]);
+    expect(noun.guide?.instruction).toContain("indéfini");
   });
 });
 describe("suivi des mots et snapshots des séances", () => {
@@ -392,6 +534,30 @@ describe("répertoire et révision générale", () => {
       when,
     )!;
 
+  it("donne la même consigne dans le répertoire et garde le sens du rappel", () => {
+    const chapter = {
+      ...list(),
+      words: [{ id: "v", term: "hablo", translation: "je parle" }],
+    };
+    const forward = general([chapter]);
+    expect(forward.questions[0].direction).toBe("to-french");
+    const answered = answerVocabularySession(
+      forward,
+      forward.questions[0].id,
+      "je parle",
+      start,
+    );
+    const reverse = general([chapter], [answered]);
+    expect(reverse.questions[0]).toMatchObject({
+      direction: "from-french",
+      expectedAnswers: ["hablo", "yo hablo"],
+      guide: { models: ["yo hablo"] },
+    });
+    expect(general([list()]).questions[0]).toMatchObject({
+      direction: "to-french",
+      guide: { models: ["la maison"] },
+    });
+  });
   it("réunit les sources publiées ou archivées et conserve les mots après suppression", () => {
     const spanish = list();
     const archived = { ...list(), id: "archived", archived: true };

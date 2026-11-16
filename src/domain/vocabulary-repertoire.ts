@@ -9,6 +9,7 @@ import type {
 } from "./model";
 import {
   generalReviewSize,
+  guideVocabularyQuestion,
   repertoireTitle,
   vocabularyListsFor,
   vocabularyProgress,
@@ -190,7 +191,7 @@ export function createGeneralReview(
     answers: [],
     questions: selected.map(({ item, direction }, index) => {
       const q = questions.get(item.word.id + ":" + direction)!;
-      return { ...q, id: "recall-" + index };
+      return { ...guideVocabularyQuestion(q, language), id: "recall-" + index };
     }),
   };
 }
@@ -208,9 +209,13 @@ export function validGeneralReviewContent(
   return session.questions
     .filter((q) => !q.retryOf)
     .every((q) => {
-      const match = index.get(wordKey(q) + q.direction);
+      const original = index.get(wordKey(q) + q.direction);
+      if (!original) return false;
+      const match = q.guide
+        ? guideVocabularyQuestion(original, session.language)
+        : original;
       return (
-        match &&
+        JSON.stringify(q.guide) === JSON.stringify(match.guide) &&
         q.prompt === match.prompt &&
         q.context === match.context &&
         q.term === match.term &&

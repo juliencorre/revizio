@@ -218,7 +218,10 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
                       Ta réponse : {answer.response ?? answer.choiceId}
                     </AppText>
                     <AppText color={colors.muted}>
-                      Traduction : {question.expectedAnswers.join(" / ")}
+                      Traduction :{" "}
+                      {(
+                        question.guide?.models ?? question.expectedAnswers
+                      ).join(" / ")}
                     </AppText>
                   </View>
                 );
@@ -248,7 +251,10 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
               value={(session.answers.length / session.questions.length) * 100}
             />
             <Card style={{ gap: spacing.xl }}>
-              <AppText>Écris la traduction en {target}.</AppText>
+              <AppText>
+                {question.guide?.instruction ??
+                  `Écris la traduction en ${target}.`}
+              </AppText>
               {question.context && (
                 <AppText variant="small">Contexte · {question.context}</AppText>
               )}
@@ -307,7 +313,10 @@ function PracticeSession({ initial }: { initial: VocabularySession }) {
                 <AppText
                   color={answer.isCorrect ? colors.green : colors.danger}
                 >
-                  Traduction : {question.expectedAnswers.join(" / ")}
+                  Traduction :{" "}
+                  {(question.guide?.models ?? question.expectedAnswers).join(
+                    " / ",
+                  )}
                 </AppText>
               </View>
             )}

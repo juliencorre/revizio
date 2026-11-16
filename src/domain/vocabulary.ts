@@ -1,3 +1,4 @@
+import { vocabularyAnswerForms } from "./vocabulary-forms";
 import { normalizeAnswer } from "./answers";
 import type {
   EnglishSettings,
@@ -53,13 +54,15 @@ export function directionLabel(
 }
 export function legacyEnglishVocabulary(
   english?: EnglishSettings,
+  previous?: VocabularyList,
 ): VocabularyList[] {
   if (!english?.words.length) return [];
   const list: VocabularyList = {
     englishWordsRevision: english.wordsRevision ?? 0,
     id: legacyEnglishListId,
     language: "english",
-    title: "Mon répertoire d’anglais",
+    title: previous?.title ?? "Mon répertoire d’anglais",
+    ...(previous?.requireArticles ? { requireArticles: true } : {}),
     status: "published",
     words: english.words.map((word) => ({
       id: word.id,
@@ -133,6 +136,8 @@ export function isVocabularyList(value: unknown): value is VocabularyList {
     vocabularyLanguages.some((item) => item.id === value.language) &&
     (value.id !== legacyEnglishListId || value.language === "english") &&
     text(value.title) &&
+    (value.requireArticles === undefined ||
+      typeof value.requireArticles === "boolean") &&
     (value.englishWordsRevision === undefined ||
       (Number.isSafeInteger(value.englishWordsRevision) &&
         Number(value.englishWordsRevision) >= 0)) &&
@@ -211,10 +216,34 @@ export function evaluateVocabularyAnswer(
 export function vocabularyQuestions(
   list: VocabularyList,
   mode: VocabularyMode,
+  withGuidance = true,
 ): VocabularyQuestion[] {
   const error = vocabularyListError(list);
   if (error) throw new Error(error);
-  return writtenVocabularyQuestions(list.words, mode);
+  const questions = writtenVocabularyQuestions(list.words, mode);
+  return withGuidance
+    ? questions.map((question) =>
+        guideVocabularyQuestion(question, list.language, list.requireArticles),
+      )
+    : questions;
+}
+
+export function guideVocabularyQuestion(
+  question: VocabularyQuestion,
+  language: VocabularyLanguage,
+  requireArticles = false,
+): VocabularyQuestion {
+  const toFrench = question.direction === "to-french";
+  return {
+    ...question,
+    ...vocabularyAnswerForms(
+      question.prompt,
+      question.expectedAnswers,
+      toFrench ? language : "french",
+      toFrench ? "french" : language,
+      requireArticles,
+    ),
+  };
 }
 
 export function writtenVocabularyQuestions(
@@ -284,7 +313,7 @@ export const wordKey = (word: Pick<VocabularyWord, "term" | "translation">) =>
     ),
   );
 export function vocabularyProgress(
-  list: Pick<VocabularyList, "words" | "language">,
+  list: Pick<VocabularyList, "words" | "language" | "requireArticles">,
   sessions: VocabularySession[],
 ): VocabularyWordProgress[] {
   const progress: VocabularyWordProgress[] = list.words
@@ -304,6 +333,19 @@ export function vocabularyProgress(
   const entries = new Map(
     progress.map((entry) => [wordKey(entry.word), entry]),
   );
+  // A previously accepted bare noun does not demonstrate that its article is known.
+  const strictQuestions =
+    list.requireArticles && sessions.length > 0
+      ? new Map(
+          writtenVocabularyQuestions(
+            progress.map((entry) => entry.word),
+            "both",
+          ).map((question) => [
+            question.id,
+            guideVocabularyQuestion(question, list.language, true),
+          ]),
+        )
+      : undefined;
   const events = sessions
     .filter((session) => session.language === list.language)
     .flatMap((session) => {
@@ -326,6 +368,15 @@ export function vocabularyProgress(
     const direction = entry.directions[question.direction];
     const correct =
       evaluateVocabularyAnswer(question, answer.choiceId) && !answer.usedHint;
+    const strictQuestion = strictQuestions?.get(
+      entry.word.id + ":" + question.direction,
+    );
+    if (
+      correct &&
+      strictQuestion &&
+      !evaluateVocabularyAnswer(strictQuestion, answer.choiceId)
+    )
+      continue;
     const time = Date.parse(answer.answeredAt);
     const previousDay =
       direction.lastAnsweredAt &&
@@ -479,6 +530,17 @@ export function answerVocabularySession(
     ],
   };
 }
+function validVocabularyGuide(guide: unknown, expected: string[]) {
+  return (
+    guide === undefined ||
+    (object(guide) &&
+      text(guide.instruction) &&
+      !!guide.instruction.trim() &&
+      Array.isArray(guide.models) &&
+      guide.models.length > 0 &&
+      guide.models.every((model) => text(model) && expected.includes(model)))
+  );
+}
 export function isVocabularySession(
   value: unknown,
 ): value is VocabularySession {
@@ -526,7 +588,8 @@ export function isVocabularySession(
         (value.mode === "both" || q.direction === value.mode) &&
         Array.isArray(q.expectedAnswers) &&
         q.expectedAnswers.length > 0 &&
-        q.expectedAnswers.every((answer) => text(answer) && !!answer.trim()),
+        q.expectedAnswers.every((answer) => text(answer) && !!answer.trim()) &&
+        validVocabularyGuide(q.guide, q.expectedAnswers),
     ) ||
     !unique(value.questions.map((q) => q.id))
   )

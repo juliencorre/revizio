@@ -148,6 +148,59 @@ for (const language of [
   });
 }
 
+test("annoncer le pronom ou l’article avant la réponse et montrer la traduction complète", async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => localStorage.setItem("revizo.mode", "demo"));
+  await createList(page, "spanish", "Verbes et noms", "hablo", "je parle");
+  await page.getByTestId("add-vocabulary-word").click();
+  await page.getByTestId("vocabulary-term-1").fill("la brújula");
+  await page.getByTestId("vocabulary-translation-1").fill("la boussole");
+  const editor = page.url();
+  await page.getByTestId("publish-vocabulary-list").click();
+
+  async function start() {
+    await page.goto("/student/vocabulary?language=spanish");
+    await page
+      .getByRole("button", { name: "Ouvrir la liste Verbes et noms" })
+      .click();
+    await page.getByTestId("vocabulary-mode-from-french").click();
+    await page.getByTestId("start-vocabulary").click();
+  }
+  await start();
+  await expect(
+    page.getByText("Tu peux écrire le pronom sujet ou le laisser de côté."),
+  ).toBeVisible();
+  await page.getByTestId("vocabulary-answer").fill("hablo");
+  await page.getByTestId("vocabulary-check").click();
+  const feedback = page.getByTestId("vocabulary-feedback");
+  await expect(feedback).toContainText("Bien joué");
+  await expect(feedback).toContainText("yo hablo");
+  await page.getByTestId("vocabulary-next").click();
+  await expect(
+    page.getByText("Tu peux écrire le nom avec ou sans son article."),
+  ).toBeVisible();
+  await answer(page, "brújula");
+  await expect(page.getByTestId("vocabulary-score")).toHaveText("2 / 2");
+  await expect(
+    page.getByText("Traduction : la brújula", { exact: true }),
+  ).toBeVisible();
+
+  await page.goto(editor);
+  await page
+    .getByRole("button", { name: "Exiger l’article pour réviser le genre" })
+    .click();
+  await page.getByTestId("publish-vocabulary-list").click();
+  await start();
+  await answer(page, "yo hablo");
+  await expect(
+    page.getByText("Écris le nom avec son article défini."),
+  ).toBeVisible();
+  await capture(page, info, "consigne-article");
+  await answer(page, "brújula");
+  await expect(page.getByTestId("vocabulary-score")).toHaveText("1 / 2");
+});
+
 test("en famille, synchroniser le suivi enfant vers le parent et isoler un autre profil", async ({
   browser,
   page,

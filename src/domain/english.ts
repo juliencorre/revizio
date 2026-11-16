@@ -1,3 +1,5 @@
+import { vocabularyVariants } from "./vocabulary";
+import { vocabularyAnswerForms } from "./vocabulary-forms";
 import type {
   Course,
   EnglishSettings,
@@ -220,30 +222,41 @@ function choiceQuestion(
 export function generateBoundedQuiz(
   settings: EnglishSettings,
   count = 10,
+  requireArticles = false,
 ): Question[] {
   const error = englishValidation(settings);
   if (error) throw new Error(error);
   const normalized = normalizeEnglish(settings);
   const questions: Question[] = [];
   for (const word of normalized.words) {
-    questions.push(
-      choiceQuestion(
-        `english-word-${word.id}`,
-        `Comment dit-on « ${word.fr} » en anglais ?`,
-        word.en,
-        normalized.words.map((item) => item.en),
+    for (const toEnglish of [true, false]) {
+      const source = toEnglish ? word.fr : word.en;
+      const target = toEnglish ? word.en : word.fr;
+      const prompt = vocabularyVariants(source)[0] ?? source;
+      const question = choiceQuestion(
+        `english-${toEnglish ? "word" : "meaning"}-${word.id}`,
+        toEnglish
+          ? `Comment dit-on « ${prompt} » en anglais ?`
+          : `Que signifie « ${prompt} » ?`,
+        target,
+        normalized.words.map((item) => (toEnglish ? item.en : item.fr)),
         "Vocabulaire : " + word.en,
-      ),
-    );
-    questions.push(
-      choiceQuestion(
-        `english-meaning-${word.id}`,
-        `Que signifie « ${word.en} » ?`,
-        word.fr,
-        normalized.words.map((item) => item.fr),
-        "Vocabulaire : " + word.en,
-      ),
-    );
+      );
+      if (question.type === "fill-blank") {
+        const variants = vocabularyVariants(target);
+        const { expectedAnswers, guide } = vocabularyAnswerForms(
+          prompt,
+          variants.length ? variants : [target],
+          toEnglish ? "french" : "english",
+          toEnglish ? "english" : "french",
+          requireArticles,
+        );
+        question.expectedAnswers = expectedAnswers;
+        if (guide) question.prompt += " " + guide.instruction;
+        question.explanation = `Traduction : ${(guide?.models ?? expectedAnswers).join(" / ")}.`;
+      }
+      questions.push(question);
+    }
   }
   const forms = [
     ...normalized.verbs.flatMap((verb) => [
@@ -298,9 +311,10 @@ export function generateBoundedQuiz(
 
 export function buildEnglishMaterial(
   settings: EnglishSettings,
+  requireArticles = false,
 ): { course: Course; series: ExerciseSeries } | null {
   const normalized = normalizeEnglish(settings);
-  const questions = generateBoundedQuiz(normalized, 20);
+  const questions = generateBoundedQuiz(normalized, 20, requireArticles);
   if (!questions.length) return null;
   const course: Course = {
     id: "english-repertoire-course",

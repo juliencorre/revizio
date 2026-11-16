@@ -41,12 +41,10 @@ export function preserveVocabularyForLegacyClient(
       next.vocabularyLists = wordsChanged
         ? [
             ...lists.filter((list) => list.id !== legacyEnglishListId),
-            ...legacyEnglishVocabulary(next.english).map((list) => ({
-              ...list,
-              title:
-                lists.find((previous) => previous.id === list.id)?.title ??
-                list.title,
-            })),
+            ...legacyEnglishVocabulary(
+              next.english,
+              lists.find((list) => list.id === legacyEnglishListId),
+            ),
           ]
         : clone(lists);
     }
@@ -129,7 +127,11 @@ export function mergeVocabularySessions(
           403,
           "Cette liste de vocabulaire n’est pas disponible.",
         );
-      const canonical = vocabularyQuestions(list, supplied.mode);
+      // An offline client may have started a session with the old, exact-only rules.
+      const withGuidance =
+        !!list.requireArticles ||
+        supplied.questions.some((q) => q.guide !== undefined);
+      const canonical = vocabularyQuestions(list, supplied.mode, withGuidance);
       const allowed = new Map(
         canonical.map((question) => [question.id, question]),
       );

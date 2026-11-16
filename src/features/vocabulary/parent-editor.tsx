@@ -246,6 +246,21 @@ function VocabularyEditor() {
                 placeholder="À la maison, chapitre 3…"
                 onChangeText={(title) => change({ ...list, title })}
               />
+              <View style={{ gap: spacing.sm, alignItems: "flex-start" }}>
+                <Button
+                  variant={list.requireArticles ? "primary" : "secondary"}
+                  selected={!!list.requireArticles}
+                  onPress={() =>
+                    change({ ...list, requireArticles: !list.requireArticles })
+                  }
+                >
+                  Exiger l’article pour réviser le genre
+                </Button>
+                <AppText variant="small">
+                  Indiquez l’article des noms dans la liste. Activez cette option
+                  pour le demander à chaque exercice sur les noms de cette liste.
+                </AppText>
+              </View>
               <VocabularyPhotoImport
                 key={photoJob ?? "photo"}
                 jobId={photoJob}
