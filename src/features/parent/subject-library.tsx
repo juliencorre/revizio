@@ -2,7 +2,11 @@ import { useRef, type ComponentRef } from "react";
 import { Platform, Pressable, View, type ViewProps } from "react-native";
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { AppIcon, AppText, Button, useFocusVisible } from "@/components/ui";
-import { englishTenses } from "@/domain/english";
+import { conjugationVerbs } from "@/domain/conjugation";
+import {
+  conjugationSeriesId,
+  conjugationTitle,
+} from "@/domain/conjugation-practice";
 import { plural } from "@/domain/format";
 import type { IconName, Subject } from "@/domain/model";
 import { preparationStatus } from "@/domain/study-overview";
@@ -300,23 +304,22 @@ export function SubjectLibrary({ subject }: { subject: Subject }) {
         });
       break;
     case "conjugaison":
-      heading = "Verbes étudiés";
+      heading = "Fiches de conjugaison";
       action = "Préparer la conjugaison";
-      empty = "Aucun verbe publié pour le moment.";
+      empty = "Aucune fiche de conjugaison publiée pour le moment.";
       onAdd = () => router.push("/parent/english?section=conjugaison");
-      entries = data.english.verbs.map((verb) => ({
-        id: verb.id,
-        title: verb.base + " · " + verb.meaning,
-        detail: verb.past + " · " + verb.participle,
-        icon: "file",
+      entries = data.conjugationSheets.map((sheet) => ({
+        id: conjugationSeriesId(sheet),
+        title: conjugationTitle(sheet),
+        detail:
+          conjugationVerbs.find((verb) => verb.base === sheet.verb)?.meaning ??
+          "",
+        icon: "book",
+        href: {
+          pathname: "/parent/english",
+          params: { section: "conjugaison", ...sheet },
+        },
       }));
-      if (data.english.tenses.length)
-        note =
-          "Temps étudiés : " +
-          englishTenses
-            .filter((tense) => data.english.tenses.includes(tense.id))
-            .map((tense) => tense.label)
-            .join(", ");
       break;
   }
   return (

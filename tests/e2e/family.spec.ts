@@ -626,9 +626,13 @@ test.describe("Import en conjugaison", () => {
   test.use({ serviceWorkers: "block" });
   test("réunir une image et un fichier dans le brouillon de conjugaison", async ({
     page,
+    browser,
+    baseURL,
   }) => {
+    test.setTimeout(60000);
     const profileId = await setup(page);
     await page.goto("/parent/english?section=conjugaison");
+    await page.getByTestId("conjugation-import-toggle").click();
     const photo = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Choisir des images" }).click();
     await (await photo).setFiles(imagePath);
@@ -674,15 +678,44 @@ test.describe("Import en conjugaison", () => {
     );
     await page.getByRole("button", { name: "Analyser les documents" }).click();
     await expect(
-      page.getByRole("textbox", { name: "Base verbale du verbe 1" }),
-    ).toHaveValue("run");
+      page.getByTestId("conjugation-proposal-run-present-simple"),
+    ).toBeVisible();
     await page.reload();
     await expect(
-      page.getByRole("textbox", { name: "Prétérit du verbe 1" }),
-    ).toHaveValue("ran");
+      page.getByTestId("conjugation-proposal-run-present-simple"),
+    ).toBeVisible();
+    expect(
+      (await envelope(page, profileId)).data.conjugationSheets ?? [],
+    ).toHaveLength(0);
     expect((await envelope(page, profileId)).data.english?.verbs).toHaveLength(
       0,
     );
+    await page.getByTestId("conjugation-proposal-run-present-simple").click();
+    await page.getByTestId("add-conjugation-sheet").click();
+    await expect
+      .poll(
+        async () => (await envelope(page, profileId)).data.conjugationSheets,
+      )
+      .toEqual([{ verb: "run", tense: "present-simple" }]);
+    const childContext = await freshContext(browser, page, baseURL);
+    try {
+      const child = await childContext.newPage();
+      await loginChild(child, profileId);
+      await child.goto("/student/conjugation");
+      await child.getByTestId("conjugation-practice").click();
+      await child.getByTestId("conjugation-answer").fill("incorrect");
+      await child.getByTestId("conjugation-check").click();
+      await expect(child.getByTestId("conjugation-correction")).toBeVisible();
+      await expect
+        .poll(
+          async () =>
+            (await envelope(page, profileId)).data.attempts[0]?.questions
+              .length,
+        )
+        .toBe(9);
+    } finally {
+      await childContext.close();
+    }
     await page.goto("/parent/english");
     await expect(
       page.getByText("0 mots", { exact: true }).first(),

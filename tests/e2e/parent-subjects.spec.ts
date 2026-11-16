@@ -66,7 +66,7 @@ test("choisir la matière et retrouver ses rubriques en revenant d’un éditeur
   await tab("Cours").press("End");
   await expect(tab("Conjugaison")).toHaveAttribute("aria-selected", "true");
   await button("Préparer la conjugaison").click();
-  await expect(page.getByTestId("english-verb-base")).toBeVisible();
+  await expect(page.getByTestId("conjugation-verb")).toBeVisible();
   await expect(page.getByTestId("english-word-en")).toHaveCount(0);
   await button("Menu de la matière").click();
   await expect(tab("Conjugaison")).toHaveAttribute("aria-selected", "true");
