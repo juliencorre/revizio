@@ -501,6 +501,56 @@ describe("compte et sessions serveur", () => {
 });
 
 describe("contenus publiés, réponses et concurrence", () => {
+  it("conserve les matières du profil avec une ancienne application et réserve le choix au parent", async () => {
+    const { token, profiles } = await setup();
+    const id = profiles[0].id;
+    const original = clone(initialData);
+    const stored = await save(
+      token,
+      { ...original, subjectVisibility: { maths: false } },
+      0,
+      id,
+    );
+    expect(stored.statusCode, stored.body).toBe(200);
+    const student = await child(id);
+    const current = await envelope(student, id);
+    expect(current.data.subjectVisibility).toEqual({ maths: false });
+    expect(
+      (
+        await save(
+          student,
+          { ...current.data, subjectVisibility: {} },
+          current.revision,
+          id,
+        )
+      ).statusCode,
+    ).toBe(403);
+    const legacy = await save(token, original, current.revision, id);
+    expect(legacy.statusCode, legacy.body).toBe(200);
+    expect(legacy.json().data.subjectVisibility).toEqual({ maths: false });
+    expect(legacy.json().data.courses).toEqual(original.courses);
+    const backup = await app.inject({
+      url: "/api/backup",
+      headers: bearer(token),
+    });
+    expect(backup.json().profiles[0].data.subjectVisibility).toEqual({
+      maths: false,
+    });
+    const revision = legacy.json().revision;
+    for (const subjectVisibility of [{ unknown: false }, { maths: "yes" }]) {
+      const invalid = await app.inject({
+        method: "PUT",
+        url: "/api/data",
+        headers: bearer(token),
+        payload: {
+          profileId: id,
+          revision,
+          data: { ...original, subjectVisibility },
+        },
+      });
+      expect(invalid.statusCode).toBe(400);
+    }
+  });
   it("filtre les brouillons pour l’enfant et refuse une modification de contenu", async () => {
     const session = await setup();
     const data = clone(initialData);

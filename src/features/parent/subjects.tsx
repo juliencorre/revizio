@@ -1,5 +1,10 @@
 import { View } from "react-native";
-import { useLocalSearchParams, useRouter, type Href } from "expo-router";
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from "expo-router";
 import {
   ActionCard,
   AppIcon,
@@ -11,6 +16,7 @@ import {
 } from "@/components/ui";
 import { plural } from "@/domain/format";
 import type { IconName } from "@/domain/model";
+import { SubjectSettings } from "./subject-settings";
 import { SubjectLibrary } from "./subject-library";
 import { useLearning } from "@/state/learning-store";
 import { useTheme, radius, spacing } from "@/theme";
@@ -104,6 +110,10 @@ export function ParentSubjectGrid({
         ...data.subjects.filter((subject) => !homeOrder.includes(subject.id)),
       ].slice(0, 6)
     : data.subjects;
+  if (!subjects.length)
+    return (
+      <AppText>Aucune matière sélectionnée pour {data.childName}.</AppText>
+    );
   return (
     <View style={grid}>
       {subjects.map((subject) => {
@@ -143,13 +153,26 @@ export function ParentSubjectGrid({
 export function ParentSubjectsScreen() {
   const data = useLearning();
   const router = useRouter();
-  const { next } = useLocalSearchParams<{ next?: string }>();
+  const { next, configure } = useLocalSearchParams<{
+    next?: string;
+    configure?: string;
+  }>();
   const action = next === "import" || next === "exercises" ? next : undefined;
   if (!data.isReady) return <LoadingParent />;
+  if (configure === "1") return <SubjectSettings />;
   return (
     <ParentLayout active="subjects">
       <PageHeading
         title="Toutes les matières"
+        action={
+          <Button
+            variant="secondary"
+            icon="settings"
+            onPress={() => router.push("/parent/subjects?configure=1")}
+          >
+            Choisir les matières
+          </Button>
+        }
         description={
           action === "import"
             ? "Dans quelle matière souhaitez-vous ajouter un cours ?"
@@ -175,6 +198,8 @@ export function ParentSubjectScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   if (!data.isReady) return <LoadingParent />;
+  if (data.subjectVisibility?.[id] === false)
+    return <Redirect href="/parent/subjects" />;
   const subject = data.subjects.find((s) => s.id === id);
   return (
     <ParentLayout active="subjects" subjectId={subject?.id}>

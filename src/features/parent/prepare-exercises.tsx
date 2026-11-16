@@ -219,6 +219,7 @@ export function PrepareExercisesScreen() {
   const course = data.courses.find((item) => item.id === params.courseId);
   const scope = params.subjectId || course?.subjectId;
   if (
+    !data.subjects.length ||
     (params.subjectId && !data.subjects.some((item) => item.id === scope)) ||
     (params.courseId && (!course || course.status !== "published")) ||
     (params.draftId && !series) ||
@@ -327,7 +328,7 @@ function ExercisesEditor({
     selectedCourses[0]?.subjectId ??
     currentSeries?.subjectId ??
     initialCourse?.subjectId ??
-    "maths";
+    data.defaultSubjectId;
   const published = currentSeries?.status === "published";
   function persistLocal(next: Editor) {
     if (!next.draftId) return;

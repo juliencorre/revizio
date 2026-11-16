@@ -9,6 +9,7 @@ import {
   PageHeading,
   useContentWidth,
 } from "@/components/ui";
+import { isVocabularyLanguage } from "@/domain/vocabulary";
 import { useTheme, radius, spacing } from "@/theme";
 import {
   ChildShell,
@@ -25,6 +26,14 @@ export function SubjectGrid() {
   const width = useContentWidth();
   const columns = width >= 1100 ? 4 : width >= 650 ? 3 : 2;
   const gap = spacing.lg;
+  if (!data.subjects.length)
+    return (
+      <Card>
+        <AppText>
+          Ton parent peut choisir tes matières dans l’espace Famille.
+        </AppText>
+      </Card>
+    );
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>
       {data.subjects.map((subject) => {
@@ -93,6 +102,7 @@ export function SubjectGrid() {
 export function StudentSubjectsScreen() {
   const { colors } = useTheme();
   const data = useChildData();
+  const hasLanguages = data.subjects.some(({ id }) => isVocabularyLanguage(id));
   return (
     <ChildShell active="courses">
       <PageHeading
@@ -100,13 +110,13 @@ export function StudentSubjectsScreen() {
         description="Choisis une matière pour retrouver ses cours et ses exercices."
       />
       {!data.isReady ? <Loading /> : <SubjectGrid />}
-      <Card inset>
-        <AppText color={colors.muted}>
-          Retrouve les listes de vocabulaire dans les matières Anglais, Espagnol
-          et Latin. Les verbes et les temps d’anglais restent dans la matière
-          Anglais.
-        </AppText>
-      </Card>
+      {data.isReady && hasLanguages && (
+        <Card inset>
+          <AppText color={colors.muted}>
+            Ouvre une langue pour retrouver tes listes de vocabulaire.
+          </AppText>
+        </Card>
+      )}
     </ChildShell>
   );
 }

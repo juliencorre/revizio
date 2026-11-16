@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActionCard,
   AppIcon,
@@ -14,6 +14,7 @@ import { useLearning } from "@/state/learning-store";
 import {
   languageLabel,
   vocabularyLanguage,
+  vocabularyLanguages,
   vocabularyProgress,
   wordKey,
 } from "@/domain/vocabulary";
@@ -36,7 +37,14 @@ export function VocabularyCollection() {
   const data = useLearning();
   const router = useRouter();
   const params = useLocalSearchParams<{ language?: string; view?: string }>();
-  const language = vocabularyLanguage(params.language);
+  const languages = vocabularyLanguages.filter(
+    ({ id }) => data.subjectVisibility?.[id] !== false,
+  );
+  const requested = vocabularyLanguage(params.language);
+  const language =
+    languages.find(({ id }) => id === requested)?.id ??
+    languages[0]?.id ??
+    requested;
   const allWords = params.view === "words";
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
@@ -90,6 +98,8 @@ export function VocabularyCollection() {
       list.status === "published" &&
       !list.archived,
   );
+  if (data.isReady && !languages.length)
+    return <Redirect href="/student/subjects" />;
   return (
     <ChildShell
       active="courses"
@@ -98,6 +108,7 @@ export function VocabularyCollection() {
       <View style={vocabularyStyles.section} testID="child-vocabulary">
         <PageHeading title={allWords ? "Tous mes mots" : "Mon vocabulaire"} />
         <LanguagePicker
+          languages={languages}
           language={language}
           onChange={(language) => {
             setQuery("");

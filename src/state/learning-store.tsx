@@ -23,6 +23,7 @@ import {
   conjugationSeriesId,
   startConjugationInData,
 } from "../domain/conjugation-practice";
+import { visibleLearningData } from "../domain/subject-visibility";
 import { initialData, subjects } from "../domain/fixtures";
 import {
   answerQuestionInData,
@@ -104,6 +105,8 @@ export interface LearningContextValue extends Omit<
   "version" | "plans" | "english" | "vocabularyLists" | "vocabularySessions"
 > {
   subjects: typeof subjects;
+  defaultSubjectId: string;
+  setSubjectVisible(id: string, visible: boolean): void;
   plans: RevisionPlan[];
   english: EnglishSettings;
   conjugationSheets: ConjugationSheet[];
@@ -373,6 +376,21 @@ export function LearningProvider({ children }: { children: ReactNode }) {
         );
     },
     [apply],
+  );
+  const setSubjectVisible = useCallback(
+    (id: string, visible: boolean) => {
+      assertParent();
+      const current = dataRef.current;
+      if (!subjects.some((subject) => subject.id === id))
+        throw new Error("Matière inconnue.");
+      if ((current.subjectVisibility?.[id] ?? true) === visible) return;
+      commit({
+        ...current,
+        subjectVisibility: { ...current.subjectVisibility, [id]: visible },
+      });
+      void syncRef.current?.sync();
+    },
+    [assertParent, commit],
   );
   const syncNow = useCallback(async () => {
     await syncRef.current?.sync();
@@ -1310,15 +1328,24 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     },
     [assertParent, addCourse, updateCourse, addSeries],
   );
+  // Keep the complete profile for mutations, synchronization and backup.
+  const visible = useMemo(() => visibleLearningData(data), [data]);
+  const activeSubjects = useMemo(
+    () => subjects.filter(({ id }) => data.subjectVisibility?.[id] !== false),
+    [data.subjectVisibility],
+  );
   const value = useMemo<LearningContextValue>(
     () => ({
-      ...data,
-      subjects,
-      plans: data.plans ?? [],
-      english: data.english ?? clone(emptyEnglishSettings),
-      conjugationSheets: data.conjugationSheets ?? [],
-      vocabularyLists: vocabularyListsFor(data),
-      vocabularySessions: data.vocabularySessions ?? [],
+      ...visible,
+      subjects: activeSubjects,
+      defaultSubjectId:
+        data.subjectVisibility?.maths === false ? (activeSubjects[0]?.id ?? "") : "maths",
+      setSubjectVisible,
+      plans: visible.plans ?? [],
+      english: visible.english ?? clone(emptyEnglishSettings),
+      conjugationSheets: visible.conjugationSheets ?? [],
+      vocabularyLists: vocabularyListsFor(visible),
+      vocabularySessions: visible.vocabularySessions ?? [],
       isReady: session.ready && loadedKey === key,
       storageError,
       childName: session.childName,
@@ -1372,7 +1399,10 @@ export function LearningProvider({ children }: { children: ReactNode }) {
       adoptJob,
     }),
     [
-      data,
+      data.subjectVisibility,
+      activeSubjects,
+      visible,
+      setSubjectVisible,
       session,
       loadedKey,
       key,

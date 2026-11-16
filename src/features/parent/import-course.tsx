@@ -33,7 +33,7 @@ type ImportDraft = {
   sourceText: string;
   existingId: string;
 };
-const emptyDraft = (subjectId = "maths"): ImportDraft => ({
+const emptyDraft = (subjectId: string): ImportDraft => ({
   subjectId,
   title: "",
   sources: [],
@@ -67,6 +67,7 @@ export function ImportCourseScreen() {
   if (!data.isReady) return <LoadingParent active="import" />;
   const initial = data.courses.find((c) => c.id === params.courseId);
   if (
+    !data.subjects.length ||
     (params.courseId && (!initial || initial.status === "archived")) ||
     (params.subjectId && !data.subjects.some((s) => s.id === params.subjectId))
   )
@@ -93,6 +94,7 @@ function ImportEditor({
   const { width } = useWindowDimensions();
   const data = useLearning();
   const initial = data.courses.find((course) => course.id === courseId);
+  const defaultSubject = scope ?? data.defaultSubjectId;
   const availableCourses = data.courses.filter(
     (c) => c.status !== "archived" && (!scope || c.subjectId === scope),
   );
@@ -116,7 +118,7 @@ function ImportEditor({
           sourceText: initial.sourceText ?? "",
           existingId: initial.id,
         }
-      : emptyDraft(scope),
+      : emptyDraft(defaultSubject),
     (value): value is ImportDraft =>
       validDraft(value) &&
       (!scope || value.subjectId === scope) &&
@@ -213,7 +215,7 @@ function ImportEditor({
             : {}),
         });
       }
-      if (!courseId) setDraft(emptyDraft(scope));
+      if (!courseId) setDraft(emptyDraft(defaultSubject));
       router.replace({ pathname: "/parent/review/[id]", params: { id } });
     });
   }
@@ -255,7 +257,7 @@ function ImportEditor({
               icon="plus"
               disabled={!!busy}
               onPress={() => {
-                setDraft(emptyDraft(scope));
+                setDraft(emptyDraft(defaultSubject));
                 setShowCourses(false);
               }}
             >

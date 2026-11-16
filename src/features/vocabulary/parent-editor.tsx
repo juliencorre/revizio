@@ -1,7 +1,7 @@
 import { subjectHref } from "@/features/parent/subject-navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { View, type ScrollViewInstance } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   AppText,
   Badge,
@@ -40,7 +40,15 @@ import {
 
 export function ParentVocabularyEditor() {
   const data = useLearning();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, language } = useLocalSearchParams<{
+    id: string;
+    language?: string;
+  }>();
+  const requested =
+    data.vocabularyLists.find((list) => list.id === id)?.language ??
+    vocabularyLanguage(language);
+  if (data.isReady && data.subjectVisibility?.[requested] === false)
+    return <Redirect href="/parent/subjects" />;
   return data.isReady ? (
     <VocabularyEditor key={`${data.activeProfileId}.${id}`} />
   ) : (

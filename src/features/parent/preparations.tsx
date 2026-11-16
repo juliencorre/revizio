@@ -124,7 +124,15 @@ export function usePreparationJobs(
       };
     }, [refresh, serverAvailable]),
   );
-  return { jobs, loading, error, updatedAt, refresh };
+  const { subjectVisibility } = useLearning();
+  const visible = jobs.filter((job) => {
+    const id =
+      job.kind === "english"
+        ? "english"
+        : (job.input?.subjectId ?? job.result?.course?.subjectId);
+    return !id || subjectVisibility?.[id] !== false;
+  });
+  return { jobs: visible, loading, error, updatedAt, refresh };
 }
 
 function JobSteps({ job }: { job: PreparationJob }) {

@@ -13,15 +13,17 @@ import {
 
 export function LanguagePicker({
   language,
+  languages,
   onChange,
 }: {
   language: VocabularyLanguage;
+  languages: ReadonlyArray<(typeof vocabularyLanguages)[number]>;
   onChange: (language: VocabularyLanguage) => void;
 }) {
   const vocabularyStyles = useVocabularyStyles();
   return (
     <View style={vocabularyStyles.row}>
-      {vocabularyLanguages.map((item) => (
+      {languages.map((item) => (
         <Button
           key={item.id}
           testID={`vocabulary-language-${item.id}`}

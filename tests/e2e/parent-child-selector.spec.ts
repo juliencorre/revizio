@@ -1,3 +1,4 @@
+import { initialData } from "../../src/domain/fixtures";
 import { expect, test, type Page } from "@playwright/test";
 
 type Profile = { id: string; name: string; grade: string };
@@ -198,4 +199,89 @@ test("afficher l’enfant unique sans proposer de faux choix", async ({
   await expect(
     page.getByRole("menu", { name: "Enfant accompagné" }),
   ).toHaveCount(0);
+});
+
+test("choisir les matières de chaque enfant et retrouver une matière réactivée", async ({
+  page,
+  browser,
+}, info) => {
+  const [first, second] = await family(page);
+  const seed = await page.request.put("/api/data", {
+    data: { profileId: second.id, revision: 0, data: initialData },
+  });
+  expect(seed.ok(), await seed.text()).toBe(true);
+  await page.goto("/parent/settings");
+  await page
+    .getByRole("button", { name: "Choisir les matières de " + second.name })
+    .click();
+  await expect(
+    page.getByText("Matières de " + second.name, { exact: true }),
+  ).toBeVisible();
+  const checkbox = page.getByRole("checkbox", { name: "Mathématiques" });
+  await expect(checkbox).toBeChecked();
+  const box = (await checkbox.boundingBox())!;
+  expect(Math.min(box.height, box.width)).toBeGreaterThanOrEqual(44);
+  await checkbox.click();
+  await expect(checkbox).not.toBeChecked();
+  await page.getByRole("checkbox", { name: "Anglais" }).click();
+  await page.screenshot({ path: info.outputPath("choix-matieres.png") });
+  await page.getByRole("button", { name: "Terminer" }).click();
+  const maths = page.getByRole("button", {
+    name: "Mathématiques",
+    exact: true,
+  });
+  await expect(maths).toHaveCount(0);
+  await page.getByTestId("parent-child-trigger").click();
+  await page.getByRole("menuitemradio", { name: first.name }).click();
+  await expect(maths).toBeVisible();
+
+  const student = await browser.newContext({
+    baseURL: info.project.use.baseURL ?? "http://127.0.0.1:4183",
+    viewport: page.viewportSize(),
+    hasTouch: true,
+  });
+  try {
+    const login = await student.request.post("/api/child-login", {
+      data: { profileId: second.id, pin: "579246" },
+    });
+    expect(login.ok(), await login.text()).toBe(true);
+    const childPage = await student.newPage();
+    await childPage.goto("/student/subjects");
+    await expect(childPage.getByTestId("subject-card-french")).toBeVisible();
+    await expect(childPage.getByTestId("subject-card-maths")).toHaveCount(0);
+    await childPage.goto("/student/conjugation");
+    await expect(childPage).toHaveURL(/student\/subjects$/);
+    await childPage.goto("/student/vocabulary");
+    await expect(
+      childPage.getByTestId("vocabulary-language-spanish"),
+    ).toBeVisible();
+    await expect(
+      childPage.getByTestId("vocabulary-language-english"),
+    ).toHaveCount(0);
+
+    await page.getByTestId("parent-child-trigger").click();
+    await page.getByRole("menuitemradio", { name: second.name }).click();
+    await page
+      .getByRole("button", { name: "Choisir les matières", exact: true })
+      .click();
+    await expect(checkbox).toBeVisible();
+    await expect(page).toHaveURL(/configure=1/);
+    await page.reload();
+    await expect(checkbox).not.toBeChecked();
+    await checkbox.click();
+    await page.getByRole("button", { name: "Terminer" }).click();
+    await maths.click();
+    const course = initialData.courses.find(
+      (item) => item.status === "published" && item.subjectId === "maths",
+    )!;
+    await expect(
+      page.getByText(course.title, { exact: true }).first(),
+    ).toBeVisible();
+    await childPage.goto("/student/subject/maths");
+    await expect(
+      childPage.getByText(course.title, { exact: true }).first(),
+    ).toBeVisible();
+  } finally {
+    await student.close();
+  }
 });

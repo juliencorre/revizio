@@ -6,7 +6,12 @@ import {
   View,
   type ScrollViewInstance,
 } from "react-native";
-import { useGlobalSearchParams, usePathname, useRouter } from "expo-router";
+import {
+  Redirect,
+  useGlobalSearchParams,
+  usePathname,
+  useRouter,
+} from "expo-router";
 import {
   AppIcon,
   AppText,
@@ -70,6 +75,12 @@ export function StudentWorkspace({ children }: { children: ReactNode }) {
   const data = useLearning();
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
+  if (
+    data.isReady &&
+    data.subjectVisibility?.english === false &&
+    (pathname === "/student/english" || pathname === "/student/conjugation")
+  )
+    return <Redirect href="/student/subjects" />;
   if (pathname === "/student/conjugation" && mode === "practice") {
     return <Suspense fallback={<PageLoading />}>{children}</Suspense>;
   }

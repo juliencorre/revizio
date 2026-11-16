@@ -43,6 +43,17 @@ export function mergeChildData(
   profileId?: string,
 ): LearningData {
   const view = childData(current);
+  if (
+    Object.keys({
+      ...current.subjectVisibility,
+      ...incoming.subjectVisibility,
+    }).some(
+      (id) =>
+        (incoming.subjectVisibility?.[id] ?? true) !==
+        (current.subjectVisibility?.[id] ?? true),
+    )
+  )
+    throw new HttpError(403, "Seul un parent peut choisir les matières.");
   if (!same(vocabularyListsFor(incoming), vocabularyListsFor(view)))
     throw new HttpError(
       403,

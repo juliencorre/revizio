@@ -705,6 +705,14 @@ export function parseLearningData(raw: string): LearningData {
     !value.reviewedCourseIds.every(nonempty)
   )
     throw new Error("Sauvegarde locale incomplète ou invalide.");
+  if (
+    value.subjectVisibility !== undefined &&
+    (!record(value.subjectVisibility) ||
+      !Object.entries(value.subjectVisibility).every(
+        ([id, visible]) => knownSubject(id) && typeof visible === "boolean",
+      ))
+  )
+    throw new Error("Le choix des matières est invalide.");
   const data = value as unknown as LearningData;
   validateExtendedData(value, data.courses, data.series);
   if (
@@ -724,6 +732,9 @@ export function parseLearningData(raw: string): LearningData {
     throw new Error("Les contenus de la sauvegarde sont incohérents.");
   return {
     ...clone(extendedDataFields(data)),
+    ...(data.subjectVisibility && {
+      subjectVisibility: { ...data.subjectVisibility },
+    }),
     version: 1,
     courses: clone(data.courses),
     series: clone(data.series),

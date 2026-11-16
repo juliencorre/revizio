@@ -2,7 +2,7 @@ import { ParentConjugation } from "./parent-conjugation";
 import { legacyEnglishListId } from "@/domain/vocabulary";
 import { subjectHref } from "@/features/parent/subject-navigation";
 import { useEffect, useRef, useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { LanguageSourceImport } from "@/features/parent/import-sources";
 import { documentExamples } from "@/services/pick-documents";
@@ -107,6 +107,8 @@ export function ParentEnglishScreen() {
         <AppText>Chargement de l’anglais…</AppText>
       </StudyWorkspace>
     );
+  if (data.subjectVisibility?.english === false)
+    return <Redirect href="/parent/subjects" />;
   if (section === "conjugaison")
     return (
       <ParentConjugation

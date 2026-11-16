@@ -376,6 +376,13 @@ export function ParentSettingsScreen() {
           sur cet appareil. Un espace familial permet de protéger les accès et
           de conserver les documents sur le serveur.
         </Notice>
+        <Button
+          variant="secondary"
+          icon="book"
+          onPress={() => router.push("/parent/subjects?configure=1")}
+        >
+          Choisir les matières
+        </Button>
         <InstallAppCard />
         <Card style={{ gap: 18 }}>
           <AppText variant="heading">
@@ -547,6 +554,18 @@ export function ParentSettingsScreen() {
                     <Badge tone="orange">Code à définir</Badge>
                   )}
                 </Pressable>
+                <Button
+                  variant="secondary"
+                  icon="book"
+                  accessibilityLabel={"Choisir les matières de " + profile.name}
+                  disabled={disabled}
+                  onPress={() => {
+                    session.selectProfile(profile.id);
+                    router.push("/parent/subjects?configure=1");
+                  }}
+                >
+                  Choisir les matières
+                </Button>
                 <View style={s.row}>
                   <Button
                     variant="ghost"

@@ -36,12 +36,12 @@ import { StudyWorkspace } from "./shared";
 import { useLocalDraft } from "./use-local-draft";
 
 type Editor = Omit<RevisionPlan, "id" | "status"> & { id?: string };
-function newEditor(): Editor {
+function newEditor(subjectId: string): Editor {
   const date = new Date();
   date.setDate(date.getDate() + 4);
   return {
     title: "",
-    subjectId: "maths",
+    subjectId,
     examDate: dateOnly(date),
     courseIds: [],
     dailyMinutes: 20,
@@ -91,7 +91,7 @@ export function ParentControlsScreen() {
   const { width } = useWindowDimensions();
   const [editor, setEditor, draft] = useLocalDraft<Editor>(
     "revizo.plan-editor." + (data.activeProfileId ?? "demo"),
-    newEditor(),
+    newEditor(data.defaultSubjectId),
     isEditor,
   );
   const [error, setError] = useState("");
@@ -199,6 +199,10 @@ export function ParentControlsScreen() {
     }
   }
   function save(): string | null {
+    if (!data.subjects.some(({ id }) => id === editor.subjectId)) {
+      setError("Choisissez une matière suivie par cet enfant.");
+      return null;
+    }
     if (!editor.title.trim()) {
       setError("Donnez un titre au contrôle.");
       return null;
@@ -406,7 +410,7 @@ export function ParentControlsScreen() {
               variant="secondary"
               icon="plus"
               onPress={() => {
-                setEditor(newEditor());
+                setEditor(newEditor(data.defaultSubjectId));
                 setConfirmedKey(null);
                 setError("");
                 setMessage("Nouveau contrôle.");
@@ -517,7 +521,7 @@ export function ParentControlsScreen() {
                                 data.deletePlan(plan.id);
                                 setDeleteId(null);
                                 if (editor.id === plan.id)
-                                  setEditor(newEditor());
+                                  setEditor(newEditor(data.defaultSubjectId));
                               }}
                             >
                               Confirmer la suppression

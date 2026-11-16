@@ -176,6 +176,8 @@ export interface AnswerReview {
 }
 export interface LearningData {
   version: 1;
+  /** Unconfigured subjects are visible in existing and newly created profiles. */
+  subjectVisibility?: Record<string, boolean>;
   courses: Course[];
   series: ExerciseSeries[];
   attempts: Attempt[];
