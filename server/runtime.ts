@@ -13,6 +13,11 @@ export interface SqlDatabase {
   close(): void;
 }
 export interface PrivateFiles {
+  size(path: string): Promise<number>;
+  freeBytes?(): number;
+  /** Move bytes during the same SQLite transaction as metadata publication. */
+  moveInTransaction?(from: string, to: string): void;
+  link?(from: string, to: string): Promise<void>;
   read(path: string): Promise<Buffer>;
   write(path: string, bytes: Uint8Array | string): Promise<void>;
   mkdir(path: string): Promise<void>;

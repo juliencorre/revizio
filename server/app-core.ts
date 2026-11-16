@@ -1,5 +1,5 @@
 import type { ApiRoutes, ApiRequest, ApiReply } from "./http";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import { join } from "node:path";
 import type {
   ChildProfile,
@@ -42,7 +42,8 @@ import {
   type StoredProfile,
 } from "./types";
 import { publicJob } from "./jobs";
-import { exportBackup, restoreBackup } from "./backup";
+import { BackupTransfers, backupManifest } from "./backup-transfer";
+import { backupEstimate, exportBackup, restoreBackup } from "./backup";
 const COOKIE = "revizio_session";
 const publicProfile = (
   profile: StoredProfile,
@@ -459,10 +460,13 @@ export async function configureServerRoutes(
       user,
       (request.query as { profileId?: string }).profileId,
     );
-    const since = (request.query as {since?: string}).since;
+    const since = (request.query as { since?: string }).since;
     if (since !== undefined && /^\d+$/.test(since)) {
-      const row = database.db.prepare("SELECT revision FROM learning WHERE profile_id=?").get(profile.id);
-      if (row && Number(row.revision) === Number(since)) return { revision: Number(since), unchanged: true };
+      const row = database.db
+        .prepare("SELECT revision FROM learning WHERE profile_id=?")
+        .get(profile.id);
+      if (row && Number(row.revision) === Number(since))
+        return { revision: Number(since), unchanged: true };
     }
     const current = database.data(profile.id);
     return {
@@ -595,6 +599,15 @@ export async function configureServerRoutes(
     const bytes = await database.files.read(
       original ? upload.originalPath : upload.path,
     );
+    const expected = (request.query as { sha256?: string }).sha256;
+    if (
+      expected &&
+      createHash("sha256").update(bytes).digest("hex") !== expected
+    )
+      throw new HttpError(
+        409,
+        "Le document a changé pendant la sauvegarde. Relancez l’export.",
+      );
     if (query.page === undefined) return reply.send(bytes);
     const page = Number(query.page);
     if (
@@ -926,6 +939,53 @@ export async function configureServerRoutes(
       available: await ai.available({ baseUrl, model }),
     };
   });
+  const backups = new BackupTransfers(database);
+  app.get("/api/backup/estimate", async (request) => {
+    const { user } = auth(request, true);
+    return {
+      ...(await backupEstimate(database, user.familyId)),
+      jsonLimit: runtime.backupLimitBytes ?? 100 * 1024 * 1024,
+      jsonBodyLimit: runtime.backupBodyLimitBytes ?? 144 * 1024 * 1024,
+    };
+  });
+  app.get("/api/backup/manifest", async (request) => {
+    const { user } = auth(request, true);
+    return backupManifest(database, user.familyId);
+  });
+  app.post("/api/backup/transfers", async (request) =>
+    backups.start(
+      auth(request, true).user.familyId,
+      (request.body as { bytes?: number } | undefined)?.bytes,
+    ),
+  );
+  app.post("/api/backup/transfers/:id/parts/:part", async (request) => {
+    const { user } = auth(request, true);
+    const { id, part } = request.params as { id: string; part: string };
+    const file = await request.file();
+    if (!file) throw new HttpError(400, "Le fichier est manquant.");
+    const hash = (request.query as { sha256?: string }).sha256 || "";
+    return backups.add(id, user.familyId, part, hash, await file.toBuffer());
+  });
+  app.post(
+    "/api/backup/transfers/:id/finish",
+    { bodyLimit: 10 * 1024 * 1024 },
+    async (request) => {
+      const { user } = auth(request, true);
+      return backups.finish(
+        (request.params as { id: string }).id,
+        user.familyId,
+        request.body,
+        images,
+        runtime.backupLimitBytes,
+      );
+    },
+  );
+  app.delete("/api/backup/transfers/:id", async (request) =>
+    backups.cancel(
+      (request.params as { id: string }).id,
+      auth(request, true).user.familyId,
+    ),
+  );
   app.get("/api/backup", async (request, reply) => {
     const { user } = auth(request, true);
     reply.header(
@@ -963,8 +1023,17 @@ export async function configureServerRoutes(
         "Confirmez votre mot de passe pour supprimer l’espace.",
       );
     const uploads = database.uploads(user.familyId);
+    database.db
+      .prepare(
+        "DELETE FROM backup_parts WHERE transfer IN (SELECT id FROM backup_transfers WHERE family=?)",
+      )
+      .run(user.familyId);
+    database.db
+      .prepare("DELETE FROM backup_transfers WHERE family=?")
+      .run(user.familyId);
     database.deleteFamily(user.familyId);
     for (const upload of uploads) await removeUploadFiles(database, upload);
+    await database.files.removeDirectory(join(database.dataDir, "restores"));
     await database.files.removeDirectory(join(database.dataDir, "backups"));
     return { ok: true };
   });

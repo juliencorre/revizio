@@ -21,6 +21,7 @@ import { FAMILY_LIMITS } from "@/domain/family";
 import { ParentAccountsCard } from "./parent-accounts";
 import { InstallAppCard } from "@/features/pwa/install-app-card";
 import { apiFetch, type SessionResponse } from "@/services/api";
+import { clearSourceCache } from "@/services/source-cache";
 import { useSession } from "@/state/session";
 import { useLearning } from "@/state/learning-store";
 import {
@@ -33,7 +34,9 @@ import {
   pinIsValid,
 } from "./shared";
 import {
-  exportJsonBackup,
+  exportFamilyBackup,
+  restoreFamilyBackup,
+  type BackupEstimate,
   pickJsonBackup,
   type BackupSelection,
 } from "./backup";
@@ -76,6 +79,10 @@ export function ParentSettingsScreen() {
   const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [restore, setRestore] = useState<BackupSelection | null>(null);
+  const [backupEstimate, setBackupEstimate] = useState<BackupEstimate | null>(
+    null,
+  );
+  const [backupProgress, setBackupProgress] = useState("");
   const [restoreConfirm, setRestoreConfirm] = useState("");
   const [deleteFamily, setDeleteFamily] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -84,6 +91,18 @@ export function ParentSettingsScreen() {
   const familyParent =
     session.mode === "family" && session.user?.role === "parent";
   const online = familyParent && session.serverAvailable && !session.offline;
+  useEffect(() => {
+    if (!online) return;
+    const controller = new AbortController();
+    void apiFetch<BackupEstimate>("/backup/estimate", {
+      signal: controller.signal,
+    })
+      .then((value) => {
+        if (!controller.signal.aborted) setBackupEstimate(value);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [online, session.user?.id]);
   const disabled = !!busy;
   const managedAi =
     ai?.provider === "cloudflare" || ai?.provider === "anthropic";
@@ -288,8 +307,8 @@ export function ParentSettingsScreen() {
     });
   }
   async function exportBackup() {
-    const value = await apiFetch<unknown>("/backup");
-    const name = await exportJsonBackup(value);
+    setBackupProgress("");
+    const name = await exportFamilyBackup(setBackupProgress);
     setFeedback({
       section: "backup",
       message:
@@ -308,10 +327,15 @@ export function ParentSettingsScreen() {
     if (!restore || restoreConfirm !== "RESTAURER")
       throw new Error("Confirmez la restauration avant de continuer.");
     await learning.syncNow();
-    await apiFetch("/backup/restore", {
-      method: "POST",
-      body: JSON.stringify({ backup: restore.value }),
-    });
+    setBackupProgress("");
+    await restoreFamilyBackup(restore, setBackupProgress);
+    const cacheCleared = await clearSourceCache().then(
+      () => true,
+      () => false,
+    );
+    setBackupEstimate(
+      await apiFetch<BackupEstimate>("/backup/estimate").catch(() => null),
+    );
     await session.refreshProfiles();
     await session.refresh();
     await learning.reloadFromServer();
@@ -321,7 +345,11 @@ export function ParentSettingsScreen() {
     setFeedback({
       section: "backup",
       message:
-        "La sauvegarde est restaurée. Vérifiez les profils et définissez les codes indiqués « Code à définir ».",
+        "La sauvegarde est restaurée. Vérifiez les profils et définissez les codes indiqués « Code à définir »." +
+        (cacheCleared
+          ? ""
+          : " Le cache de documents de cet appareil n’a pas pu être vidé."),
+      warning: !cacheCleared,
     });
   }
   async function removeFamily() {
@@ -848,6 +876,19 @@ export function ParentSettingsScreen() {
             résultats. Elle ne contient pas les mots de passe ni les codes
             enfants.
           </AppText>
+          {backupEstimate && (
+            <AppText variant="small" color={colors.muted}>
+              {backupEstimate.documents} document
+              {backupEstimate.documents > 1 ? "s" : ""} ·{" "}
+              {(backupEstimate.bytes / 1048576).toLocaleString("fr-FR", {
+                maximumFractionDigits: 1,
+              })}{" "}
+              Mio de pièces jointes (originaux inclus).
+            </AppText>
+          )}
+          {busy === "backup" && !!backupProgress && (
+            <AppText variant="small">{backupProgress}</AppText>
+          )}
           <View style={s.row}>
             <Button
               icon="download"

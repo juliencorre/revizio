@@ -19,6 +19,10 @@ import type { AiJob, CourseSource, LearningData } from "../../src/domain/model";
 import { cloudImages } from "../../cloud/images";
 import { CloudAi, CLOUD_MODEL } from "../../cloud/ai";
 
+import {
+  documentParts,
+  type BackupManifest,
+} from "../../src/domain/backup-format";
 import { textPdf } from "../fixtures/text-pdf";
 
 type SessionSnapshot = { token: string; profiles: { id: string }[] };
@@ -203,6 +207,7 @@ describe("installation Cloudflare dans workerd", () => {
       name: string,
       mime: string,
       bytes: Buffer,
+      target = "/api/uploads?profileId=" + profileId,
     ) => {
       const form = new FormData();
       form.append(
@@ -211,7 +216,7 @@ describe("installation Cloudflare dans workerd", () => {
         name,
       );
       const body = new Response(form);
-      return server.fetch(origin + "/api/uploads?profileId=" + profileId, {
+      return server.fetch(origin + target, {
         method: "POST",
         headers: {
           origin,
@@ -426,6 +431,106 @@ describe("installation Cloudflare dans workerd", () => {
     expect(
       extracted.result?.course?.sources?.map((source) => source.page),
     ).toEqual([1, 2]);
+
+    // Exercise real multipart parsing and the atomic volume archive in the DO runtime.
+    const paddedPdf = new Uint8Array(7 * 1024 * 1024);
+    paddedPdf.set(new TextEncoder().encode("%PDF-1.5\n"));
+    const importLarge = await uploadDocument(
+      "cours.pdf",
+      "application/pdf",
+      Buffer.from(paddedPdf),
+    );
+    expect(importLarge.status, await importLarge.clone().text()).toBe(200);
+    const estimate = (await (
+      await request("/api/backup/estimate", "GET", undefined, parent.token)
+    ).json()) as { bytes: number; jsonLimit: number };
+    expect(estimate.bytes).toBeGreaterThan(estimate.jsonLimit);
+    const manifest = (await (
+      await request("/api/backup/manifest", "GET", undefined, parent.token)
+    ).json()) as BackupManifest;
+    const transfer = (await (
+      await request("/api/backup/transfers", "POST", {}, parent.token)
+    ).json()) as { id: string };
+    const base = "/api/backup/transfers/" + transfer.id;
+    expect(
+      (await request(base + "/finish", "POST", manifest, parent.token)).status,
+    ).toBe(400);
+    for (const [index, file] of manifest.uploads.entries()) {
+      for (const kind of documentParts) {
+        const asset = await request(
+          "/api/uploads/" +
+            file.id +
+            "?sha256=" +
+            file[kind].sha256 +
+            (kind === "original" ? "&original=1" : ""),
+          "GET",
+          undefined,
+          parent.token,
+        );
+        expect(asset.status).toBe(200);
+        const partBytes = Buffer.from(await asset.arrayBuffer());
+        const partPath = base + "/parts/" + index + "-" + kind;
+        if (index === 0 && kind === "normalized") {
+          const invalid = await uploadDocument(
+            "document",
+            "application/octet-stream",
+            partBytes,
+            partPath + "?sha256=incorrect",
+          );
+          expect(invalid.status).toBe(400);
+        }
+        const sent = await uploadDocument(
+          "document",
+          "application/octet-stream",
+          partBytes,
+          partPath + "?sha256=" + file[kind].sha256,
+        );
+        expect(sent.status, await sent.clone().text()).toBe(200);
+      }
+    }
+    const restoredLarge = await request(
+      base + "/finish",
+      "POST",
+      manifest,
+      parent.token,
+    );
+    expect(restoredLarge.status, await restoredLarge.clone().text()).toBe(200);
+    expect(
+      (await request(base + "/finish", "POST", manifest, parent.token)).status,
+    ).toBe(200);
+    const after = (await (
+      await request("/api/backup/manifest", "GET", undefined, parent.token)
+    ).json()) as BackupManifest;
+    expect(after.uploads).toEqual(manifest.uploads);
+    const sourceFromPlan = (profiles: BackupManifest["profiles"]) =>
+      profiles
+        .flatMap((p) => p.data.courses.flatMap((c) => c.sources))
+        .filter((s) => s.storageId);
+    const previousTags = sourceFromPlan(manifest.profiles).map((s) =>
+      Reflect.get(s, "cacheRevision"),
+    );
+    const restoredTags = sourceFromPlan(after.profiles).map((s) =>
+      Reflect.get(s, "cacheRevision"),
+    );
+    if (restoredTags.length) {
+      expect(new Set(restoredTags).size).toBe(1);
+      expect(restoredTags[0]).toEqual(expect.any(String));
+      expect(restoredTags).not.toEqual(previousTags);
+    }
+    const profilesWithoutTags = (profiles: BackupManifest["profiles"]) =>
+      JSON.parse(
+        JSON.stringify(profiles, (key, value) =>
+          key === "cacheRevision" ? undefined : value,
+        ),
+      );
+    expect(profilesWithoutTags(after.profiles)).toEqual(
+      profilesWithoutTags(manifest.profiles),
+    );
+    // A small legacy archive can replace a large current library as well.
+    expect(
+      (await request("/api/backup/restore", "POST", { backup }, parent.token))
+        .status,
+    ).toBe(200);
   }, 60000);
   it("refuse les fichiers invalides avant de les transformer et applique les rotations", async () => {
     await expect(

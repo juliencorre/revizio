@@ -1,6 +1,16 @@
-import { readFile, writeFile, mkdir, unlink, rm } from "node:fs/promises";
+import {
+  readFile,
+  writeFile,
+  mkdir,
+  unlink,
+  rm,
+  stat,
+  link,
+} from "node:fs/promises";
 import type { PrivateFiles } from "./runtime";
 export const nodeFiles: PrivateFiles = {
+  link,
+  size: async (path) => (await stat(path)).size,
   read: (path) => readFile(path),
   write: (path, bytes) => writeFile(path, bytes, { mode: 0o600 }),
   mkdir: async (path) => {

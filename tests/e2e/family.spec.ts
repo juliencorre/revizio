@@ -689,3 +689,55 @@ test.describe("Import en conjugaison", () => {
     ).toBeVisible();
   });
 });
+
+test("exporte puis restaure une archive familiale de plus de 12 Mio", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  const profileId = await setup(page);
+  const bytes = Buffer.alloc(7 * 1024 * 1024, 32);
+  bytes.write("%PDF-1.5\n");
+  const sent = await page.request.post("/api/uploads?profileId=" + profileId, {
+    multipart: {
+      file: {
+        name: "histoire.pdf",
+        mimeType: "application/pdf",
+        buffer: bytes,
+      },
+    },
+  });
+  expect(sent.ok(), await sent.text()).toBe(true);
+  const { uri } = (await sent.json()) as { uri: string };
+  await page.goto("/parent/settings");
+  const download = page.waitForEvent("download");
+  await page.getByTestId("settings-backup-export").click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/\.revizo$/);
+  const path = join(directory, file.suggestedFilename());
+  await file.saveAs(path);
+  expect((await readFile(path)).subarray(0, 8).toString()).toBe("REVIZO2\n");
+  await chooseBackup(page, path);
+  await expect(page.getByTestId("settings-restore-review")).toContainText(
+    "1 document",
+  );
+  await page.getByTestId("settings-restore-confirm-text").fill("RESTAURER");
+  await page.getByTestId("settings-restore-confirm").click();
+  await expect(page.getByTestId("settings-backup-feedback")).toContainText(
+    "La sauvegarde est restaurée",
+    { timeout: 30000 },
+  );
+  expect((await (await page.request.get(uri)).body()).equals(bytes)).toBe(true);
+  // An older self-hosted server could export this same library as one large JSON.
+  const legacy = await page.request.get("/api/backup");
+  const legacyPath = join(directory, "ancienne-sauvegarde.json");
+  await writeFile(legacyPath, await legacy.body());
+  await chooseBackup(page, legacyPath);
+  await page.getByTestId("settings-restore-confirm-text").fill("RESTAURER");
+  await page.getByTestId("settings-restore-confirm").click();
+  await expect(page.getByTestId("settings-restore-review")).toHaveCount(0, {
+    timeout: 30000,
+  });
+  await expect(page.getByTestId("settings-backup-feedback")).toContainText(
+    "La sauvegarde est restaurée",
+  );
+});

@@ -29,6 +29,32 @@ export class SqliteFiles implements PrivateFiles {
       "CREATE TABLE IF NOT EXISTS private_files (path TEXT NOT NULL, part INTEGER NOT NULL, bytes BLOB NOT NULL, PRIMARY KEY(path,part))",
     );
   }
+  freeBytes() {
+    const used = this.storage.sql
+      .exec<{ size: number }>(
+        "SELECT COALESCE(SUM(length(bytes)),0) AS size FROM private_files",
+      )
+      .one().size;
+    return 450 * 1024 * 1024 - used;
+  }
+  moveInTransaction(from: string, to: string) {
+    this.storage.sql.exec(
+      "UPDATE private_files SET path=? WHERE path=?",
+      to,
+      from,
+    );
+  }
+  async size(path: string): Promise<number> {
+    const size = this.storage.sql
+      .exec<{ size: number | null }>(
+        "SELECT SUM(length(bytes)) AS size FROM private_files WHERE path=?",
+        path,
+      )
+      .one().size;
+    if (size === null)
+      throw new HttpError(404, "Ce document privé est introuvable.");
+    return size;
+  }
   async read(path: string): Promise<Buffer> {
     const rows = this.storage.sql
       .exec<{ bytes: ArrayBuffer }>(

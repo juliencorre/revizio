@@ -1,3 +1,4 @@
+import type { DocumentPart } from "../src/domain/backup-format";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ImageProcessor } from "./runtime";
@@ -16,6 +17,54 @@ const text = (v: unknown, max = 200) =>
   typeof v === "string" && v.length <= max ? v : "";
 const identifier = (v: unknown) =>
   typeof v === "string" && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+export async function backupEstimate(
+  database: FamilyDatabase,
+  familyId: string,
+) {
+  const uploads = database.uploads(familyId);
+  let bytes = 0;
+  const profiles = database
+    .profiles(familyId)
+    .map(({ id, name, grade }) => ({ id, name, grade, data: null }));
+  const metadata = uploads.map(
+    ({ id, profileId, name, mimeType, rotation }) => ({
+      id,
+      profileId,
+      name,
+      mimeType,
+      rotation,
+      bytes: "",
+      originalBytes: "",
+    }),
+  );
+  let jsonBytes = Buffer.byteLength(
+    JSON.stringify({
+      backup: {
+        format: "revizio-backup",
+        version: 1,
+        exportedAt: isoNow(),
+        profiles,
+        uploads: metadata,
+      },
+    }),
+  );
+  for (const profile of profiles) {
+    const row = database.db
+      .prepare(
+        "SELECT LENGTH(CAST(data AS BLOB)) AS bytes FROM learning WHERE profile_id=?",
+      )
+      .get(profile.id);
+    jsonBytes += Number(row?.bytes ?? 4) - 4;
+  }
+  for (const file of uploads) {
+    for (const path of [file.path, file.originalPath]) {
+      const size = await database.files.size(path);
+      bytes += size;
+      jsonBytes += 4 * Math.ceil(size / 3);
+    }
+  }
+  return { bytes, jsonBytes, documents: uploads.length };
+}
 export async function exportBackup(
   database: FamilyDatabase,
   familyId: string,
@@ -63,6 +112,10 @@ export async function restoreBackup(
   value: unknown,
   images: ImageProcessor,
   limitBytes = 100 * 1024 * 1024,
+  transfer?: {
+    sourcePath(index: number, part: DocumentPart): string;
+    committed(): void;
+  },
 ) {
   const backup = row(value);
   if (
@@ -116,7 +169,7 @@ export async function restoreBackup(
   const files: StoredUpload[] = [];
   const temporaryPaths: string[] = [];
   try {
-    for (const raw of backup.uploads) {
+    for (const [index, raw] of backup.uploads.entries()) {
       const source = row(raw);
       if (
         !identifier(source.id) ||
@@ -125,21 +178,26 @@ export async function restoreBackup(
           String(source.mimeType),
         ) ||
         !text(source.name, 180) ||
-        typeof source.bytes !== "string" ||
-        typeof source.originalBytes !== "string" ||
-        source.bytes.length > 40 * 1024 * 1024 ||
-        source.originalBytes.length > 40 * 1024 * 1024
+        (!transfer &&
+          (typeof source.bytes !== "string" ||
+            typeof source.originalBytes !== "string" ||
+            source.bytes.length > 40 * 1024 * 1024 ||
+            source.originalBytes.length > 40 * 1024 * 1024))
       )
         throw new HttpError(400, "Un document de la sauvegarde est invalide.");
-      const bytes = Buffer.from(source.bytes, "base64"),
-        original = Buffer.from(source.originalBytes, "base64");
-      total += bytes.length + original.length;
+      const bytes = transfer
+        ? await database.files.read(transfer.sourcePath(index, "normalized"))
+        : Buffer.from(String(source.bytes), "base64");
+      const originalSize = transfer
+        ? await database.files.size(transfer.sourcePath(index, "original"))
+        : Buffer.byteLength(String(source.originalBytes), "base64");
+      total += bytes.length + originalSize;
       if (
         !bytes.length ||
-        !original.length ||
-        total > limitBytes ||
+        !originalSize ||
+        total > (transfer ? 450 * 1024 * 1024 : limitBytes) ||
         bytes.length > 25 * 1024 * 1024 ||
-        original.length > 25 * 1024 * 1024
+        originalSize > 25 * 1024 * 1024
       )
         throw new HttpError(413, "Cette sauvegarde est trop volumineuse.");
       if (source.mimeType === "application/pdf") {
@@ -163,15 +221,27 @@ export async function restoreBackup(
         }
       }
       const prefix = randomUUID();
-      const path = join(
-        database.filesDir,
-        prefix + storedExtension(String(source.mimeType)),
-      );
-      const originalPath = join(database.filesDir, prefix + ".original");
-      await database.files.write(path, bytes);
-      temporaryPaths.push(path);
-      await database.files.write(originalPath, original);
-      temporaryPaths.push(originalPath);
+      const path =
+        transfer?.sourcePath(index, "normalized") ??
+        join(
+          database.filesDir,
+          prefix + storedExtension(String(source.mimeType)),
+        );
+      const originalPath =
+        transfer?.sourcePath(index, "original") ??
+        join(database.filesDir, prefix + ".original");
+      if (!transfer) {
+        await database.files.write(path, bytes);
+        temporaryPaths.push(path);
+        const original = Buffer.from(String(source.originalBytes), "base64");
+        if (original.length !== originalSize)
+          throw new HttpError(
+            400,
+            "Un document original de la sauvegarde est invalide.",
+          );
+        await database.files.write(originalPath, original);
+        temporaryPaths.push(originalPath);
+      }
       files.push({
         id: String(source.id),
         familyId,
@@ -192,6 +262,7 @@ export async function restoreBackup(
         400,
         "La sauvegarde contient des documents dupliqués.",
       );
+    const cacheRevision = randomUUID();
     for (const profile of profiles)
       for (const course of profile.data.courses)
         for (const source of course.sources) {
@@ -212,6 +283,7 @@ export async function restoreBackup(
               );
             source.uri = `/api/uploads/${id}`;
             source.storageId = id;
+            Object.assign(source, { cacheRevision });
             delete source.cachedUri;
           } else if (source.uri)
             throw new HttpError(
@@ -221,56 +293,146 @@ export async function restoreBackup(
         }
     const previousProfiles = database.profiles(familyId),
       previousFiles = database.uploads(familyId);
-    const previous = await exportBackup(database, familyId, limitBytes);
+    const revisions = previousProfiles.map((profile) => [
+      profile.id,
+      database.db
+        .prepare("SELECT revision FROM learning WHERE profile_id=?")
+        .get(profile.id)?.revision,
+    ]);
     const backupDir = join(database.dataDir, "backups");
     await database.files.mkdir(backupDir);
-    await database.files.write(
-      join(backupDir, `before-restore-${Date.now()}.json`),
-      JSON.stringify(previous),
-    );
-    database.transaction(() => {
-      database.db
-        .prepare("DELETE FROM sessions WHERE family_id=? AND role=?")
-        .run(familyId, "child");
-      database.db.prepare("DELETE FROM jobs WHERE family_id=?").run(familyId);
-      database.db
-        .prepare("DELETE FROM uploads WHERE family_id=?")
-        .run(familyId);
-      for (const current of previousProfiles)
-        if (!profiles.some((p) => p.id === current.id))
-          database.deleteProfile(current.id);
-      for (const profile of profiles) {
-        const current = previousProfiles.find((p) => p.id === profile.id);
-        if (current)
-          // All final names were validated together; temporary duplicates during a
-          // rename must not reject an otherwise valid atomic restore.
-          database.updateProfile(
-            profile.id,
-            {
-              name: profile.name,
-              grade: profile.grade,
-            },
-            false,
-          );
-        else
-          database.addProfile(
-            familyId,
-            {
-              id: profile.id,
-              name: profile.name,
-              grade: profile.grade,
-              pinHash: "",
-            },
-            false,
-          );
-        database.db
-          .prepare(
-            "UPDATE learning SET data=?,revision=revision+1,updated_at=? WHERE profile_id=?",
-          )
-          .run(JSON.stringify(profile.data), isoNow(), profile.id);
+    // Ordinary archives keep the historical standalone JSON. A large library is
+    // archived in binary volumes so restoring a small file still works at any size.
+    let archivePath: string | undefined;
+    let archiveDirectory: string | undefined;
+    const moves: [string, string][] = [];
+    if (
+      !database.files.moveInTransaction &&
+      (await backupEstimate(database, familyId)).bytes <= limitBytes
+    ) {
+      const previous = await exportBackup(database, familyId, limitBytes);
+      archivePath = join(backupDir, "before-restore-" + randomUUID() + ".json");
+      await database.files.write(archivePath, JSON.stringify(previous));
+    } else {
+      archiveDirectory = join(backupDir, "before-restore-" + randomUUID());
+      await database.files.mkdir(archiveDirectory);
+      try {
+        const uploads = [];
+        for (const [index, file] of previousFiles.entries()) {
+          const normalized = index + "-normalized",
+            original = index + "-original";
+          for (const [from, name] of [
+            [file.path, normalized],
+            [file.originalPath, original],
+          ]) {
+            const to = join(archiveDirectory, name);
+            if (database.files.moveInTransaction) moves.push([from, to]);
+            else if (database.files.link) await database.files.link(from, to);
+            else
+              await database.files.write(to, await database.files.read(from));
+          }
+          uploads.push({
+            id: file.id,
+            profileId: file.profileId,
+            name: file.name,
+            mimeType: file.mimeType,
+            rotation: file.rotation,
+            normalized,
+            original,
+          });
+        }
+        await database.files.write(
+          join(archiveDirectory, "manifest.json"),
+          JSON.stringify({
+            format: "revizio-backup-volumes",
+            version: 1,
+            exportedAt: isoNow(),
+            uploads,
+            profiles: previousProfiles.map(({ id, name, grade }) => ({
+              id,
+              name,
+              grade,
+              data: database.data(id).data,
+            })),
+          }),
+        );
+      } catch (error) {
+        await database.files.removeDirectory(archiveDirectory);
+        throw error;
       }
-      for (const file of files) database.saveUpload(file);
-    });
+    }
+    try {
+      database.transaction(() => {
+        const currentProfiles = database.profiles(familyId);
+        const currentRevisions = currentProfiles.map((profile) => [
+          profile.id,
+          database.db
+            .prepare("SELECT revision FROM learning WHERE profile_id=?")
+            .get(profile.id)?.revision,
+        ]);
+        if (
+          JSON.stringify(revisions) !== JSON.stringify(currentRevisions) ||
+          JSON.stringify(previousProfiles) !==
+            JSON.stringify(currentProfiles) ||
+          JSON.stringify(previousFiles) !==
+            JSON.stringify(database.uploads(familyId))
+        ) {
+          throw new HttpError(
+            409,
+            "La famille a changé pendant la restauration. Réessayez pour conserver la version récente.",
+          );
+        }
+        database.db
+          .prepare("DELETE FROM sessions WHERE family_id=? AND role=?")
+          .run(familyId, "child");
+        database.db.prepare("DELETE FROM jobs WHERE family_id=?").run(familyId);
+        database.db
+          .prepare("DELETE FROM uploads WHERE family_id=?")
+          .run(familyId);
+        for (const current of previousProfiles)
+          if (!profiles.some((p) => p.id === current.id))
+            database.deleteProfile(current.id);
+        for (const profile of profiles) {
+          const current = previousProfiles.find((p) => p.id === profile.id);
+          if (current)
+            // All final names were validated together; temporary duplicates during a
+            // rename must not reject an otherwise valid atomic restore.
+            database.updateProfile(
+              profile.id,
+              {
+                name: profile.name,
+                grade: profile.grade,
+              },
+              false,
+            );
+          else
+            database.addProfile(
+              familyId,
+              {
+                id: profile.id,
+                name: profile.name,
+                grade: profile.grade,
+                pinHash: "",
+              },
+              false,
+            );
+          database.db
+            .prepare(
+              "UPDATE learning SET data=?,revision=revision+1,updated_at=? WHERE profile_id=?",
+            )
+            .run(JSON.stringify(profile.data), isoNow(), profile.id);
+        }
+        for (const file of files) database.saveUpload(file);
+        for (const [from, to] of moves)
+          database.files.moveInTransaction!(from, to);
+        transfer?.committed();
+      });
+    } catch (error) {
+      if (archivePath) await database.files.unlink(archivePath).catch(() => {});
+      if (archiveDirectory)
+        await database.files.removeDirectory(archiveDirectory).catch(() => {});
+      throw error;
+    }
     for (const previousFile of previousFiles)
       await removeUploadFiles(database, previousFile);
     return {
