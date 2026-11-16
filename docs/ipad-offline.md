@@ -24,6 +24,8 @@ Après une première ouverture en ligne et l’installation du service worker, l
 
 Les documents privés utilisent le cache documentaire séparé de l’application : il faut les avoir ouverts/téléchargés au préalable. Le service worker ne conserve aucun appel API, fichier importé, réponse authentifiée ou ressource d’un autre site. La création d’un compte, l’import durable d’un nouveau document, une génération IA et la synchronisation vers un autre appareil nécessitent le serveur. Le navigateur peut supprimer ses données de site pour libérer de l’espace ; l’export familial et les sauvegardes du serveur restent nécessaires.
 
+Lorsque deux appareils modifient le même champ, Révizo affiche le contenu concerné et les deux valeurs. Choisir la version à conserver pour chaque différence. Les modifications indépendantes se synchronisent ensemble, y compris la création d’un autre brouillon. Si le profil est à jour, le serveur renvoie seulement son numéro de révision. Les vérifications périodiques reprennent au retour dans l’application.
+
 ## Construire et intégrer
 
 ```sh
