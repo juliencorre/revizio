@@ -23,55 +23,53 @@ import {
   type TextStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Activity,
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  CalendarDays,
-  Camera,
-  ChartNoAxesCombined,
-  Check,
-  ChevronRight,
-  ChevronDown,
-  Clock3,
-  Cpu,
-  FileText,
-  FlaskConical,
-  Globe,
-  GraduationCap,
-  House,
-  Languages,
-  Leaf,
-  Lightbulb,
-  Menu,
-  Music,
-  Palette,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-  Upload,
-  Users,
-  Volume2,
-  X,
-  Calculator,
-  Settings,
-  Download,
-  Lock,
-  LogOut,
-  Cloud,
-  Search,
-  Save,
-  Eye,
-  RotateCw,
-  EyeOff,
-  Wifi,
-  Headphones,
-} from "lucide-react-native";
+import Activity from "lucide-react-native/icons/activity";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import ArrowRight from "lucide-react-native/icons/arrow-right";
+import BookOpen from "lucide-react-native/icons/book-open";
+import CalendarDays from "lucide-react-native/icons/calendar-days";
+import Camera from "lucide-react-native/icons/camera";
+import ChartNoAxesCombined from "lucide-react-native/icons/chart-no-axes-combined";
+import Check from "lucide-react-native/icons/check";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import Clock3 from "lucide-react-native/icons/clock-3";
+import Cpu from "lucide-react-native/icons/cpu";
+import FileText from "lucide-react-native/icons/file-text";
+import FlaskConical from "lucide-react-native/icons/flask-conical";
+import Globe from "lucide-react-native/icons/globe";
+import GraduationCap from "lucide-react-native/icons/graduation-cap";
+import House from "lucide-react-native/icons/house";
+import Languages from "lucide-react-native/icons/languages";
+import Leaf from "lucide-react-native/icons/leaf";
+import Lightbulb from "lucide-react-native/icons/lightbulb";
+import Menu from "lucide-react-native/icons/menu";
+import Music from "lucide-react-native/icons/eighth-notes";
+import Palette from "lucide-react-native/icons/palette";
+import Pencil from "lucide-react-native/icons/pencil";
+import Play from "lucide-react-native/icons/play";
+import Plus from "lucide-react-native/icons/plus";
+import RefreshCw from "lucide-react-native/icons/refresh-cw";
+import ShieldCheck from "lucide-react-native/icons/shield-check";
+import Sparkles from "lucide-react-native/icons/sparkles";
+import Trash2 from "lucide-react-native/icons/trash";
+import Upload from "lucide-react-native/icons/upload";
+import Users from "lucide-react-native/icons/users";
+import Volume2 from "lucide-react-native/icons/volume-2";
+import X from "lucide-react-native/icons/x";
+import Calculator from "lucide-react-native/icons/calculator";
+import Settings from "lucide-react-native/icons/settings";
+import Download from "lucide-react-native/icons/download";
+import Lock from "lucide-react-native/icons/lock";
+import LogOut from "lucide-react-native/icons/log-out";
+import Cloud from "lucide-react-native/icons/cloud";
+import Search from "lucide-react-native/icons/search";
+import Save from "lucide-react-native/icons/save";
+import Eye from "lucide-react-native/icons/eye";
+import RotateCw from "lucide-react-native/icons/rotate-cw";
+import EyeOff from "lucide-react-native/icons/eye-off";
+import Wifi from "lucide-react-native/icons/wifi";
+import Headphones from "lucide-react-native/icons/headphones";
 import { usePathname, useRouter, type Href } from "expo-router";
 import {
   createThemedStyles,
